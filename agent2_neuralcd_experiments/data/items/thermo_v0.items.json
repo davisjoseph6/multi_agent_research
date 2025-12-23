@@ -1,0 +1,41 @@
+{
+  "subject_id": "thermo_v0",
+  "items": [
+    {
+      "item_id": "Q001",
+      "concept_ids": ["C01"],
+      "bloom_id": "U",
+      "stem": "State the first law of thermodynamics for a closed system.",
+      "difficulty_hint": 0.3
+    },
+    {
+      "item_id": "Q002",
+      "concept_ids": ["C02"],
+      "bloom_id": "U",
+      "stem": "Explain the sign convention for heat and work in thermodynamics.",
+      "difficulty_hint": 0.35
+    },
+    {
+      "item_id": "Q003",
+      "concept_ids": ["C01", "C03"],
+      "bloom_id": "A",
+      "stem": "Apply the first law to compute the change in internal energy given heat and work.",
+      "difficulty_hint": 0.55
+    },
+    {
+      "item_id": "Q004",
+      "concept_ids": ["C05", "C07"],
+      "bloom_id": "A",
+      "stem": "Compute work for an isothermal ideal-gas expansion using PV=nRT.",
+      "difficulty_hint": 0.60
+    },
+    {
+      "item_id": "Q005",
+      "concept_ids": ["C10", "C11"],
+      "bloom_id": "N",
+      "stem": "Analyze a steady-flow device and identify missing terms in the steady-flow energy equation.",
+      "difficulty_hint": 0.75
+    }
+  ]
+}
+

@@ -1,0 +1,24 @@
+{
+  "subject_id": "thermo_v0",
+  "subject_name": "Thermodynamics (v0)",
+  "concepts": [
+    { "concept_id": "C01", "name": "First law (closed system)", "parents": [] },
+    { "concept_id": "C02", "name": "Heat vs work sign convention", "parents": ["C01"] },
+    { "concept_id": "C03", "name": "Internal energy", "parents": ["C01"] },
+    { "concept_id": "C04", "name": "Enthalpy", "parents": ["C01"] },
+    { "concept_id": "C05", "name": "Ideal gas law", "parents": [] },
+    { "concept_id": "C06", "name": "Specific heats (Cp, Cv)", "parents": ["C05"] },
+    { "concept_id": "C07", "name": "Isothermal process", "parents": ["C05"] },
+    { "concept_id": "C08", "name": "Adiabatic process", "parents": ["C05"] },
+    { "concept_id": "C09", "name": "Entropy basics", "parents": [] },
+    { "concept_id": "C10", "name": "Control mass vs control volume", "parents": [] },
+    { "concept_id": "C11", "name": "Steady-flow energy equation", "parents": ["C10", "C01"] },
+    { "concept_id": "C12", "name": "Cycles (Carnot basics)", "parents": ["C09", "C05"] }
+  ],
+  "bloom_levels": [
+    { "bloom_id": "U", "name": "Understand" },
+    { "bloom_id": "A", "name": "Apply" },
+    { "bloom_id": "N", "name": "Analyze" }
+  ]
+}
+
