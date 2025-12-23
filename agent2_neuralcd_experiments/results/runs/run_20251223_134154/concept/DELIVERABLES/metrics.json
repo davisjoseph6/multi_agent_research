@@ -1,0 +1,17 @@
+{
+  "final": {
+    "epoch": 20,
+    "train_loss": 0.49579235196113586,
+    "val_auc": 0.7061669275267035,
+    "val_acc": 0.654375,
+    "val_n": 1600
+  },
+  "run_dir": "results/runs/run_20251223_134154/concept",
+  "best": {
+    "epoch": 8.0,
+    "train_loss": 0.5482733702659607,
+    "val_auc": 0.717605517475987,
+    "val_acc": 0.658125,
+    "val_n": 1600.0
+  }
+}
