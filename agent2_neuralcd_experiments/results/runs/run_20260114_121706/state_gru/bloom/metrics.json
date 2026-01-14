@@ -1,0 +1,11 @@
+{
+  "final": {
+    "epoch": 20,
+    "train_loss": 0.6612193867564201,
+    "val_loss": 0.6833522617816925,
+    "val_auc": 0.5735544539468705,
+    "val_acc": 0.56125,
+    "val_n": 1600
+  },
+  "run_dir": "results/runs/run_20260114_121706/state_gru/bloom"
+}
