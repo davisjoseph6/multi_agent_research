@@ -2,15 +2,14 @@
 """
 src.demo_attn_forward_pass
 
-Demo attention context retrieval at a given (student_idx, t).
+Demo self-attention context retrieval at a given (student_idx, t).
 
-Outputs a JSON with:
-- p_no_ctx: prediction using only decayed state
-- p_with_ctx: prediction using decayed state + ctx_to_u(c_t)
+Writes a JSON showing:
 - alpha_{t,i}: attention weights over past interactions
-- per-memory contribution breakdown:
-    dot score, time bias, concept bias, total score
-- top attended past steps with (item_idx, correct, gap, overlap)
+- c_t: context vector (first dims)
+- bias decomposition per memory element:
+    dot / time bias / concept bias / total score
+- p_no_ctx vs p_with_ctx (ablation)
 """
 from __future__ import annotations
 
@@ -27,10 +26,10 @@ from src.attn_state_neuralcdm import AttnStateNeuralCDM
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run_dir", required=True, help="results/.../state_attn/{concept|bloom}")
+    parser.add_argument("--run_dir", required=True)
     parser.add_argument("--student_idx", type=int, required=True)
     parser.add_argument("--t", type=int, required=True)
-    parser.add_argument("--top_k", type=int, default=8)
+    parser.add_argument("--top_k", type=int, default=10)
     parser.add_argument("--device", default="cpu", choices=["cpu", "cuda"])
     args = parser.parse_args()
 
@@ -38,8 +37,7 @@ def main() -> None:
     ckpt = torch.load(run_dir / "checkpoint.pt", map_location="cpu")
 
     Q = np.load(ckpt["q_path"])
-    logs_path = ckpt["logs_path"]
-    df = pd.read_csv(logs_path)
+    df = pd.read_csv(ckpt["logs_path"])
 
     device = torch.device(args.device if (args.device == "cpu" or torch.cuda.is_available()) else "cpu")
 
@@ -50,7 +48,6 @@ def main() -> None:
         attn_dim=int(ckpt.get("attn_dim", 0)) or None,
         attn_window=int(ckpt.get("attn_window", 50)),
     ).to(device)
-
     model.load_state_dict(ckpt["model_state"], strict=True)
     model.eval()
 
@@ -81,11 +78,11 @@ def main() -> None:
 
         if i == args.t:
             with torch.no_grad():
-                # decayed state only
+                # baseline: no context, only decay
                 u_decayed = model.decay_u(u, dt_t)
                 p_no_ctx = model.predict_from_u(u_decayed, e_t, q_t)
 
-                # full step with attention (but don't advance yet)
+                # full: with attention context
                 p, u_new, u_decayed2, u_eff, c_t, attn = model.step(
                     u_prev=u,
                     e_idx=e_t,
@@ -99,40 +96,28 @@ def main() -> None:
                     return_attn=True,
                 )
 
-                # build a ranked list of attended memory entries
-                alpha = attn["alpha"].cpu().numpy().tolist()
-                gap = attn["gap"].cpu().numpy().tolist()
-                overlap = attn["overlap"].cpu().numpy().tolist()
-                score_dot = attn["score_dot"].cpu().numpy().tolist()
-                score_time = attn["score_time"].cpu().numpy().tolist()
-                score_concept = attn["score_concept"].cpu().numpy().tolist()
-                score_total = attn["score_total"].cpu().numpy().tolist()
-
-                L = len(alpha)
-                idx_sorted = sorted(range(L), key=lambda j: alpha[j], reverse=True)
+                alpha = attn["alpha"].cpu().numpy()
+                order = np.argsort(-alpha)
 
                 top = []
-                for j in idx_sorted[: args.top_k]:
-                    # map j into original history index in sdf:
-                    # memory contains i past steps, but maybe windowed inside attention.
-                    # For demo simplicity, we store only local memory info:
+                for j in order[: args.top_k]:
                     top.append(
                         {
-                            "rank": len(top) + 1,
-                            "alpha": float(alpha[j]),
-                            "gap": float(gap[j]),
-                            "overlap": float(overlap[j]),
-                            "score_dot": float(score_dot[j]),
-                            "score_time": float(score_time[j]),
-                            "score_concept": float(score_concept[j]),
-                            "score_total": float(score_total[j]),
+                            "rank": int(len(top) + 1),
+                            "alpha": float(attn["alpha"][j].item()),
+                            "gap": float(attn["gap"][j].item()),
+                            "overlap": float(attn["overlap"][j].item()),
+                            "score_dot": float(attn["score_dot"][j].item()),
+                            "score_time": float(attn["score_time"][j].item()),
+                            "score_concept": float(attn["score_concept"][j].item()),
+                            "score_total": float(attn["score_total"][j].item()),
                         }
                     )
 
                 out = {
-                    "student_idx": args.student_idx,
+                    "student_idx": int(args.student_idx),
                     "t": int(row["t"]),
-                    "item_idx": e,
+                    "item_idx": int(e),
                     "correct": int(row["correct"]),
                     "delta_t": float(dt),
                     "attn_window": int(model.attn_window),
@@ -141,7 +126,6 @@ def main() -> None:
                     "p_with_ctx": float(p.item()),
                     "ctx_first10": c_t.squeeze(0).detach().cpu().tolist()[:10],
                     "top_attended": top,
-                    "note": "top_attended lists only score/bias breakdown; it is enough to show alpha_{t,i} and why.",
                 }
 
                 out_path = run_dir / f"demo_attn_s{args.student_idx}_t{args.t}.json"
@@ -149,19 +133,15 @@ def main() -> None:
 
                 print("Saved:", out_path)
                 print(
-                    "delta_t:",
-                    out["delta_t"],
-                    "| observed:",
-                    out["correct"],
-                    "| p_no_ctx:",
-                    out["p_no_ctx"],
-                    "| p_with_ctx:",
-                    out["p_with_ctx"],
+                    "delta_t:", out["delta_t"],
+                    "| observed:", out["correct"],
+                    "| p_no_ctx:", out["p_no_ctx"],
+                    "| p_with_ctx:", out["p_with_ctx"],
                 )
 
-        # advance state and append current step to memory
+        # advance + append to memory for next step
         with torch.no_grad():
-            p_step, u, _, _, _ = model.step(
+            _, u, _, _, _ = model.step(
                 u_prev=u,
                 e_idx=e_t,
                 r=r_t,
@@ -174,9 +154,9 @@ def main() -> None:
                 return_attn=False,
             )
 
-        mem_q = torch.cat([mem_q, q_t], dim=0)
-        mem_r = torch.cat([mem_r, r_t], dim=0)
-        mem_time = torch.cat([mem_time, time_now.detach().squeeze(0)], dim=0)
+        mem_q = torch.cat([mem_q, q_t.detach()], dim=0)
+        mem_r = torch.cat([mem_r, r_t.detach()], dim=0)
+        mem_time = torch.cat([mem_time, time_now.detach().view(1)], dim=0)
 
 
 if __name__ == "__main__":
