@@ -1,0 +1,11 @@
+{
+  "final": {
+    "epoch": 20,
+    "train_loss": 0.6313320657238364,
+    "val_loss": 0.6342351034283638,
+    "val_auc": 0.6816212768711747,
+    "val_acc": 0.64625,
+    "val_n": 1600
+  },
+  "run_dir": "results/runs/run_20260114_152113/state_attn/concept"
+}
