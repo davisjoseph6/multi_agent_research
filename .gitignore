@@ -1,0 +1,20 @@
+# Python
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+*.py[cod]
+.env
+
+# Private or generated research data
+agent2_realdata_benchmark/data/raw/
+agent2_realdata_benchmark/data/processed/
+agent2_realdata_benchmark/data/splits/
+
+# Generated results and model weights
+agent2_realdata_benchmark/results/
+**/checkpoints/
+*.pt
+*.pth
+
+# Windows download metadata
+*:Zone.Identifier

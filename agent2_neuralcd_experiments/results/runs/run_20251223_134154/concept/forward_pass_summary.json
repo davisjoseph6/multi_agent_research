@@ -1,0 +1,54 @@
+{
+  "experiment": "NeuralCD forward-pass demonstration",
+  "note": "Compact presentation summary. The before probability comes from an untrained initialization. These examples demonstrate the forward-pass mechanism; dataset-level performance is evaluated separately.",
+  "positive_case": {
+    "student_idx": 107,
+    "item_idx": 4,
+    "concepts": [
+      {
+        "concept_id": "C10",
+        "concept_name": "Control mass vs control volume",
+        "mastery": 0.899,
+        "item_requirement": 0.342,
+        "interaction_signal_x": 0.526
+      },
+      {
+        "concept_id": "C11",
+        "concept_name": "Steady-flow energy equation",
+        "mastery": 0.897,
+        "item_requirement": 0.341,
+        "interaction_signal_x": 0.524
+      }
+    ],
+    "item_discrimination": 0.943,
+    "p_before_untrained": 0.5,
+    "logit_after_training": 2.77,
+    "p_after_training": 0.941,
+    "observed_correct": 1
+  },
+  "negative_case": {
+    "student_idx": 14,
+    "item_idx": 2,
+    "concepts": [
+      {
+        "concept_id": "C01",
+        "concept_name": "First law (closed system)",
+        "mastery": 0.054,
+        "item_requirement": 0.564,
+        "interaction_signal_x": -0.49
+      },
+      {
+        "concept_id": "C03",
+        "concept_name": "Internal energy",
+        "mastery": 0.115,
+        "item_requirement": 0.563,
+        "interaction_signal_x": -0.429
+      }
+    ],
+    "item_discrimination": 0.959,
+    "p_before_untrained": 0.5,
+    "logit_after_training": -4.036,
+    "p_after_training": 0.017,
+    "observed_correct": 0
+  }
+}
