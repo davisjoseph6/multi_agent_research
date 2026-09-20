@@ -43,6 +43,7 @@ def main() -> None:
         SOURCE,
         usecols=COLUMNS,
         dtype="string",
+        encoding="latin1",
         low_memory=False,
     )
 
