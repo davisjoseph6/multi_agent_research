@@ -284,3 +284,34 @@ student's local representation.
 
 No final test evaluation is permitted before checkpoint selection
 and adaptation hyperparameter selection are complete.
+
+### NeuralCD initialization and first validation
+
+The initial untrained model produced probabilities above 0.99
+for all 2048 monitored training-sample interactions.
+
+After each of five training epochs, the monitored fractions
+below 0.01 and above 0.99 were both zero.
+
+This is a training diagnostic, not proof of validation calibration.
+
+The initial chronological validation configuration uses:
+- Training checkpoint candidate: epoch 5.
+- Student initialization: mean training-student embedding logits.
+- Local optimizer: SGD.
+- Local learning rate: 0.1.
+- Prior penalty: 0.01.
+- One local update per supported observed interaction.
+
+These settings are provisional and must not be described as
+the finally selected NeuralCD configuration.
+
+The first matched comparison requires 42437 validation targets.
+The remaining 311 primary targets involve items with no trained
+item embeddings and must be reported as unsupported.
+
+Model selection will use validation NLL on the identical
+known-item population for NeuralCD and frozen BKT.
+
+No validation outcomes are used to update global model weights.
+The test partition remains locked.
