@@ -253,3 +253,34 @@ for reported validation or test results.
 
 Checkpoint selection, adaptation hyperparameters and matched target
 coverage must be fixed before final test evaluation.
+
+### NeuralCD full training experiment v1
+
+NeuralCD full training uses 188223 skill-annotated interactions
+from 2951 training students.
+
+Training configuration:
+- Random seed: 7
+- Optimizer: Adam
+- Learning rate: 0.002
+- Batch size: 256
+- Epochs: 5
+- Candidate checkpoints: every epoch, 1 through 5.
+
+Every epoch checkpoint is preserved with a SHA-256 checksum.
+
+A fixed training sample of 2048 interactions is evaluated without
+dropout before training and after every epoch. Its NLL and
+probability-saturation diagnostics are training diagnostics only.
+
+The full training script does not read validation or test outcomes.
+
+A separate chronological validation procedure will select among
+the prespecified epoch checkpoints using matched-population
+validation NLL.
+
+Validation personalization may optimize only each unseen
+student's local representation.
+
+No final test evaluation is permitted before checkpoint selection
+and adaptation hyperparameter selection are complete.

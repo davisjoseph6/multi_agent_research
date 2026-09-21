@@ -1,0 +1,125 @@
+{
+  "batch_size": 256,
+  "before_training": {
+    "exact_one_count": 0,
+    "exact_zero_count": 0,
+    "fixed_sample_clipped_nll": 3.093738056281733,
+    "fraction_above_0_99": 1.0,
+    "fraction_below_0_01": 0.0,
+    "maximum_probability": 0.9998455047607422,
+    "mean_probability": 0.9998454973683693,
+    "minimum_probability": 0.9998453855514526
+  },
+  "dataset": "assist2009_corrected_collapsed",
+  "device": "cuda",
+  "epoch_results": [
+    {
+      "batches": 736,
+      "checkpoint": "epoch_01.pt",
+      "checkpoint_sha256": "949b29bf0a88f4e7fd49afcd8f308a96b04b292d392fd9e841fd6d6c8d857572",
+      "epoch": 1,
+      "examples_processed": 188223,
+      "fixed_sample": {
+        "exact_one_count": 0,
+        "exact_zero_count": 0,
+        "fixed_sample_clipped_nll": 0.6377248741439822,
+        "fraction_above_0_99": 0.0,
+        "fraction_below_0_01": 0.0,
+        "maximum_probability": 0.6893930435180664,
+        "mean_probability": 0.6490536490164232,
+        "minimum_probability": 0.5849449038505554
+      },
+      "mean_training_bce": 0.6919019022906031
+    },
+    {
+      "batches": 736,
+      "checkpoint": "epoch_02.pt",
+      "checkpoint_sha256": "75342dd941a9c6c1c5251dca715e72e01891c7c3f8edfb029c4c3bcd077a3883",
+      "epoch": 2,
+      "examples_processed": 188223,
+      "fixed_sample": {
+        "exact_one_count": 0,
+        "exact_zero_count": 0,
+        "fixed_sample_clipped_nll": 0.5051994775029738,
+        "fraction_above_0_99": 0.0,
+        "fraction_below_0_01": 0.0,
+        "maximum_probability": 0.902079164981842,
+        "mean_probability": 0.6812411765713478,
+        "minimum_probability": 0.35181334614753723
+      },
+      "mean_training_bce": 0.5664526319941803
+    },
+    {
+      "batches": 736,
+      "checkpoint": "epoch_03.pt",
+      "checkpoint_sha256": "e4a81c8100ca0dd9b511ef77891958b1058ed354faf7021f6a62c32eb688e496",
+      "epoch": 3,
+      "examples_processed": 188223,
+      "fixed_sample": {
+        "exact_one_count": 0,
+        "exact_zero_count": 0,
+        "fixed_sample_clipped_nll": 0.4592469313691793,
+        "fraction_above_0_99": 0.0,
+        "fraction_below_0_01": 0.0,
+        "maximum_probability": 0.9475620985031128,
+        "mean_probability": 0.6911238410611986,
+        "minimum_probability": 0.24480319023132324
+      },
+      "mean_training_bce": 0.4855684141709091
+    },
+    {
+      "batches": 736,
+      "checkpoint": "epoch_04.pt",
+      "checkpoint_sha256": "f15291a0985788ac54d392e71347c602ff9079b37de96ffa8e2e80e13ea78235",
+      "epoch": 4,
+      "examples_processed": 188223,
+      "fixed_sample": {
+        "exact_one_count": 0,
+        "exact_zero_count": 0,
+        "fixed_sample_clipped_nll": 0.4351882117414595,
+        "fraction_above_0_99": 0.0,
+        "fraction_below_0_01": 0.0,
+        "maximum_probability": 0.9664850831031799,
+        "mean_probability": 0.6834420027735177,
+        "minimum_probability": 0.190100759267807
+      },
+      "mean_training_bce": 0.4522832792572357
+    },
+    {
+      "batches": 736,
+      "checkpoint": "epoch_05.pt",
+      "checkpoint_sha256": "c1cceba3baa36df54c7c544b1f0961a1db6cca1976987ded1dcf922b068dc581",
+      "epoch": 5,
+      "examples_processed": 188223,
+      "fixed_sample": {
+        "exact_one_count": 0,
+        "exact_zero_count": 0,
+        "fixed_sample_clipped_nll": 0.4220350115643885,
+        "fraction_above_0_99": 0.0,
+        "fraction_below_0_01": 0.0,
+        "maximum_probability": 0.9774575233459473,
+        "mean_probability": 0.6893722569584497,
+        "minimum_probability": 0.16388672590255737
+      },
+      "mean_training_bce": 0.43390100499480283
+    }
+  ],
+  "epochs_planned": 5,
+  "fixed_sample_size": 2048,
+  "fixed_sample_source_rows_sha256": "2994470d132421f3dadf4fe02fe9dede39715ce0f8cbb4ed204acbd6d4ed4d9d",
+  "learning_rate": 0.002,
+  "optimizer": "Adam",
+  "processed_sha256": "452a1e25dbc6d882fed1647f0f6ce2f54d515c131b708e6a6759a4c6f8e0ee15",
+  "q_sha256": "60b7a0af15f02b5f35e1c9e477658817fa917274b6752f6e992f792b4e45daa2",
+  "run_id": "full_train_v1",
+  "seed": 7,
+  "source_sha256": "162ef8d2d28bcbfea6591a282994062bd8d5eaa00636544292a0d268dca6e5da",
+  "split_assignment_sha256": "07a56030f27efb3ce8bc04212cb6bcd67cc2d28f7d133fc9bf0f90d9b6a2f4da",
+  "status": "completed_training_only",
+  "tagged_training_examples": 188223,
+  "test_evaluated": false,
+  "torch_version": "2.14.0+cu130",
+  "training_students": 2951,
+  "unique_trained_items": 17146,
+  "validation_evaluated": false
+}
