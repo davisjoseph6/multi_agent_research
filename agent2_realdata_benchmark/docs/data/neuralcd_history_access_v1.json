@@ -1,0 +1,71 @@
+{
+  "bkt_only_history_events": 390,
+  "bkt_predictions_sha256": "3beb9130da238d5d912ee21f5a51d2d2fc556ae25c425671505a8dbffc130102",
+  "groups": {
+    "all_matched": {
+      "bkt": {
+        "accuracy_at_0_5": 0.6992954261611329,
+        "brier": 0.20285444347924603,
+        "nll": 0.5941418354152707,
+        "roc_auc": 0.6700017667564809
+      },
+      "brier_gain_bkt_minus_neuralcd": 0.007998669735390346,
+      "count": 42437,
+      "neuralcd": {
+        "accuracy_at_0_5": 0.7025944341023164,
+        "brier": 0.19485577374385568,
+        "nll": 0.5736185606457903,
+        "roc_auc": 0.7231505420999944
+      },
+      "nll_gain_bkt_minus_neuralcd": 0.02052327476948035,
+      "positive_fraction": 0.6591182223060066,
+      "students": 626
+    },
+    "clean_prefix": {
+      "bkt": {
+        "accuracy_at_0_5": 0.6976428074130557,
+        "brier": 0.203571092361612,
+        "nll": 0.5957181579879983,
+        "roc_auc": 0.6744121865486478
+      },
+      "brier_gain_bkt_minus_neuralcd": 0.008889532408348555,
+      "count": 30163,
+      "neuralcd": {
+        "accuracy_at_0_5": 0.7051685840267878,
+        "brier": 0.19468155995326344,
+        "nll": 0.5733739229892073,
+        "roc_auc": 0.7292448584907534
+      },
+      "nll_gain_bkt_minus_neuralcd": 0.022344234998791013,
+      "positive_fraction": 0.6517919305108908,
+      "students": 625
+    },
+    "one_or_more_bkt_only_history_events": {
+      "bkt": {
+        "accuracy_at_0_5": 0.7033566889359621,
+        "brier": 0.20109329957841474,
+        "nll": 0.5902680682846541,
+        "roc_auc": 0.6581404097880124
+      },
+      "brier_gain_bkt_minus_neuralcd": 0.005809400482951421,
+      "count": 12274,
+      "neuralcd": {
+        "accuracy_at_0_5": 0.696268535114877,
+        "brier": 0.19528389909546331,
+        "nll": 0.574219750611206,
+        "roc_auc": 0.7080884719572299
+      },
+      "nll_gain_bkt_minus_neuralcd": 0.016048317673448054,
+      "positive_fraction": 0.6771223724947043,
+      "students": 94
+    }
+  },
+  "interpretation": "Clean-prefix targets have zero earlier tagged events that BKT can use but NeuralCD cannot. This restricts the comparison population; it does not recompute BKT states for exposed targets.",
+  "selected_predictions_sha256": "de025192c21a1863d5db71fdbcb18cf55d03ad80f9a1e2f3b0259f63f81a3085",
+  "split_assignment_sha256": "07a56030f27efb3ce8bc04212cb6bcd67cc2d28f7d133fc9bf0f90d9b6a2f4da",
+  "status": "validation_history_access_sensitivity",
+  "students_with_bkt_only_history": 100,
+  "test_evaluated": false,
+  "validation_interactions": 58525,
+  "validation_students": 633
+}

@@ -434,3 +434,32 @@ The test partition has not been evaluated.
 The small NLL difference between the selected configuration and
 runner-up must not be interpreted as established evidence that
 their generalization performance differs.
+
+### NeuralCD–BKT matched-history sensitivity v1
+
+The selected NeuralCD configuration is epoch 2, online SGD
+learning rate 0.1 and prior penalty 0.1.
+
+For each validation interaction, a BKT-only history event is
+defined as a preceding skill-annotated interaction whose
+item embedding was not fitted on NeuralCD training data.
+
+The analysis divides the identical scored target population into:
+
+1. Clean-prefix targets with zero prior BKT-only history events.
+2. Exposed targets with one or more prior BKT-only history events.
+
+Both models' existing predictions are compared on each subset.
+The current event is excluded from its own history count.
+
+The clean-prefix analysis is a restricted-population
+sensitivity analysis. It is not a counterfactual evaluation
+of BKT after removing unavailable history from every student.
+
+The groups can differ in their populations and outcomes.
+Comparisons across groups are descriptive, not causal.
+
+The selected NeuralCD configuration and its grid results
+are not changed by this analysis.
+
+The test partition remains locked.
