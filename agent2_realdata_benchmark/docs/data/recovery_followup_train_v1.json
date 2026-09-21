@@ -1,0 +1,53 @@
+{
+  "audit_code_sha256": "7bb9b73cda9934b4e77539d3a0f197d19e99330e285198cd59b76d992d72e62f",
+  "by_current_first_action": {
+    "0": {
+      "cross_assistment_followups": 162522,
+      "main_problems": 166078,
+      "next_answer_attempt_count": 154611,
+      "next_hint_request_count": 5935,
+      "next_missing_action_count": 0,
+      "next_positive_response_rate": 0.6993945435079558,
+      "next_scaffold_request_count": 1976
+    },
+    "1": {
+      "cross_assistment_followups": 12393,
+      "main_problems": 12895,
+      "next_answer_attempt_count": 6034,
+      "next_hint_request_count": 6044,
+      "next_missing_action_count": 0,
+      "next_positive_response_rate": 0.28467683369644153,
+      "next_scaffold_request_count": 315
+    },
+    "2": {
+      "cross_assistment_followups": 4117,
+      "main_problems": 4222,
+      "next_answer_attempt_count": 2022,
+      "next_hint_request_count": 294,
+      "next_missing_action_count": 0,
+      "next_positive_response_rate": 0.25771192615982513,
+      "next_scaffold_request_count": 1801
+    }
+  },
+  "interpretation": "Descriptive longitudinal association only. Voluntary help-seeking is confounded. Later correct=0 can include a help request. No treatment effect is identified.",
+  "main_problems": 183195,
+  "manifest_sha256": "6684271c9badf0701e5fbb24bf41b9eca65d19ba1dae6811199ced2a56b5b41a",
+  "outcome_definition": "Correctness of immediately next main problem, restricted to known different ASSISTment IDs.",
+  "source_sha256": "452a1e25dbc6d882fed1647f0f6ce2f54d515c131b708e6a6759a4c6f8e0ee15",
+  "status": "training_only_descriptive_followup",
+  "test_gate": "closed",
+  "test_outcomes_evaluated": false,
+  "test_rows_returned": 0,
+  "train_students_sha256": "7eef9ce681630ccb4c2e9165a742b3936a8dfafb23f151f32bcff01006f97add",
+  "training_interactions": 230387,
+  "training_students": 2951,
+  "transition_counts": {
+    "different_assistment": 179032,
+    "next_main_exists": 180244,
+    "no_next_main": 2951,
+    "same_assistment": 1212,
+    "unknown_assistment_relationship": 0
+  },
+  "validation_rows_returned": 0,
+  "version": "recovery_followup_train_v1"
+}
