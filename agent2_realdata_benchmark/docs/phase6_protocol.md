@@ -532,3 +532,42 @@ independently verified true student mastery.
 
 The final test protocol must be frozen separately before test
 records are accessed.
+
+### Model-independent predictive uncertainty interface v1
+
+Frozen BKT and NeuralCD predictions are converted into a common
+signal representation without changing either baseline.
+
+For pre-response predicted correctness probability p:
+
+- Predicted failure risk is 1-p.
+- Predictive entropy is -p ln(p) - (1-p) ln(1-p).
+- Normalized predictive entropy divides entropy by ln(2).
+
+Boundary entropy is defined as zero at p=0 and p=1.
+
+The conversion function receives only the predicted probability.
+It receives neither current-response labels nor future outcomes.
+
+Failure risk and predictive entropy have different meanings.
+A high predicted failure risk does not imply high entropy.
+
+Predictive entropy describes uncertainty in the model's binary
+outcome distribution. It is not a separately identified measure
+of epistemic uncertainty, estimator uncertainty, out-of-
+distribution uncertainty, or independently verified mastery.
+
+Calibration diagnostics must accompany any claim that these
+probabilities reliably quantify response uncertainty.
+
+Unsupported items require an explicit unsupported status.
+They must not receive artificial certainty or a prediction
+from an untrained item embedding.
+
+No intervention threshold, recovery action or recovery policy
+is selected by this interface.
+
+All threshold selection and policy development must occur
+without accessing held-out test outcomes.
+
+The held-out test gate remains closed.
