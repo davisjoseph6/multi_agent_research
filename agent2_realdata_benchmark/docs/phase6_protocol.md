@@ -941,3 +941,33 @@ The experiment will not be retuned using these outcomes.
 
 The frozen cognitive-diagnosis and event-detection baselines
 remain unchanged. The held-out test gate remains closed.
+
+### Training-only recovery feasibility audit v1
+
+The recovery feasibility audit uses only rows returned by a
+PyArrow student-ID filter based on train_students.json.
+
+The processed dataset checksum and training-student population
+are verified before analysis.
+
+The audit reports:
+- First-action frequencies.
+- Main-problem and scaffolding counts.
+- Hint-count parsing quality.
+- Availability of the next recorded main problem.
+- Subsequent positive-response rates by first action.
+- Same-ASSISTment sequence availability.
+
+All subsequent outcomes are descriptive observations.
+
+Help-seeking is voluntary and is not treated as randomized
+intervention assignment.
+
+Within-problem intervention timing cannot be reconstructed
+from these aggregate problem-level records.
+
+No intervention policy is fitted or selected.
+
+No validation or test rows are returned to the analysis.
+
+The held-out test gate remains closed.
