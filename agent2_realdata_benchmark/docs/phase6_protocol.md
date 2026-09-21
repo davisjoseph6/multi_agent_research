@@ -358,3 +358,26 @@ between conditions.
 
 The ablation is evaluated on the validation partition only.
 Its findings are development results, not independent test evidence.
+
+### NeuralCD adaptation-effect analysis
+
+Online adaptation and frozen-prior predictions are compared
+on identical source rows using the selected epoch-2 checkpoint.
+
+Paired student-cluster bootstrap intervals quantify the
+conditional validation differences in NLL, Brier, accuracy
+and ROC-AUC.
+
+Prespecified history groups are:
+- Zero preceding supported observations.
+- 1 through 4.
+- 5 through 19.
+- 20 or more.
+
+History-group analyses are exploratory.
+
+Epoch 2 was selected using online-adaptation validation NLL.
+Therefore, these bootstrap intervals do not correct for
+checkpoint-selection bias and are not confirmatory evidence.
+
+The test partition remains locked.

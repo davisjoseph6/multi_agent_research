@@ -1,0 +1,89 @@
+{
+  "bootstrap_method": "paired_student_cluster",
+  "bootstrap_results": {
+    "accuracy_gain": {
+      "ci95": [
+        0.016753781334685365,
+        0.03438432645430955
+      ],
+      "estimate": 0.02478968824374956,
+      "replicates": 1000
+    },
+    "auc_gain": {
+      "ci95": [
+        0.042197314947834096,
+        0.06404686922128174
+      ],
+      "estimate": 0.05231503399392401,
+      "replicates": 300
+    },
+    "brier_reduction": {
+      "ci95": [
+        0.009436240008951212,
+        0.015325482885634538
+      ],
+      "estimate": 0.012126411791712392,
+      "replicates": 1000
+    },
+    "nll_reduction": {
+      "ci95": [
+        0.02269599500072838,
+        0.03625637558287612
+      ],
+      "estimate": 0.02883658809274737,
+      "replicates": 1000
+    }
+  },
+  "bootstrap_seed": 20260921,
+  "checkpoint_epoch": 2,
+  "checkpoint_sha256": "75342dd941a9c6c1c5251dca715e72e01891c7c3f8edfb029c4c3bcd077a3883",
+  "frozen_predictions_sha256": "1a991b6f54dd897ad37f57ec9946c954d28cb8c2fe616eb4c352f6f2f49448f1",
+  "history_groups": {
+    "0": {
+      "brier_reduction": 0.0,
+      "count": 626,
+      "frozen_nll": 0.7195457708747421,
+      "nll_reduction": 0.0,
+      "online_nll": 0.7195457708747421,
+      "positive_fraction": 0.5591054313099042,
+      "students": 626
+    },
+    "1_to_4": {
+      "brier_reduction": 0.010048709758620359,
+      "count": 2288,
+      "frozen_nll": 0.5858879164081159,
+      "nll_reduction": 0.02395783055207128,
+      "online_nll": 0.5619300858560448,
+      "positive_fraction": 0.6691433566433567,
+      "students": 608
+    },
+    "20_plus": {
+      "brier_reduction": 0.011408769659819915,
+      "count": 33550,
+      "frozen_nll": 0.5955131317735722,
+      "nll_reduction": 0.027078579458901277,
+      "online_nll": 0.5684345523146708,
+      "positive_fraction": 0.6655737704918033,
+      "students": 323
+    },
+    "5_to_19": {
+      "brier_reduction": 0.018224153221198264,
+      "count": 5973,
+      "frozen_nll": 0.6357756598389122,
+      "nll_reduction": 0.043602282227129315,
+      "online_nll": 0.5921733776117829,
+      "positive_fraction": 0.6294994140298008,
+      "students": 535
+    }
+  },
+  "limitation": "Development analysis conditional on selecting epoch 2 using online-adaptation validation NLL. Bootstrap intervals do not correct for model-selection bias. History groups are exploratory.",
+  "matched_targets": 42437,
+  "online_predictions_sha256": "d0258e8ee5a2d190941ba3e436116bb1c8c2c2033ba6f06866b3bfee856c3387",
+  "split_assignment_sha256": "07a56030f27efb3ce8bc04212cb6bcd67cc2d28f7d133fc9bf0f90d9b6a2f4da",
+  "status": "conditional_validation_ablation",
+  "students_in_split": 633,
+  "students_with_matched_targets": 626,
+  "test_evaluated": false,
+  "zero_history_predictions_agree": true,
+  "zero_history_targets": 626
+}
