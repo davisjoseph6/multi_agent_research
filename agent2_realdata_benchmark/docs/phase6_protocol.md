@@ -643,3 +643,52 @@ evaluation measures must be registered before examining
 validation outcomes for this detector.
 
 The held-out test gate remains closed.
+
+### Offline event-detection experiment v1
+
+The experiment specification is registered in
+docs/data/event_detection_experiment_v1.json before examining
+validation response labels for event-detector policy selection.
+
+Detection target: observed negative response (correct = 0).
+
+This target is not a validated measure of intervention need.
+
+Both frozen models are evaluated on the same 42437 supported
+validation targets for policy selection.
+
+The candidate search contains 25 policies per model:
+- One no-trigger control.
+- Three risk-only configurations.
+- Three entropy-only configurations.
+- Nine risk-or-entropy configurations.
+- Nine risk-and-entropy configurations.
+
+The candidate risk thresholds are 0.5, 0.7 and 0.9.
+The candidate entropy thresholds are 0.5, 0.8 and 0.95.
+
+A candidate is eligible for selection only if its alert rate
+is at most 30 percent of matched supported targets.
+
+Selection maximizes detected negative responses within this
+budget. Ties are broken by fewer false-positive alerts,
+fewer total alerts, registered policy order and ascending
+threshold values.
+
+The 30-percent budget is a research design assumption and
+does not represent an empirically established classroom
+intervention capacity.
+
+Unsupported NeuralCD predictions are abstentions and are
+reported separately.
+
+Policies selected using validation outcomes are development
+results. Student-cluster confidence intervals on those same
+data do not correct for policy-selection bias.
+
+No alert is interpreted as evidence that a pedagogical
+intervention would improve learning.
+
+No test outcomes may be used for policy selection.
+
+The held-out test gate remains closed.

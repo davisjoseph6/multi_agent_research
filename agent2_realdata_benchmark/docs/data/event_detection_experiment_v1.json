@@ -1,0 +1,193 @@
+{
+  "abstention_policy": "Unsupported NeuralCD targets are abstentions, not false negatives or no-flag predictions.",
+  "alert_budget_fraction": 0.3,
+  "bootstrap_policy": "Student-cluster analysis of selected policies is exploratory and does not correct for selection bias.",
+  "candidate_count_per_model": 25,
+  "candidates": [
+    {
+      "entropy_threshold": 0.8,
+      "policy": "no_trigger",
+      "risk_threshold": 0.7
+    },
+    {
+      "entropy_threshold": 0.8,
+      "policy": "risk_only",
+      "risk_threshold": 0.5
+    },
+    {
+      "entropy_threshold": 0.8,
+      "policy": "risk_only",
+      "risk_threshold": 0.7
+    },
+    {
+      "entropy_threshold": 0.8,
+      "policy": "risk_only",
+      "risk_threshold": 0.9
+    },
+    {
+      "entropy_threshold": 0.5,
+      "policy": "entropy_only",
+      "risk_threshold": 0.7
+    },
+    {
+      "entropy_threshold": 0.8,
+      "policy": "entropy_only",
+      "risk_threshold": 0.7
+    },
+    {
+      "entropy_threshold": 0.95,
+      "policy": "entropy_only",
+      "risk_threshold": 0.7
+    },
+    {
+      "entropy_threshold": 0.5,
+      "policy": "risk_or_entropy",
+      "risk_threshold": 0.5
+    },
+    {
+      "entropy_threshold": 0.8,
+      "policy": "risk_or_entropy",
+      "risk_threshold": 0.5
+    },
+    {
+      "entropy_threshold": 0.95,
+      "policy": "risk_or_entropy",
+      "risk_threshold": 0.5
+    },
+    {
+      "entropy_threshold": 0.5,
+      "policy": "risk_or_entropy",
+      "risk_threshold": 0.7
+    },
+    {
+      "entropy_threshold": 0.8,
+      "policy": "risk_or_entropy",
+      "risk_threshold": 0.7
+    },
+    {
+      "entropy_threshold": 0.95,
+      "policy": "risk_or_entropy",
+      "risk_threshold": 0.7
+    },
+    {
+      "entropy_threshold": 0.5,
+      "policy": "risk_or_entropy",
+      "risk_threshold": 0.9
+    },
+    {
+      "entropy_threshold": 0.8,
+      "policy": "risk_or_entropy",
+      "risk_threshold": 0.9
+    },
+    {
+      "entropy_threshold": 0.95,
+      "policy": "risk_or_entropy",
+      "risk_threshold": 0.9
+    },
+    {
+      "entropy_threshold": 0.5,
+      "policy": "risk_and_entropy",
+      "risk_threshold": 0.5
+    },
+    {
+      "entropy_threshold": 0.8,
+      "policy": "risk_and_entropy",
+      "risk_threshold": 0.5
+    },
+    {
+      "entropy_threshold": 0.95,
+      "policy": "risk_and_entropy",
+      "risk_threshold": 0.5
+    },
+    {
+      "entropy_threshold": 0.5,
+      "policy": "risk_and_entropy",
+      "risk_threshold": 0.7
+    },
+    {
+      "entropy_threshold": 0.8,
+      "policy": "risk_and_entropy",
+      "risk_threshold": 0.7
+    },
+    {
+      "entropy_threshold": 0.95,
+      "policy": "risk_and_entropy",
+      "risk_threshold": 0.7
+    },
+    {
+      "entropy_threshold": 0.5,
+      "policy": "risk_and_entropy",
+      "risk_threshold": 0.9
+    },
+    {
+      "entropy_threshold": 0.8,
+      "policy": "risk_and_entropy",
+      "risk_threshold": 0.9
+    },
+    {
+      "entropy_threshold": 0.95,
+      "policy": "risk_and_entropy",
+      "risk_threshold": 0.9
+    }
+  ],
+  "confusion_matrix": {
+    "false_negative": "no_flag_and_correct_equals_zero",
+    "false_positive": "flag_and_correct_equals_one",
+    "positive_detection": "flag_and_correct_equals_zero",
+    "true_negative": "no_flag_and_correct_equals_one"
+  },
+  "eligible_primary_target_count": 42748,
+  "entropy_thresholds": [
+    0.5,
+    0.8,
+    0.95
+  ],
+  "metrics": [
+    "true_positives",
+    "false_positives",
+    "false_negatives",
+    "true_negatives",
+    "precision",
+    "recall",
+    "false_positive_rate",
+    "alert_rate"
+  ],
+  "model_candidate_count": 50,
+  "models": [
+    "bkt_v1",
+    "neuralcd_v1"
+  ],
+  "neuralcd_unsupported_target_count": 311,
+  "policy_order": [
+    "no_trigger",
+    "risk_only",
+    "entropy_only",
+    "risk_or_entropy",
+    "risk_and_entropy"
+  ],
+  "purpose": "Offline detection of observed negative responses; not intervention-benefit or recovery evaluation.",
+  "risk_thresholds": [
+    0.5,
+    0.7,
+    0.9
+  ],
+  "selection_population": "same_42437_neuralcd_supported_validation_targets",
+  "selection_rule": "Among candidates flagging at most 30 percent of matched targets, maximize true-negative-response detections (TP); break ties by fewer false-positive alerts (FP), fewer total alerts, policy_order, risk_threshold ascending, entropy_threshold ascending.",
+  "selection_target_count": 42437,
+  "source_sha256": {
+    "bkt_freeze": "48d2129eb7a16b888faf766765b7e0ebda2e762bc99a13a472bd201a76bd2e89",
+    "bridge_report": "0c823e73675e647304f23f1b31bc0b6c3277f93697bb039c80a50a4a0589cdc9",
+    "event_bridge": "d70dea87a0bc6bd3663fcf5deb6ce5d221d72a3cf4a26e5bb162bca785f56639",
+    "event_detector": "e24fd54c6d836450fa10a53ba0b974349e177fd29bd2345ecc9c6127ce2b5422",
+    "neuralcd_freeze": "86494866b02305b80a77af99384b830a0eb112761a03ac52fa458ad4bbb078c5",
+    "signals": "3bd53b03d44f6ecc6f93a586adeb971f556a2fc0b731d5f24ea1878a0eab359b",
+    "test_gate": "e8d22481fa4350a75ad5c505940037833a9f965006b918f2f851106e31b3acd1"
+  },
+  "status": "registered_before_label_evaluation",
+  "target": "correct_equals_zero",
+  "test_evaluated": false,
+  "test_gate": "closed",
+  "validation_response_labels_accessed": false,
+  "version": "event_detection_experiment_v1",
+  "zero_alert_precision": null
+}
