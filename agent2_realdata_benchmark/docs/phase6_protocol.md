@@ -860,3 +860,44 @@ this matched-population experiment and are reported separately.
 
 No candidate has been evaluated or selected in this stage.
 The held-out test gate remains closed.
+
+### Cross-model disagreement validation evaluation v1
+
+The outcome evaluator was committed before validation response
+labels were loaded for the registered disagreement experiment.
+
+All eight previously constructed label-free rankings were
+reconstructed and verified before outcome scoring.
+
+All candidates use the same 42437 matched targets and exactly:
+- 4243 alerts at the ten-percent budget.
+- 8487 alerts at the twenty-percent budget.
+- 12731 alerts at the thirty-percent budget.
+
+The primary comparison uses observed negative-response
+detections at the thirty-percent budget.
+
+The registered selection considers NeuralCD risk and its
+four positive-alpha disagreement variants only.
+
+BKT risk, mean risk and maximum risk are reported controls,
+not candidates for the registered family selection.
+
+For each candidate, the report identifies how many alerts
+were reallocated relative to NeuralCD risk and the resulting
+gain or loss in detected negative responses.
+
+Because the alert count is fixed, each additional true
+positive corresponds to one fewer false-positive alert.
+
+The same validation outcomes informed prior model development.
+The reported findings are exploratory development results,
+not independent confirmatory estimates.
+
+Disagreement is not a calibrated epistemic uncertainty measure.
+
+No intervention was performed and no causal learning benefit
+was evaluated.
+
+The frozen BKT, NeuralCD and event-detection policies remain
+unchanged. The held-out test gate remains closed.

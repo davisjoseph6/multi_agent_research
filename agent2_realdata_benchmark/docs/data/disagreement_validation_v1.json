@@ -1,0 +1,501 @@
+{
+  "candidate_count": 8,
+  "candidate_results": [
+    {
+      "alpha": 0.0,
+      "budgets": {
+        "0.1": {
+          "alert_rate": 0.09998350496029408,
+          "alerts": 4243,
+          "count": 42437,
+          "false_positive_rate": 0.05008759071895892,
+          "fn": 11624,
+          "fp": 1401,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.6698090973367901,
+          "recall": 0.19646066639015622,
+          "tn": 26570,
+          "tp": 2842
+        },
+        "0.2": {
+          "alert_rate": 0.1999905742630252,
+          "alerts": 8487,
+          "count": 42437,
+          "false_positive_rate": 0.11808658968217083,
+          "fn": 9282,
+          "fp": 3303,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.6108165429480382,
+          "recall": 0.35835752799668186,
+          "tn": 24668,
+          "tp": 5184
+        },
+        "0.3": {
+          "alert_rate": 0.2999976435657563,
+          "alerts": 12731,
+          "count": 42437,
+          "false_positive_rate": 0.19584569732937684,
+          "fn": 7213,
+          "fp": 5478,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5697117272798681,
+          "recall": 0.5013825521913452,
+          "tn": 22493,
+          "tp": 7253
+        }
+      },
+      "candidate_id": "neuralcd_risk"
+    },
+    {
+      "alpha": null,
+      "budgets": {
+        "0.1": {
+          "alert_rate": 0.09998350496029408,
+          "alerts": 4243,
+          "count": 42437,
+          "false_positive_rate": 0.04604769225269029,
+          "fn": 11511,
+          "fp": 1288,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.6964411972660853,
+          "recall": 0.20427208627125673,
+          "tn": 26683,
+          "tp": 2955
+        },
+        "0.2": {
+          "alert_rate": 0.1999905742630252,
+          "alerts": 8487,
+          "count": 42437,
+          "false_positive_rate": 0.12455757749097279,
+          "fn": 9463,
+          "fp": 3484,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5894898079415577,
+          "recall": 0.3458454306650076,
+          "tn": 24487,
+          "tp": 5003
+        },
+        "0.3": {
+          "alert_rate": 0.2999976435657563,
+          "alerts": 12731,
+          "count": 42437,
+          "false_positive_rate": 0.21554467126666904,
+          "fn": 7764,
+          "fp": 6029,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5264315450475218,
+          "recall": 0.46329323931978433,
+          "tn": 21942,
+          "tp": 6702
+        }
+      },
+      "candidate_id": "bkt_risk"
+    },
+    {
+      "alpha": null,
+      "budgets": {
+        "0.1": {
+          "alert_rate": 0.09998350496029408,
+          "alerts": 4243,
+          "count": 42437,
+          "false_positive_rate": 0.0425798148081942,
+          "fn": 11414,
+          "fp": 1191,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.7193023803912326,
+          "recall": 0.21097746439928108,
+          "tn": 26780,
+          "tp": 3052
+        },
+        "0.2": {
+          "alert_rate": 0.1999905742630252,
+          "alerts": 8487,
+          "count": 42437,
+          "false_positive_rate": 0.11597726216438455,
+          "fn": 9223,
+          "fp": 3244,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.6177683515965594,
+          "recall": 0.3624360569611503,
+          "tn": 24727,
+          "tp": 5243
+        },
+        "0.3": {
+          "alert_rate": 0.2999976435657563,
+          "alerts": 12731,
+          "count": 42437,
+          "false_positive_rate": 0.19588144864323764,
+          "fn": 7214,
+          "fp": 5479,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5696331788547639,
+          "recall": 0.501313424581778,
+          "tn": 22492,
+          "tp": 7252
+        }
+      },
+      "candidate_id": "mean_risk"
+    },
+    {
+      "alpha": null,
+      "budgets": {
+        "0.1": {
+          "alert_rate": 0.09998350496029408,
+          "alerts": 4243,
+          "count": 42437,
+          "false_positive_rate": 0.04290157663294126,
+          "fn": 11423,
+          "fp": 1200,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.7171812396888994,
+          "recall": 0.21035531591317572,
+          "tn": 26771,
+          "tp": 3043
+        },
+        "0.2": {
+          "alert_rate": 0.1999905742630252,
+          "alerts": 8487,
+          "count": 42437,
+          "false_positive_rate": 0.11519073325944729,
+          "fn": 9201,
+          "fp": 3222,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.6203605514316013,
+          "recall": 0.36395686437163005,
+          "tn": 24749,
+          "tp": 5265
+        },
+        "0.3": {
+          "alert_rate": 0.2999976435657563,
+          "alerts": 12731,
+          "count": 42437,
+          "false_positive_rate": 0.19634621572342784,
+          "fn": 7227,
+          "fp": 5492,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5686120493284109,
+          "recall": 0.5004147656574036,
+          "tn": 22479,
+          "tp": 7239
+        }
+      },
+      "candidate_id": "max_risk"
+    },
+    {
+      "alpha": 0.25,
+      "budgets": {
+        "0.1": {
+          "alert_rate": 0.09998350496029408,
+          "alerts": 4243,
+          "count": 42437,
+          "false_positive_rate": 0.05902541918415502,
+          "fn": 11874,
+          "fp": 1651,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.6108885222719774,
+          "recall": 0.17917876399834093,
+          "tn": 26320,
+          "tp": 2592
+        },
+        "0.2": {
+          "alert_rate": 0.1999905742630252,
+          "alerts": 8487,
+          "count": 42437,
+          "false_positive_rate": 0.12226949340388259,
+          "fn": 9399,
+          "fp": 3420,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5970307529162248,
+          "recall": 0.3502695976773123,
+          "tn": 24551,
+          "tp": 5067
+        },
+        "0.3": {
+          "alert_rate": 0.2999976435657563,
+          "alerts": 12731,
+          "count": 42437,
+          "false_positive_rate": 0.19831253798577098,
+          "fn": 7282,
+          "fp": 5547,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5642918859476868,
+          "recall": 0.4966127471312042,
+          "tn": 22424,
+          "tp": 7184
+        }
+      },
+      "candidate_id": "neuralcd_risk_plus_disagreement_a0.25"
+    },
+    {
+      "alpha": 0.5,
+      "budgets": {
+        "0.1": {
+          "alert_rate": 0.09998350496029408,
+          "alerts": 4243,
+          "count": 42437,
+          "false_positive_rate": 0.07261091845125309,
+          "fn": 12254,
+          "fp": 2031,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5213292481734622,
+          "recall": 0.1529102723627817,
+          "tn": 25940,
+          "tp": 2212
+        },
+        "0.2": {
+          "alert_rate": 0.1999905742630252,
+          "alerts": 8487,
+          "count": 42437,
+          "false_positive_rate": 0.12616638661470808,
+          "fn": 9508,
+          "fp": 3529,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5841875810062448,
+          "recall": 0.34273468823448083,
+          "tn": 24442,
+          "tp": 4958
+        },
+        "0.3": {
+          "alert_rate": 0.2999976435657563,
+          "alerts": 12731,
+          "count": 42437,
+          "false_positive_rate": 0.19952808265703764,
+          "fn": 7316,
+          "fp": 5581,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5616212394941481,
+          "recall": 0.49426240840591734,
+          "tn": 22390,
+          "tp": 7150
+        }
+      },
+      "candidate_id": "neuralcd_risk_plus_disagreement_a0.5"
+    },
+    {
+      "alpha": 1.0,
+      "budgets": {
+        "0.1": {
+          "alert_rate": 0.09998350496029408,
+          "alerts": 4243,
+          "count": 42437,
+          "false_positive_rate": 0.07643630903435701,
+          "fn": 12361,
+          "fp": 2138,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4961112420457224,
+          "recall": 0.14551361813908475,
+          "tn": 25833,
+          "tp": 2105
+        },
+        "0.2": {
+          "alert_rate": 0.1999905742630252,
+          "alerts": 8487,
+          "count": 42437,
+          "false_positive_rate": 0.13785706624718458,
+          "fn": 9835,
+          "fp": 3856,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5456580652763049,
+          "recall": 0.32012995990598647,
+          "tn": 24115,
+          "tp": 4631
+        },
+        "0.3": {
+          "alert_rate": 0.2999976435657563,
+          "alerts": 12731,
+          "count": 42437,
+          "false_positive_rate": 0.2062850809767259,
+          "fn": 7505,
+          "fp": 5770,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5467755871494776,
+          "recall": 0.48119729019770496,
+          "tn": 22201,
+          "tp": 6961
+        }
+      },
+      "candidate_id": "neuralcd_risk_plus_disagreement_a1"
+    },
+    {
+      "alpha": 2.0,
+      "budgets": {
+        "0.1": {
+          "alert_rate": 0.09998350496029408,
+          "alerts": 4243,
+          "count": 42437,
+          "false_positive_rate": 0.07883164706302957,
+          "fn": 12428,
+          "fp": 2205,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.48032052792835256,
+          "recall": 0.14088206829807826,
+          "tn": 25766,
+          "tp": 2038
+        },
+        "0.2": {
+          "alert_rate": 0.1999905742630252,
+          "alerts": 8487,
+          "count": 42437,
+          "false_positive_rate": 0.16120267419827677,
+          "fn": 10488,
+          "fp": 4509,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4687168610816543,
+          "recall": 0.2749896308585649,
+          "tn": 23462,
+          "tp": 3978
+        },
+        "0.3": {
+          "alert_rate": 0.2999976435657563,
+          "alerts": 12731,
+          "count": 42437,
+          "false_positive_rate": 0.22898716527832397,
+          "fn": 8140,
+          "fp": 6405,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.49689733720838897,
+          "recall": 0.4373012581224941,
+          "tn": 21566,
+          "tp": 6326
+        }
+      },
+      "candidate_id": "neuralcd_risk_plus_disagreement_a2"
+    }
+  ],
+  "evaluation_code_sha256": "cb1abb53938bb70baa5f5478bdc4dde330dcc9d8c1eb0e7530b9518ddb2e9ea7",
+  "individual_validation_labels_read_for_scoring": true,
+  "interpretation": "Development-set negative-response detection at fixed alert counts. Previously reused validation outcomes preclude independent confirmatory claims. No intervention benefit or epistemic calibration has been established.",
+  "matched_targets": 42437,
+  "neuralcd_abstentions_outside_population": 311,
+  "paired_primary_comparisons_vs_neuralcd_risk": {
+    "bkt_risk": {
+      "alerts_reallocated": 4795,
+      "net_additional_negative_responses": -551,
+      "newly_flagged_negative_responses": 1762,
+      "no_longer_flagged_negative_responses": 2313
+    },
+    "max_risk": {
+      "alerts_reallocated": 1436,
+      "net_additional_negative_responses": -14,
+      "newly_flagged_negative_responses": 633,
+      "no_longer_flagged_negative_responses": 647
+    },
+    "mean_risk": {
+      "alerts_reallocated": 2599,
+      "net_additional_negative_responses": -1,
+      "newly_flagged_negative_responses": 1132,
+      "no_longer_flagged_negative_responses": 1133
+    },
+    "neuralcd_risk": {
+      "alerts_reallocated": 0,
+      "net_additional_negative_responses": 0,
+      "newly_flagged_negative_responses": 0,
+      "no_longer_flagged_negative_responses": 0
+    },
+    "neuralcd_risk_plus_disagreement_a0.25": {
+      "alerts_reallocated": 556,
+      "net_additional_negative_responses": -69,
+      "newly_flagged_negative_responses": 202,
+      "no_longer_flagged_negative_responses": 271
+    },
+    "neuralcd_risk_plus_disagreement_a0.5": {
+      "alerts_reallocated": 1038,
+      "net_additional_negative_responses": -103,
+      "newly_flagged_negative_responses": 393,
+      "no_longer_flagged_negative_responses": 496
+    },
+    "neuralcd_risk_plus_disagreement_a1": {
+      "alerts_reallocated": 2076,
+      "net_additional_negative_responses": -292,
+      "newly_flagged_negative_responses": 781,
+      "no_longer_flagged_negative_responses": 1073
+    },
+    "neuralcd_risk_plus_disagreement_a2": {
+      "alerts_reallocated": 3945,
+      "net_additional_negative_responses": -927,
+      "newly_flagged_negative_responses": 1429,
+      "no_longer_flagged_negative_responses": 2356
+    }
+  },
+  "primary_alert_count": 12731,
+  "ranking_report_sha256": "7caf5317603eb0d6383584743357e5acfa08d00d1a8e118665484a97627e22e3",
+  "rankings_sha256": "c506afce0801475435fb6a4433f0f112271b676579b7c13e814a6340117f7223",
+  "registration_sha256": "c35094035ab357ec1fc7a207cb6972beb5f78bc3f35f316bad2f9bb7744de633",
+  "selected_disagreement_family": {
+    "alpha": 0.0,
+    "budgets": {
+      "0.1": {
+        "alert_rate": 0.09998350496029408,
+        "alerts": 4243,
+        "count": 42437,
+        "false_positive_rate": 0.05008759071895892,
+        "fn": 11624,
+        "fp": 1401,
+        "negative_responses": 14466,
+        "positive_responses": 27971,
+        "precision": 0.6698090973367901,
+        "recall": 0.19646066639015622,
+        "tn": 26570,
+        "tp": 2842
+      },
+      "0.2": {
+        "alert_rate": 0.1999905742630252,
+        "alerts": 8487,
+        "count": 42437,
+        "false_positive_rate": 0.11808658968217083,
+        "fn": 9282,
+        "fp": 3303,
+        "negative_responses": 14466,
+        "positive_responses": 27971,
+        "precision": 0.6108165429480382,
+        "recall": 0.35835752799668186,
+        "tn": 24668,
+        "tp": 5184
+      },
+      "0.3": {
+        "alert_rate": 0.2999976435657563,
+        "alerts": 12731,
+        "count": 42437,
+        "false_positive_rate": 0.19584569732937684,
+        "fn": 7213,
+        "fp": 5478,
+        "negative_responses": 14466,
+        "positive_responses": 27971,
+        "precision": 0.5697117272798681,
+        "recall": 0.5013825521913452,
+        "tn": 22493,
+        "tp": 7253
+      }
+    },
+    "candidate_id": "neuralcd_risk"
+  },
+  "status": "validation_disagreement_evaluated",
+  "test_evaluated": false,
+  "test_gate": "closed",
+  "validation_label_source_sha256": "3beb9130da238d5d912ee21f5a51d2d2fc556ae25c425671505a8dbffc130102",
+  "version": "disagreement_validation_v1"
+}
