@@ -186,3 +186,21 @@ class OnlineStudentAdapter:
                 .numpy()
                 .copy()
             )
+
+
+class FrozenPriorAdapter(OnlineStudentAdapter):
+    """No-adaptation control with the identical training-derived prior.
+
+    Observations are counted to satisfy the chronological evaluator's
+    accounting contract, but no local or global parameters are updated.
+    """
+
+    def observe(self, item_idx: int, correct: int) -> bool:
+        if correct not in (0, 1):
+            raise ValueError("correct must be 0 or 1")
+
+        if not self.supported(item_idx):
+            return False
+
+        self.observations += 1
+        return True

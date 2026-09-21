@@ -175,3 +175,40 @@ def test_invalid_q_shape_is_rejected():
             np.zeros((3, 4)),
             np.ones(3, dtype=bool),
         )
+
+
+def test_frozen_prior_ablation_never_adapts():
+    from src.evaluation.neuralcd_online import FrozenPriorAdapter
+
+    model, original = make_adapter()
+
+    adapter = FrozenPriorAdapter(
+        model=model,
+        q_matrix=original.q.cpu().numpy(),
+        seen_item_mask=original.seen,
+        learning_rate=0.1,
+        prior_penalty=0.01,
+    )
+
+    initial = adapter.local_logits.detach().clone()
+    p_before = adapter.predict(0)
+
+    assert adapter.observe(0, 1) is True
+    assert adapter.observe(1, 0) is True
+
+    assert adapter.observations == 2
+
+    torch.testing.assert_close(
+        adapter.local_logits.detach(),
+        initial,
+    )
+
+    assert adapter.predict(0) == pytest.approx(p_before)
+
+    assert adapter.observe(2, 1) is False
+    assert adapter.observations == 2
+
+    assert all(
+        parameter.grad is None
+        for parameter in model.parameters()
+    )

@@ -19,7 +19,10 @@ import pyarrow.dataset as ds
 import torch
 
 from scripts.fit_bkt import metrics
-from src.evaluation.neuralcd_online import OnlineStudentAdapter
+from src.evaluation.neuralcd_online import (
+    OnlineStudentAdapter,
+    FrozenPriorAdapter,
+)
 from src.evaluation.neuralcd_stream import (
     Interaction,
     evaluate_histories,
@@ -72,6 +75,12 @@ def main() -> None:
         help="Integration test only; omit for full validation.",
     )
 
+    parser.add_argument(
+        "--no-adaptation",
+        action="store_true",
+        help="Keep the training-derived student prior fixed.",
+    )
+
     args = parser.parse_args()
 
     if (
@@ -86,10 +95,16 @@ def main() -> None:
         else "full_validation_candidate"
     )
 
+    if args.no_adaptation:
+        mode += "_no_adaptation"
+
     run_name = f"epoch_{args.epoch:02d}"
 
     if args.max_students is not None:
         run_name += f"_smoke_{args.max_students}students"
+
+    if args.no_adaptation:
+        run_name += "_no_adaptation"
 
     output_dir = OUTPUT / run_name
 
@@ -317,8 +332,14 @@ def main() -> None:
             for row in group.itertuples(index=False)
         ]
 
+    adapter_type = (
+        FrozenPriorAdapter
+        if args.no_adaptation
+        else OnlineStudentAdapter
+    )
+
     def make_adapter():
-        return OnlineStudentAdapter(
+        return adapter_type(
             model=model,
             q_matrix=q,
             seen_item_mask=seen,
@@ -485,8 +506,15 @@ def main() -> None:
             manifest["assignment_sha256"]
         ),
         "device": device,
-        "adaptation_learning_rate": ADAPTATION_LR,
-        "adaptation_prior_penalty": PRIOR_PENALTY,
+        "adaptation_mode": (
+            "frozen_prior" if args.no_adaptation else "online_sgd"
+        ),
+        "adaptation_learning_rate": (
+            None if args.no_adaptation else ADAPTATION_LR
+        ),
+        "adaptation_prior_penalty": (
+            None if args.no_adaptation else PRIOR_PENALTY
+        ),
         "validation_students_processed": len(histories),
         "primary_targets": int(len(targets)),
         "matched_targets": int(len(predictions)),

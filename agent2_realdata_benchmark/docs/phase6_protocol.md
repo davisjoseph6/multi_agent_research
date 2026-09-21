@@ -337,3 +337,24 @@ are development analyses conditional on the selected models.
 They do not correct for checkpoint-selection bias.
 
 No test outcomes have been evaluated.
+
+### NeuralCD online-adaptation ablation
+
+The initial adaptation ablation compares the selected epoch-2
+checkpoint under two conditions:
+
+1. Online SGD adaptation with learning rate 0.1 and prior penalty 0.01.
+2. A frozen-prior control that never updates the local student logits.
+
+Both conditions use identical globally trained weights, training-
+derived initial representations, Q-matrix, student histories and
+matched target identifiers.
+
+The frozen-prior control counts supported observations but ignores
+their labels for representation updates.
+
+Predictions with zero preceding supported observations must agree
+between conditions.
+
+The ablation is evaluated on the validation partition only.
+Its findings are development results, not independent test evidence.
