@@ -134,3 +134,31 @@ constitute a validated unseen-item solution.
 
 This NeuralCD experiment evaluates prediction of recorded responses,
 not recovery effectiveness or independently verified mastery.
+
+### NeuralCD initial training-population decision
+
+The initial NeuralCDM baseline trains on all skill-annotated
+interactions belonging to training students, including scaffolding.
+
+Only the frozen eligible primary targets contribute to the principal
+validation metrics.
+
+This differs from the original shared-parameter BKT fitting objective,
+which scores primary targets but incorporates tagged scaffolding
+responses through sequential belief updates.
+
+A primary-target-only NeuralCD training ablation will assess sensitivity
+to this difference.
+
+Training-student IDs must use a compact training-only index.
+Validation-student IDs are not allocated learned training embeddings.
+
+An item may be used for validation personalization only when its
+parameters were fitted using training interactions. Unknown items must
+not contribute gradients through random, untrained item embeddings.
+
+Validation personalization is strictly chronological:
+predict current target, reveal response, then update local student state.
+
+The network's nonnegative prediction-layer constraint is enforced
+after every optimizer update.
