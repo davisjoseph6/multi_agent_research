@@ -463,3 +463,36 @@ The selected NeuralCD configuration and its grid results
 are not changed by this analysis.
 
 The test partition remains locked.
+
+### Selected NeuralCD calibration diagnostics v1
+
+The selected configuration is:
+- Epoch 2.
+- Online SGD learning rate 0.1.
+- Prior penalty 0.1.
+
+Calibration is assessed descriptively on the same 42437 matched
+validation targets used for the NeuralCD-BKT comparison.
+
+Both models are evaluated using ten equal-width probability bins.
+
+Reported diagnostics include:
+- Expected calibration error.
+- Bin-wise mean probability and observed positive fraction.
+- Mean prediction bias.
+- NLL, Brier score and ROC-AUC.
+- Near-zero and near-one prediction fractions.
+- Calibration by preceding supported NeuralCD history length.
+
+The history groups are 0, 1-4, 5-19 and 20+.
+
+No calibrator is fitted and no model predictions are modified.
+
+ECE is bin-dependent, and small calibration subgroups may produce
+unstable estimates. The selected configuration was chosen using
+validation outcomes, so these remain development diagnostics.
+
+Observed binary responses, including help-request outcomes, are
+not independent ground-truth measurements of student mastery.
+
+The test partition remains locked.
