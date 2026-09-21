@@ -832,3 +832,31 @@ No intervention or causal recovery outcome is evaluated.
 
 The existing frozen models and selected event policies
 remain unchanged. The held-out test gate remains closed.
+
+### Label-free disagreement rankings v1
+
+All eight registered candidate scores are computed using
+the frozen BKT and NeuralCD validation predictions.
+
+Each candidate ranks the same 42437 supported targets.
+
+Scores are ordered descending, with the registered SHA256
+tie-break and ascending source-row fallback.
+
+Each ranking contains exactly:
+- 4243 alerts at the ten-percent budget.
+- 8487 alerts at the twenty-percent budget.
+- 12731 alerts at the thirty-percent budget.
+
+The budget sets are nested.
+
+The ranking artifact contains model-derived scores,
+identities and alert decisions, but no response outcomes.
+
+The scores are not calibrated response probabilities.
+
+The 311 unsupported NeuralCD targets remain excluded from
+this matched-population experiment and are reported separately.
+
+No candidate has been evaluated or selected in this stage.
+The held-out test gate remains closed.

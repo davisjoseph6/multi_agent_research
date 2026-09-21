@@ -1,0 +1,31 @@
+{
+  "alert_counts_per_candidate": {
+    "0.1": 4243,
+    "0.2": 8487,
+    "0.3": 12731
+  },
+  "candidate_count": 8,
+  "candidates": [
+    "neuralcd_risk",
+    "bkt_risk",
+    "mean_risk",
+    "max_risk",
+    "neuralcd_risk_plus_disagreement_a0.25",
+    "neuralcd_risk_plus_disagreement_a0.5",
+    "neuralcd_risk_plus_disagreement_a1",
+    "neuralcd_risk_plus_disagreement_a2"
+  ],
+  "individual_response_labels_read": false,
+  "matched_targets": 42437,
+  "neuralcd_unsupported_reported_separately": 311,
+  "ranking_code_sha256": "d02cc400ab1a5f614a61eda65f8e7892f6db98db528e8c60f744d02d5f7e0a56",
+  "ranking_records": 339496,
+  "rankings_sha256": "c506afce0801475435fb6a4433f0f112271b676579b7c13e814a6340117f7223",
+  "registration_sha256": "c35094035ab357ec1fc7a207cb6972beb5f78bc3f35f316bad2f9bb7744de633",
+  "score_code_sha256": "d8d996bbc2685ebb51515943b41bd1203011255d983e849ec7a5c62e65dc619b",
+  "signals_sha256": "3bd53b03d44f6ecc6f93a586adeb971f556a2fc0b731d5f24ea1878a0eab359b",
+  "status": "label_free_rankings_completed",
+  "test_evaluated": false,
+  "test_gate": "closed",
+  "version": "disagreement_rankings_v1"
+}
