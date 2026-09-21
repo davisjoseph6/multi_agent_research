@@ -1,0 +1,293 @@
+{
+  "candidate_count": 45,
+  "candidates": [
+    {
+      "epoch": 1,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 1,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 1,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 1,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 1,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 1,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 1,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 1,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 1,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 2,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 2,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 2,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 2,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 2,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 2,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 2,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 2,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 2,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 3,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 3,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 3,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 3,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 3,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 3,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 3,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 3,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 3,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 4,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 4,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 4,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 4,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 4,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 4,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 4,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 4,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 4,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 5,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 5,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 5,
+      "learning_rate": 0.01,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 5,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 5,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 5,
+      "learning_rate": 0.1,
+      "prior_penalty": 0.1
+    },
+    {
+      "epoch": 5,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.0
+    },
+    {
+      "epoch": 5,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.01
+    },
+    {
+      "epoch": 5,
+      "learning_rate": 0.3,
+      "prior_penalty": 0.1
+    }
+  ],
+  "epochs": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "existing_candidate_count": 5,
+  "learning_rates": [
+    0.01,
+    0.1,
+    0.3
+  ],
+  "limitations": "Hyperparameters and checkpoint are selected on the same validation partition. Final performance requires locked test evaluation. Original reference outputs remain unchanged.",
+  "matched_targets_required": 42437,
+  "new_candidate_count": 40,
+  "primary_targets_required": 42748,
+  "prior_penalties": [
+    0.0,
+    0.01,
+    0.1
+  ],
+  "reference_results": [
+    {
+      "epoch": 1,
+      "predictions_sha256": "e31ab8c6858a775cc9516bbd628f4edf6f2d2749ad6fc52f4a0a0bd3c8027e70",
+      "report_sha256": "1decd5bfdfcef5e6a26cf52a41d7efebb81e55caf80dbe72366326d2e022eb60"
+    },
+    {
+      "epoch": 2,
+      "predictions_sha256": "d0258e8ee5a2d190941ba3e436116bb1c8c2c2033ba6f06866b3bfee856c3387",
+      "report_sha256": "2e5e0b66c2bf390b1af6616fde2e9664d193463bf7962f279a93c715491d41d5"
+    },
+    {
+      "epoch": 3,
+      "predictions_sha256": "10276db09bf3a33546cf104003621cb6a5e975950f501296a7dfece536b34c4f",
+      "report_sha256": "ee32ec7a66943fb7997e1a274d95e89827a73c3844f99e310e36095fdbe1a2ab"
+    },
+    {
+      "epoch": 4,
+      "predictions_sha256": "d5331d85ee6f9ecaf269ee8d6419e65c93254fd6645a62b141667a523abf9abe",
+      "report_sha256": "e8dee8a71aa5820b8c10c880d4b7a269693301d26bdb69fe99f06749ceb112c9"
+    },
+    {
+      "epoch": 5,
+      "predictions_sha256": "023a6d1e6905fa7c6dd2ea2601a89ca2a11aecbc4e1f08ac4f0a3713af11de5d",
+      "report_sha256": "6f2153fe324cbdfb97a419d5a41d189d5e227d2e613b531028321bcf973cf896"
+    }
+  ],
+  "selection_direction": "minimize",
+  "selection_metric": "matched_validation_nll",
+  "status": "registered_before_new_evaluations",
+  "test_evaluated": false,
+  "tie_break": [
+    "epoch_ascending",
+    "learning_rate_ascending",
+    "prior_penalty_ascending"
+  ],
+  "training_report_sha256": "4268025af7db7664a03e8b3fe71cb9a0ff85aff39edf9947519783f58d3cb5b6",
+  "unsupported_targets_required": 311,
+  "validator_sha256": "ac3e4e5e181e4c6d6bba1bcc8b2aeceb2e5d22226000daf503531dcc1a30647e",
+  "version": "neuralcd_grid_v1",
+  "wrapper_sha256": "75c750468decde0f2af8f03ce512026bf354e3cfcfac1b48ec483e9f2f5e07d4"
+}

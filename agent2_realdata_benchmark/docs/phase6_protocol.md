@@ -381,3 +381,33 @@ Therefore, these bootstrap intervals do not correct for
 checkpoint-selection bias and are not confirmatory evidence.
 
 The test partition remains locked.
+
+### Prespecified NeuralCD joint validation grid v1
+
+The joint model-selection search is registered before any new
+grid evaluations.
+
+Candidates:
+- Epochs: 1, 2, 3, 4, 5.
+- Online SGD learning rates: 0.01, 0.1, 0.3.
+- Prior penalties: 0, 0.01, 0.1.
+
+There are 45 combinations. The five previously evaluated
+learning-rate-0.1, penalty-0.01 combinations are reused without
+recalculation. Forty additional combinations remain.
+
+Every configuration uses the identical 42437 known-item
+validation target population.
+
+Selection minimizes matched validation NLL, breaking exact ties
+by earlier epoch, lower learning rate and lower prior penalty.
+
+The validator and wrapper source hashes are recorded in
+docs/data/neuralcd_grid_spec_v1.json.
+
+Existing training weights and historical validation reports
+must not be modified.
+
+Grid results are development estimates. The test partition
+remains locked until configuration selection and all planned
+sensitivity analyses are finalized.
