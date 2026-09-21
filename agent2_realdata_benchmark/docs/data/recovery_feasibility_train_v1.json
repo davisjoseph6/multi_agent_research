@@ -1,0 +1,86 @@
+{
+  "data_provenance": {
+    "audit_code_sha256": "9c538bdd2e778f8625f7608e739a56064c6637c2131da11855523149b001a124",
+    "columns_projected": [
+      "source_row",
+      "student_id",
+      "event_order",
+      "is_main_problem",
+      "is_primary_target",
+      "correct",
+      "first_action",
+      "hint_count",
+      "assistment_id"
+    ],
+    "manifest_sha256": "6684271c9badf0701e5fbb24bf41b9eca65d19ba1dae6811199ced2a56b5b41a",
+    "processed_sha256": "452a1e25dbc6d882fed1647f0f6ce2f54d515c131b708e6a6759a4c6f8e0ee15",
+    "student_filter": "registered_train_students_only",
+    "train_students_sha256": "7eef9ce681630ccb4c2e9165a742b3936a8dfafb23f151f32bcff01006f97add"
+  },
+  "first_action_all_interactions": {
+    "0": 205564,
+    "1": 20598,
+    "2": 4225
+  },
+  "hint_count_quality": {
+    "negative_numeric_values": 0,
+    "nonempty": 230387,
+    "nonempty_unparseable": 0,
+    "parseable_numeric": 230387
+  },
+  "limitations": [
+    "First action is observed during an interaction, not an available pre-response predictor.",
+    "Next main problem is the next recorded main row within the same student, not a causal outcome.",
+    "Voluntary help requests are not randomized treatment.",
+    "Correct=0 includes help-request outcome coding.",
+    "Event order does not recover exact within-problem hint and attempt timing.",
+    "The analysis does not administer an intervention.",
+    "Arrow filtering guarantees returned training rows; physical mixed-row-group reads are not ruled out."
+  ],
+  "main_problem_groups_by_first_action": {
+    "0": {
+      "current_positive_response_rate": 0.7260925589180988,
+      "main_problems": 166078,
+      "next_main_positive_response_rate": 0.6993157093324038,
+      "next_main_same_assistment": 1005,
+      "with_next_main_problem": 163527,
+      "without_next_main_problem": 2551
+    },
+    "1": {
+      "current_positive_response_rate": 0.0,
+      "main_problems": 12895,
+      "next_main_positive_response_rate": 0.28275369223439734,
+      "next_main_same_assistment": 201,
+      "with_next_main_problem": 12594,
+      "without_next_main_problem": 301
+    },
+    "2": {
+      "current_positive_response_rate": 0.0,
+      "main_problems": 4222,
+      "next_main_positive_response_rate": 0.25733689061363085,
+      "next_main_same_assistment": 6,
+      "with_next_main_problem": 4123,
+      "without_next_main_problem": 99
+    }
+  },
+  "population": {
+    "duplicate_student_event_orders": 0,
+    "main_problems": 183195,
+    "primary_targets": 172439,
+    "scaffolding_interactions": 47192,
+    "training_interactions": 230387,
+    "training_students": 2951
+  },
+  "sequence_availability": {
+    "immediate_next_record_scaffold_same_assistment": 15620,
+    "main_with_next_main": 180244,
+    "main_without_next_main": 2951,
+    "next_main_same_assistment": 1212
+  },
+  "status": "training_only_observational_audit",
+  "test_gate": "closed",
+  "test_outcomes_evaluated": false,
+  "test_rows_returned": 0,
+  "validation_rows_returned": 0,
+  "version": "recovery_feasibility_train_v1"
+}
