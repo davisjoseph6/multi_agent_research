@@ -692,3 +692,38 @@ intervention would improve learning.
 No test outcomes may be used for policy selection.
 
 The held-out test gate remains closed.
+
+### Event-detection validation evaluation v1
+
+The event-detection evaluation implementation was committed
+before validation labels were loaded for policy scoring.
+
+All 50 registered model-policy configurations were evaluated.
+
+Every candidate generated its decisions from the frozen,
+label-free uncertainty signals before response labels were read.
+
+The two models were selected independently using the registered
+rule on the same 42437 matched validation targets.
+
+Selected decisions are preserved without response labels.
+
+The frozen BKT model is additionally evaluated on all 42748
+eligible validation targets under its selected policy.
+
+The 311 unsupported NeuralCD targets remain abstentions.
+
+The alert budget applies to the pooled response population,
+not separately to every student or classroom.
+
+Policy selection and reported detection performance use the
+same validation outcomes. These are development results and
+cannot be treated as independent test estimates.
+
+The target is observed negative response, including the
+dataset's help-request outcome coding. It is not a
+counterfactual measure of intervention need.
+
+No pedagogical intervention was administered or evaluated.
+
+The held-out test gate remains closed.

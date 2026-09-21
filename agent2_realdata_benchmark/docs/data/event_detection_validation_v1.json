@@ -1,0 +1,1078 @@
+{
+  "candidate_results": {
+    "bkt_v1": [
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "no_trigger",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.16143931003605344,
+          "alerts": 6851,
+          "count": 42437,
+          "false_positive_rate": 0.09198813056379822,
+          "fn": 10188,
+          "fp": 2573,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.6244343891402715,
+          "recall": 0.29572791372874324,
+          "tn": 25398,
+          "tp": 4278
+        },
+        "policy": "risk_only",
+        "risk_threshold": 0.5,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 4.7128684874048587e-05,
+          "alerts": 2,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14464,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 1.0,
+          "recall": 0.00013825521913452232,
+          "tn": 27971,
+          "tp": 2
+        },
+        "policy": "risk_only",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_only",
+        "risk_threshold": 0.9,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 1.0,
+          "alerts": 42437,
+          "count": 42437,
+          "false_positive_rate": 1.0,
+          "fn": 0,
+          "fp": 27971,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.34088177769399347,
+          "recall": 1.0,
+          "tn": 0,
+          "tp": 14466
+        },
+        "policy": "entropy_only",
+        "risk_threshold": 0.7,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.6048495416735395,
+          "alerts": 25668,
+          "count": 42437,
+          "false_positive_rate": 0.5344821422187266,
+          "fn": 3748,
+          "fp": 14950,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4175627240143369,
+          "recall": 0.7409097193419052,
+          "tn": 13021,
+          "tp": 10718
+        },
+        "policy": "entropy_only",
+        "risk_threshold": 0.7,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.19940146570209957,
+          "alerts": 8462,
+          "count": 42437,
+          "false_positive_rate": 0.16402702799327876,
+          "fn": 10592,
+          "fp": 4588,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4578113921058851,
+          "recall": 0.2678003594635697,
+          "tn": 23383,
+          "tp": 3874
+        },
+        "policy": "entropy_only",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 1.0,
+          "alerts": 42437,
+          "count": 42437,
+          "false_positive_rate": 1.0,
+          "fn": 0,
+          "fp": 27971,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.34088177769399347,
+          "recall": 1.0,
+          "tn": 0,
+          "tp": 14466
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.6048495416735395,
+          "alerts": 25668,
+          "count": 42437,
+          "false_positive_rate": 0.5344821422187266,
+          "fn": 3748,
+          "fp": 14950,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4175627240143369,
+          "recall": 0.7409097193419052,
+          "tn": 13021,
+          "tp": 10718
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.28015646723378185,
+          "alerts": 11889,
+          "count": 42437,
+          "false_positive_rate": 0.1963819670372886,
+          "fn": 8070,
+          "fp": 5493,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5379762805955085,
+          "recall": 0.4421401907922024,
+          "tn": 22478,
+          "tp": 6396
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 1.0,
+          "alerts": 42437,
+          "count": 42437,
+          "false_positive_rate": 1.0,
+          "fn": 0,
+          "fp": 27971,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.34088177769399347,
+          "recall": 1.0,
+          "tn": 0,
+          "tp": 14466
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.6048495416735395,
+          "alerts": 25668,
+          "count": 42437,
+          "false_positive_rate": 0.5344821422187266,
+          "fn": 3748,
+          "fp": 14950,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4175627240143369,
+          "recall": 0.7409097193419052,
+          "tn": 13021,
+          "tp": 10718
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.19944859438697363,
+          "alerts": 8464,
+          "count": 42437,
+          "false_positive_rate": 0.16402702799327876,
+          "fn": 10590,
+          "fp": 4588,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.45793950850661624,
+          "recall": 0.26793861468270425,
+          "tn": 23383,
+          "tp": 3876
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 1.0,
+          "alerts": 42437,
+          "count": 42437,
+          "false_positive_rate": 1.0,
+          "fn": 0,
+          "fp": 27971,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.34088177769399347,
+          "recall": 1.0,
+          "tn": 0,
+          "tp": 14466
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.6048495416735395,
+          "alerts": 25668,
+          "count": 42437,
+          "false_positive_rate": 0.5344821422187266,
+          "fn": 3748,
+          "fp": 14950,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4175627240143369,
+          "recall": 0.7409097193419052,
+          "tn": 13021,
+          "tp": 10718
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.19940146570209957,
+          "alerts": 8462,
+          "count": 42437,
+          "false_positive_rate": 0.16402702799327876,
+          "fn": 10592,
+          "fp": 4588,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4578113921058851,
+          "recall": 0.2678003594635697,
+          "tn": 23383,
+          "tp": 3874
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 0.16143931003605344,
+          "alerts": 6851,
+          "count": 42437,
+          "false_positive_rate": 0.09198813056379822,
+          "fn": 10188,
+          "fp": 2573,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.6244343891402715,
+          "recall": 0.29572791372874324,
+          "tn": 25398,
+          "tp": 4278
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.16143931003605344,
+          "alerts": 6851,
+          "count": 42437,
+          "false_positive_rate": 0.09198813056379822,
+          "fn": 10188,
+          "fp": 2573,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.6244343891402715,
+          "recall": 0.29572791372874324,
+          "tn": 25398,
+          "tp": 4278
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.08068430850437118,
+          "alerts": 3424,
+          "count": 42437,
+          "false_positive_rate": 0.05963319151978835,
+          "fn": 12710,
+          "fp": 1668,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5128504672897196,
+          "recall": 0.1213880824001106,
+          "tn": 26303,
+          "tp": 1756
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 4.7128684874048587e-05,
+          "alerts": 2,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14464,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 1.0,
+          "recall": 0.00013825521913452232,
+          "tn": 27971,
+          "tp": 2
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 4.7128684874048587e-05,
+          "alerts": 2,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14464,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 1.0,
+          "recall": 0.00013825521913452232,
+          "tn": 27971,
+          "tp": 2
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": true
+      }
+    ],
+    "neuralcd_v1": [
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "no_trigger",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.2732285505572967,
+          "alerts": 11595,
+          "count": 42437,
+          "false_positive_rate": 0.17428765507132388,
+          "fn": 7746,
+          "fp": 4875,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5795601552393272,
+          "recall": 0.464537536291995,
+          "tn": 23096,
+          "tp": 6720
+        },
+        "policy": "risk_only",
+        "risk_threshold": 0.5,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_only",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_only",
+        "risk_threshold": 0.9,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 0.9341140985460801,
+          "alerts": 39641,
+          "count": 42437,
+          "false_positive_rate": 0.911622752136141,
+          "fn": 324,
+          "fp": 25499,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.35675184783431296,
+          "recall": 0.9776026545002073,
+          "tn": 2472,
+          "tp": 14142
+        },
+        "policy": "entropy_only",
+        "risk_threshold": 0.7,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.6731154417135989,
+          "alerts": 28565,
+          "count": 42437,
+          "false_positive_rate": 0.5811018554931894,
+          "fn": 2155,
+          "fp": 16254,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4309819709434623,
+          "recall": 0.8510300013825521,
+          "tn": 11717,
+          "tp": 12311
+        },
+        "policy": "entropy_only",
+        "risk_threshold": 0.7,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.46501873365223745,
+          "alerts": 19734,
+          "count": 42437,
+          "false_positive_rate": 0.36527117371563406,
+          "fn": 4949,
+          "fp": 10217,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4822641126988953,
+          "recall": 0.6578874602516245,
+          "tn": 17754,
+          "tp": 9517
+        },
+        "policy": "entropy_only",
+        "risk_threshold": 0.7,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 0.9341140985460801,
+          "alerts": 39641,
+          "count": 42437,
+          "false_positive_rate": 0.911622752136141,
+          "fn": 324,
+          "fp": 25499,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.35675184783431296,
+          "recall": 0.9776026545002073,
+          "tn": 2472,
+          "tp": 14142
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.6731154417135989,
+          "alerts": 28565,
+          "count": 42437,
+          "false_positive_rate": 0.5811018554931894,
+          "fn": 2155,
+          "fp": 16254,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4309819709434623,
+          "recall": 0.8510300013825521,
+          "tn": 11717,
+          "tp": 12311
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.49044465914178664,
+          "alerts": 20813,
+          "count": 42437,
+          "false_positive_rate": 0.37531729291051447,
+          "fn": 4151,
+          "fp": 10498,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4956037092201989,
+          "recall": 0.7130512926862989,
+          "tn": 17473,
+          "tp": 10315
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 0.9341140985460801,
+          "alerts": 39641,
+          "count": 42437,
+          "false_positive_rate": 0.911622752136141,
+          "fn": 324,
+          "fp": 25499,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.35675184783431296,
+          "recall": 0.9776026545002073,
+          "tn": 2472,
+          "tp": 14142
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.6731154417135989,
+          "alerts": 28565,
+          "count": 42437,
+          "false_positive_rate": 0.5811018554931894,
+          "fn": 2155,
+          "fp": 16254,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4309819709434623,
+          "recall": 0.8510300013825521,
+          "tn": 11717,
+          "tp": 12311
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.46501873365223745,
+          "alerts": 19734,
+          "count": 42437,
+          "false_positive_rate": 0.36527117371563406,
+          "fn": 4949,
+          "fp": 10217,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4822641126988953,
+          "recall": 0.6578874602516245,
+          "tn": 17754,
+          "tp": 9517
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 0.9341140985460801,
+          "alerts": 39641,
+          "count": 42437,
+          "false_positive_rate": 0.911622752136141,
+          "fn": 324,
+          "fp": 25499,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.35675184783431296,
+          "recall": 0.9776026545002073,
+          "tn": 2472,
+          "tp": 14142
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.6731154417135989,
+          "alerts": 28565,
+          "count": 42437,
+          "false_positive_rate": 0.5811018554931894,
+          "fn": 2155,
+          "fp": 16254,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4309819709434623,
+          "recall": 0.8510300013825521,
+          "tn": 11717,
+          "tp": 12311
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.46501873365223745,
+          "alerts": 19734,
+          "count": 42437,
+          "false_positive_rate": 0.36527117371563406,
+          "fn": 4949,
+          "fp": 10217,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.4822641126988953,
+          "recall": 0.6578874602516245,
+          "tn": 17754,
+          "tp": 9517
+        },
+        "policy": "risk_or_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": false
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 0.2732285505572967,
+          "alerts": 11595,
+          "count": 42437,
+          "false_positive_rate": 0.17428765507132388,
+          "fn": 7746,
+          "fp": 4875,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5795601552393272,
+          "recall": 0.464537536291995,
+          "tn": 23096,
+          "tp": 6720
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.2732285505572967,
+          "alerts": 11595,
+          "count": 42437,
+          "false_positive_rate": 0.17428765507132388,
+          "fn": 7746,
+          "fp": 4875,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5795601552393272,
+          "recall": 0.464537536291995,
+          "tn": 23096,
+          "tp": 6720
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.24780262506774747,
+          "alerts": 10516,
+          "count": 42437,
+          "false_positive_rate": 0.16424153587644347,
+          "fn": 8544,
+          "fp": 4594,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": 0.5631418790414606,
+          "recall": 0.40937370385732064,
+          "tn": 23377,
+          "tp": 5922
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.5,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.7,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.5,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.8,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": true
+      },
+      {
+        "entropy_threshold": 0.95,
+        "metrics": {
+          "alert_rate": 0.0,
+          "alerts": 0,
+          "count": 42437,
+          "false_positive_rate": 0.0,
+          "fn": 14466,
+          "fp": 0,
+          "negative_responses": 14466,
+          "positive_responses": 27971,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 27971,
+          "tp": 0
+        },
+        "policy": "risk_and_entropy",
+        "risk_threshold": 0.9,
+        "within_alert_budget": true
+      }
+    ]
+  },
+  "eligible_primary_targets": 42748,
+  "evaluation_code_sha256": "0d1d2a628e5a839ac070fc3fa7808653073d8d682cce24ceb39b79d4c665b53a",
+  "interpretation": "Offline detection of observed negative responses, not intervention need or causal recovery. Selection uses validation outcomes; these are development metrics.",
+  "label_source_sha256": "3beb9130da238d5d912ee21f5a51d2d2fc556ae25c425671505a8dbffc130102",
+  "matched_targets": 42437,
+  "neuralcd_abstentions": 311,
+  "registration_sha256": "844796f2cbf08c9b6f8bf55741566db482d4be5dbef287bdb85cd6cc1a3f8f6a",
+  "selected": {
+    "bkt_v1": {
+      "entropy_threshold": 0.95,
+      "metrics": {
+        "alert_rate": 0.28015646723378185,
+        "alerts": 11889,
+        "count": 42437,
+        "false_positive_rate": 0.1963819670372886,
+        "fn": 8070,
+        "fp": 5493,
+        "negative_responses": 14466,
+        "positive_responses": 27971,
+        "precision": 0.5379762805955085,
+        "recall": 0.4421401907922024,
+        "tn": 22478,
+        "tp": 6396
+      },
+      "policy": "risk_or_entropy",
+      "risk_threshold": 0.5,
+      "within_alert_budget": true
+    },
+    "neuralcd_v1": {
+      "entropy_threshold": 0.8,
+      "metrics": {
+        "alert_rate": 0.2732285505572967,
+        "alerts": 11595,
+        "count": 42437,
+        "false_positive_rate": 0.17428765507132388,
+        "fn": 7746,
+        "fp": 4875,
+        "negative_responses": 14466,
+        "positive_responses": 27971,
+        "precision": 0.5795601552393272,
+        "recall": 0.464537536291995,
+        "tn": 23096,
+        "tp": 6720
+      },
+      "policy": "risk_only",
+      "risk_threshold": 0.5,
+      "within_alert_budget": true
+    }
+  },
+  "selected_bkt_full_coverage": {
+    "alert_rate": 0.28015345747169457,
+    "alerts": 11976,
+    "count": 42748,
+    "false_positive_rate": 0.1962948504099088,
+    "fn": 8126,
+    "fp": 5531,
+    "negative_responses": 14571,
+    "positive_responses": 28177,
+    "precision": 0.5381596526386105,
+    "recall": 0.4423169308901242,
+    "tn": 22646,
+    "tp": 6445
+  },
+  "selected_decisions_sha256": "2766031296552f456bd1918216a1c72dc5f623742799465cba6e210125e53604",
+  "signals_sha256": "3bd53b03d44f6ecc6f93a586adeb971f556a2fc0b731d5f24ea1878a0eab359b",
+  "status": "validation_policy_selection_completed",
+  "test_evaluated": false,
+  "test_gate": "closed",
+  "validation_response_labels_accessed_for_scoring": true,
+  "version": "event_detection_validation_v1"
+}
