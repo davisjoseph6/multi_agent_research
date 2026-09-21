@@ -901,3 +901,43 @@ was evaluated.
 
 The frozen BKT, NeuralCD and event-detection policies remain
 unchanged. The held-out test gate remains closed.
+
+### Frozen disagreement experiment v1
+
+The registered cross-model disagreement experiment is frozen
+in docs/data/disagreement_v1_frozen.json.
+
+The primary population contains 42437 matched validation
+targets, with exactly 12731 alerts per candidate.
+
+The registered disagreement-family selection retained
+NeuralCD risk alone, with alpha = 0.
+
+Primary negative-response detections:
+- NeuralCD risk: 7253.
+- NeuralCD risk plus disagreement, alpha 0.25: 7184.
+- Alpha 0.5: 7150.
+- Alpha 1.0: 6961.
+- Alpha 2.0: 6326.
+
+None of the registered positive-alpha additive variants
+improved primary detection over the risk-only control on
+this development population.
+
+BKT risk, mean risk and maximum risk were reported as
+separate controls.
+
+The outcome does not establish that cross-model disagreement
+is universally uninformative or that the models' disagreement
+measures epistemic uncertainty.
+
+The same validation outcomes informed earlier model and
+policy choices. These findings are development results,
+not independent confirmation.
+
+No intervention or causal learning benefit was evaluated.
+
+The experiment will not be retuned using these outcomes.
+
+The frozen cognitive-diagnosis and event-detection baselines
+remain unchanged. The held-out test gate remains closed.

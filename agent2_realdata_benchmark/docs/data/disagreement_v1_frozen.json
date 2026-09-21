@@ -1,0 +1,28 @@
+{
+  "evaluation_code_sha256": "cb1abb53938bb70baa5f5478bdc4dde330dcc9d8c1eb0e7530b9518ddb2e9ea7",
+  "individual_response_labels_read_during_freeze": false,
+  "interpretation": "None of the four registered positive-alpha disagreement variants improved negative-response detections over NeuralCD risk at the primary fixed alert budget on this reused validation population. No causal recovery effect or independently calibrated epistemic uncertainty was evaluated.",
+  "matched_targets": 42437,
+  "neuralcd_abstentions_outside_population": 311,
+  "primary_alert_count": 12731,
+  "primary_true_positives": {
+    "bkt_risk": 6702,
+    "max_risk": 7239,
+    "mean_risk": 7252,
+    "neuralcd_risk": 7253,
+    "neuralcd_risk_plus_disagreement_a0.25": 7184,
+    "neuralcd_risk_plus_disagreement_a0.5": 7150,
+    "neuralcd_risk_plus_disagreement_a1": 6961,
+    "neuralcd_risk_plus_disagreement_a2": 6326
+  },
+  "ranking_artifact_sha256": "c506afce0801475435fb6a4433f0f112271b676579b7c13e814a6340117f7223",
+  "ranking_report_sha256": "7caf5317603eb0d6383584743357e5acfa08d00d1a8e118665484a97627e22e3",
+  "registration_sha256": "c35094035ab357ec1fc7a207cb6972beb5f78bc3f35f316bad2f9bb7744de633",
+  "selected_alpha": 0.0,
+  "selected_candidate": "neuralcd_risk",
+  "status": "frozen_development_disagreement_result",
+  "test_access_authorized": false,
+  "test_evaluated": false,
+  "validation_report_sha256": "fb1a02d759090bed065611fc7ac0b79b84eca3b56312dfe75d677179f45b7147",
+  "version": "disagreement_v1"
+}
