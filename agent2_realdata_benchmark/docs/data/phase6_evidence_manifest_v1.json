@@ -1,0 +1,71 @@
+{
+  "artifact_sha256": {
+    "bkt_freeze": "48d2129eb7a16b888faf766765b7e0ebda2e762bc99a13a472bd201a76bd2e89",
+    "disagreement_freeze": "e5cb8f94b0ae4f1304ead5cec51f22f5f172b173770765ae9c0b31d3019c81b2",
+    "disagreement_registration": "c35094035ab357ec1fc7a207cb6972beb5f78bc3f35f316bad2f9bb7744de633",
+    "disagreement_validation": "fb1a02d759090bed065611fc7ac0b79b84eca3b56312dfe75d677179f45b7147",
+    "durable_implementation": "62f2c7d4d2035d8c1bbc25230db6743b8ea51e226b5b03e803416e66922577d0",
+    "event_freeze": "330b0e137fb06e29b30f4ecbe33c8b2ef40e0502ce3523404cb55c55a33f19cd",
+    "event_registration": "844796f2cbf08c9b6f8bf55741566db482d4be5dbef287bdb85cd6cc1a3f8f6a",
+    "event_validation": "cc81c25df1249958d32777a463b444daa31b5bde6bcbff2c1c8ac63de1163fa7",
+    "fault_protocol": "6c9961ae1127a3897c55fb08609e84f9e45e8ac6749855f533e858498807ab68",
+    "fault_results": "3f0d6b23fde5aa92042993431bf7d7c650a00da00369acba9a043f7fbe415718",
+    "neuralcd_freeze": "86494866b02305b80a77af99384b830a0eb112761a03ac52fa458ad4bbb078c5",
+    "process_tests": "c22321c9966e5c8adade1c46798e392487d60a4ce8c23b9c84ec4e05e8e80a15",
+    "recovery_fault": "78eae530ed7708081a294f8424552a4e002029117ac35d92abe5fdc85b818b61",
+    "recovery_feasibility": "f27d60b262ac6d9228aa27cbc8af8cce7d04243d0912de3570c48295e69a476b",
+    "recovery_followup": "419f002489832f5e021c3e57852ecad2143a03a203d95c667a53cc260f66e270",
+    "recovery_shared_skill": "6534c3a7383e59da44629c753a8e4c0147f16140be5231cb26f257779af56b48",
+    "test_gate": "e8d22481fa4350a75ad5c505940037833a9f965006b918f2f851106e31b3acd1",
+    "uncertainty_bridge": "0c823e73675e647304f23f1b31bc0b6c3277f93697bb039c80a50a4a0589cdc9"
+  },
+  "builder_sha256": "f38755de66d371a6a14749c644df02d336438abc8e3a3cc3b0fe7b012659de0d",
+  "held_out_test_evaluated": false,
+  "interaction_rows_read_by_this_builder": false,
+  "new_models_fitted": false,
+  "new_policies_selected": false,
+  "not_established": [
+    "Causal benefit of hints or scaffolding",
+    "Real student assistance delivery",
+    "Improved student learning or mastery",
+    "Distributed exactly-once delivery",
+    "Independent held-out predictive confirmation"
+  ],
+  "response_labels_read_by_this_builder": false,
+  "source_commit": "fc3d9bde6c7929a10cc3f2fc7b36e7b547278ab5",
+  "status": "existing_evidence_consolidated",
+  "test_gate": "closed",
+  "verified_findings": {
+    "disagreement": {
+      "evidence_type": "reused_validation_development",
+      "matched_targets": 42437,
+      "primary_alerts_per_candidate": 12731,
+      "primary_true_positives": {
+        "bkt_risk": 6702,
+        "max_risk": 7239,
+        "mean_risk": 7252,
+        "neuralcd_risk": 7253,
+        "neuralcd_risk_plus_disagreement_a0.25": 7184,
+        "neuralcd_risk_plus_disagreement_a0.5": 7150,
+        "neuralcd_risk_plus_disagreement_a1": 6961,
+        "neuralcd_risk_plus_disagreement_a2": 6326
+      },
+      "selected_alpha": 0.0,
+      "selected_candidate": "neuralcd_risk"
+    },
+    "fault_evaluation": {
+      "combined_tests_passed": 180,
+      "evidence_type": "synthetic_local_software_tests",
+      "process_tests_passed": 3,
+      "protocol_edited_after_registration": false
+    },
+    "recovery_feasibility": {
+      "cross_assistment_followups": 179032,
+      "evidence_type": "training_only_observational",
+      "shared_skill_followups": 126995,
+      "training_interactions": 230387,
+      "training_students": 2951
+    }
+  },
+  "version": "phase6_evidence_manifest_v1"
+}
