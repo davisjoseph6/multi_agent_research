@@ -216,3 +216,40 @@ student model must be identified as distinct methods.
 
 Latent proficiency outputs are not independently verified measures
 of actual student mastery.
+
+### NeuralCD chronological evaluator
+
+The primary adapted-NeuralCD evaluator uses a newly initialized
+student adapter for every learner.
+
+Within each learner, interactions must have strictly increasing
+event_order values and unique source_row identifiers.
+
+For every supported interaction:
+1. Predict using the state before the current observation.
+2. Record the prediction only for an eligible primary target.
+3. Reveal the current binary outcome.
+4. Perform exactly one local student update.
+
+Supported scaffolding interactions contribute to adaptation history,
+but not to primary evaluation metrics.
+
+Unsupported questions contribute neither predictions nor updates.
+Unsupported primary targets must be counted and reported.
+
+Every recorded prediction includes the source row, student ID,
+event order, item index, observed outcome, predicted probability,
+and number of preceding supported observations.
+
+The evaluator must verify:
+- Independent initialization for each learner.
+- No duplicate source rows across learner histories.
+- Exact primary-target accounting.
+- No state changes during prediction.
+- Exactly one update after a supported observation.
+
+Model checkpoints produced by incomplete smoke tests are forbidden
+for reported validation or test results.
+
+Checkpoint selection, adaptation hyperparameters and matched target
+coverage must be fixed before final test evaluation.
