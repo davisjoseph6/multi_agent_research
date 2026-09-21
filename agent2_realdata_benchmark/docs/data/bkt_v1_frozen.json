@@ -1,0 +1,34 @@
+{
+  "comparison_with_original_fit": {
+    "maximum_absolute_probability_difference": 0.0012767657233433427,
+    "validation_nll_difference_selected_minus_original": -1.5572278240227888e-06
+  },
+  "dataset": "assist2009_corrected_collapsed",
+  "model_description": "Shared-parameter BKT with factorized conjunctive multi-skill approximation",
+  "outcome_definition": "ASSISTments recorded binary outcome; zeros can include help requests",
+  "parameters": {
+    "guess": 0.2793249796153968,
+    "initial_mastery": 0.7568476236319888,
+    "learning": 0.05154682159613857,
+    "slip": 0.2083717238294807
+  },
+  "processed_sha256": "452a1e25dbc6d882fed1647f0f6ce2f54d515c131b708e6a6759a4c6f8e0ee15",
+  "selected_run": "high_initial_mastery",
+  "selection_rule": "Lowest training NLL among converged prespecified initializations",
+  "source_sha256": "162ef8d2d28bcbfea6591a282994062bd8d5eaa00636544292a0d268dca6e5da",
+  "split_assignment_sha256": "07a56030f27efb3ce8bc04212cb6bcd67cc2d28f7d133fc9bf0f90d9b6a2f4da",
+  "split_seed": 7,
+  "status": "frozen_for_benchmark",
+  "test_evaluated": false,
+  "training_nll": 0.5922073379442662,
+  "validation": {
+    "accuracy_at_0_5": 0.6994479273884159,
+    "brier": 0.20277580089521052,
+    "count": 42748,
+    "nll": 0.5939645797862801,
+    "positive_fraction": 0.6591419481613174,
+    "roc_auc": 0.6702896947163081
+  },
+  "validation_predictions": "results/bkt/frozen_v1_validation_predictions.parquet",
+  "version": "bkt_shared_v1"
+}
