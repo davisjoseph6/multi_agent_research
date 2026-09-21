@@ -89,3 +89,48 @@ or validation model selection.
 The predicted target is the dataset's recorded binary outcome, which
 can include help requests among zero-valued labels. This is not a
 direct measurement of true knowledge.
+
+## NeuralCD benchmark design
+
+The student-disjoint primary split remains unchanged.
+
+The first NeuralCD experiment uses the original NeuralCDM-style
+architecture, reproduced against the authors' reference implementation.
+
+All global model parameters, including training-student embeddings and
+training-item parameters, are fitted using training students only.
+
+The initial baseline may train on skill-tagged training interactions,
+including scaffolding, but scores only the frozen primary target
+population. Training data selection must be fixed before fitting.
+
+For validation students, global parameters are frozen. A new student
+representation must be initialized from a training-derived prior.
+
+Cold-start adaptation may use earlier observed responses from that
+validation student, but it must not use the current or future response.
+
+Only the new student's local representation may be updated during
+validation inference. Any adaptation learning rate, regularization
+and initialization strategy must be selected using validation data
+and frozen before final test evaluation.
+
+The first item-embedding comparison covers only validation targets
+whose items occur in the annotated training interactions.
+
+BKT must be evaluated on exactly the same target identifiers.
+Uncovered items and excluded target counts must be reported.
+
+The original NeuralCD preprocessing must not overwrite the frozen
+ASSISTments source, student memberships or target definition.
+
+A separate known-student chronological experiment requires its own
+training-prefix split and model refitting. No student representation
+may be trained on future responses relative to its evaluation target.
+
+Unseen-item generalization requires a separately documented inductive
+item model or fallback. Randomly initialized item embeddings do not
+constitute a validated unseen-item solution.
+
+This NeuralCD experiment evaluates prediction of recorded responses,
+not recovery effectiveness or independently verified mastery.

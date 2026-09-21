@@ -1,0 +1,33 @@
+{
+  "bkt_full_validation": {
+    "accuracy_at_0_5": 0.6994479273884159,
+    "brier": 0.20277580089521052,
+    "count": 42748,
+    "nll": 0.5939645797862801,
+    "positive_fraction": 0.6591419481613174,
+    "roc_auc": 0.6702896947163081
+  },
+  "bkt_known_item_matched_validation": {
+    "accuracy_at_0_5": 0.6992954261611329,
+    "brier": 0.20285444347924603,
+    "count": 42437,
+    "nll": 0.5941418354152707,
+    "positive_fraction": 0.6591182223060066,
+    "roc_auc": 0.6700017667564809
+  },
+  "cold_start_targets_zero_prior_tagged": 627,
+  "comparison_population": "Validation primary targets whose item IDs have at least one skill-tagged training interaction",
+  "dataset": "assist2009_corrected_collapsed",
+  "distinct_unseen_items": 256,
+  "frozen_bkt_version": "bkt_shared_v1",
+  "frozen_prediction_sha256": "3beb9130da238d5d912ee21f5a51d2d2fc556ae25c425671505a8dbffc130102",
+  "known_item_target_fraction": 0.9927248058388697,
+  "known_item_targets": 42437,
+  "split_assignment_sha256": "07a56030f27efb3ce8bc04212cb6bcd67cc2d28f7d133fc9bf0f90d9b6a2f4da",
+  "test_partition_inspected": false,
+  "training_primary_item_count": 15432,
+  "training_tagged_item_count": 17146,
+  "unseen_item_targets": 311,
+  "validation_primary_targets": 42748,
+  "validation_students_with_targets": 627
+}
