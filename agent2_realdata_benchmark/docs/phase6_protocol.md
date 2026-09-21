@@ -791,3 +791,44 @@ must have separate version identifiers and evaluation
 protocols. They must not silently replace these policies.
 
 The held-out test gate remains closed.
+
+### Cross-model disagreement experiment v1
+
+A separate development experiment is registered in
+docs/data/disagreement_experiment_v1.json.
+
+For matched supported targets, disagreement is defined as
+the absolute difference between BKT and NeuralCD predicted
+positive-response probabilities.
+
+The primary comparison tests whether adding disagreement
+to NeuralCD failure risk changes negative-response detection
+at an identical alert budget.
+
+The controls include continuous NeuralCD risk, continuous
+BKT risk, mean risk and maximum risk.
+
+Eight candidate scores are registered. Every candidate
+generates exactly 12731 alerts on the same 42437 targets
+for the primary comparison.
+
+Ten-percent and twenty-percent alert budgets are additional
+descriptive sensitivity analyses.
+
+Scores are ranked without response labels. Equal scores
+receive the registered deterministic tie-break.
+
+The primary metric is the number of observed negative
+responses detected at the fixed thirty-percent budget.
+
+The comparison reuses validation outcomes that informed earlier
+model and policy selection. It therefore cannot provide
+independent confirmatory evidence of incremental benefit.
+
+Disagreement is not independently calibrated epistemic
+uncertainty. A combined ranking score is not a probability.
+
+No intervention or causal recovery outcome is evaluated.
+
+The existing frozen models and selected event policies
+remain unchanged. The held-out test gate remains closed.

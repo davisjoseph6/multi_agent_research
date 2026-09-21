@@ -1,0 +1,94 @@
+{
+  "additional_metrics": [
+    "precision",
+    "recall",
+    "false_positive_count",
+    "false_positive_rate",
+    "alert_overlap"
+  ],
+  "alert_counts": {
+    "0.1": 4243,
+    "0.2": 8487,
+    "0.3": 12731
+  },
+  "candidate_count": 8,
+  "candidate_scores": [
+    {
+      "alpha": 0.0,
+      "definition": "1 - p_neuralcd",
+      "id": "neuralcd_risk"
+    },
+    {
+      "alpha": null,
+      "definition": "1 - p_bkt",
+      "id": "bkt_risk"
+    },
+    {
+      "alpha": null,
+      "definition": "((1 - p_neuralcd) + (1 - p_bkt)) / 2",
+      "id": "mean_risk"
+    },
+    {
+      "alpha": null,
+      "definition": "max(1 - p_neuralcd, 1 - p_bkt)",
+      "id": "max_risk"
+    },
+    {
+      "alpha": 0.25,
+      "definition": "(1 - p_neuralcd) + alpha * abs(p_neuralcd - p_bkt)",
+      "id": "neuralcd_risk_plus_disagreement_a0.25"
+    },
+    {
+      "alpha": 0.5,
+      "definition": "(1 - p_neuralcd) + alpha * abs(p_neuralcd - p_bkt)",
+      "id": "neuralcd_risk_plus_disagreement_a0.5"
+    },
+    {
+      "alpha": 1.0,
+      "definition": "(1 - p_neuralcd) + alpha * abs(p_neuralcd - p_bkt)",
+      "id": "neuralcd_risk_plus_disagreement_a1"
+    },
+    {
+      "alpha": 2.0,
+      "definition": "(1 - p_neuralcd) + alpha * abs(p_neuralcd - p_bkt)",
+      "id": "neuralcd_risk_plus_disagreement_a2"
+    }
+  ],
+  "candidate_selection": "Among neuralcd_risk and the four disagreement variants, maximize true positives at 12731 alerts; break exact ties by smaller alpha. Selection is development-only.",
+  "descriptive_budget_fractions": [
+    0.1,
+    0.2
+  ],
+  "disagreement_definition": "abs(p_neuralcd - p_bkt)",
+  "individual_response_labels_read": false,
+  "matched_targets": 42437,
+  "models": [
+    "bkt_v1",
+    "neuralcd_v1"
+  ],
+  "population": "matched_validation_supported_targets",
+  "primary_alert_fraction": 0.3,
+  "primary_comparison": "Each nonzero-alpha disagreement score versus neuralcd_risk at the identical alert count. Also report bkt_risk, mean_risk and max_risk.",
+  "primary_outcome": "number_of_observed_negative_responses_flagged_at_exactly_12731_alerts",
+  "ranking_rule": "descending_score",
+  "scientific_limitations": "Reuses validation outcomes previously used for model and event-policy selection. Disagreement is not independently calibrated epistemic uncertainty. No intervention is performed and no causal recovery outcome is measured.",
+  "source_sha256": {
+    "bkt_freeze": "48d2129eb7a16b888faf766765b7e0ebda2e762bc99a13a472bd201a76bd2e89",
+    "bridge": "0c823e73675e647304f23f1b31bc0b6c3277f93697bb039c80a50a4a0589cdc9",
+    "event_freeze": "330b0e137fb06e29b30f4ecbe33c8b2ef40e0502ce3523404cb55c55a33f19cd",
+    "event_structure_audit": "0f0c8b3b150cb890062d94f2f1a8d941ae9feb4d08816a4b81e46dd9c491956a",
+    "neuralcd_freeze": "86494866b02305b80a77af99384b830a0eb112761a03ac52fa458ad4bbb078c5",
+    "predictive_interface": "4b60b76b764c4dfad88877c1fb490a1111997e92ddb835fe8ce1dec2ea45e058",
+    "signals": "3bd53b03d44f6ecc6f93a586adeb971f556a2fc0b731d5f24ea1878a0eab359b",
+    "test_gate": "e8d22481fa4350a75ad5c505940037833a9f965006b918f2f851106e31b3acd1"
+  },
+  "status": "registered_before_disagreement_outcome_analysis",
+  "target": "observed_correct_equals_zero",
+  "test_evaluated": false,
+  "test_gate": "closed",
+  "tie_breaker": "ascending_SHA256_of_UTF8('phase6_disagreement_v1|' + student_id + '|' + str(source_row)); then ascending source_row",
+  "unsupported_neuralcd_targets": 311,
+  "unsupported_policy": "Exclude unsupported NeuralCD targets from this matched-population study; report 311 separately.",
+  "version": "disagreement_experiment_v1",
+  "zero_alert_policy": "not_applicable"
+}
