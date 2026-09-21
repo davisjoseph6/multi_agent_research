@@ -758,3 +758,36 @@ The original selected policies and validation reports remain
 unchanged.
 
 The held-out test gate remains closed.
+
+### Frozen event-detection policies v1
+
+The registered negative-response detection experiment is
+frozen in docs/data/event_detection_v1_frozen.json.
+
+BKT v1:
+- Selected policy: risk_or_entropy.
+- Risk threshold: 0.5.
+- Entropy threshold: 0.95.
+
+NeuralCD v1:
+- Selected policy: risk_only.
+- Risk threshold: 0.5.
+
+Selection used the same 42437 matched validation targets
+and the registered 30-percent pooled alert budget.
+
+The selected BKT OR policy is mathematically equivalent
+to a single probability cutoff. It does not demonstrate
+an independent information contribution from entropy.
+
+Selected policy metrics are development results because
+the policies were selected using validation outcomes.
+
+The frozen event policies do not administer interventions
+or establish intervention benefit.
+
+Future disagreement-based or uncertainty-aware policies
+must have separate version identifiers and evaluation
+protocols. They must not silently replace these policies.
+
+The held-out test gate remains closed.
