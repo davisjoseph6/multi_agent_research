@@ -1,0 +1,30 @@
+{
+  "assignment_sha256": "07a56030f27efb3ce8bc04212cb6bcd67cc2d28f7d133fc9bf0f90d9b6a2f4da",
+  "dataset": "assist2009_corrected_collapsed",
+  "interaction_counts": {
+    "test": 57948,
+    "train": 230387,
+    "val": 58525
+  },
+  "interactions": 346860,
+  "primary_target_counts": {
+    "test": 44212,
+    "train": 172439,
+    "val": 42748
+  },
+  "processed_sha256": "452a1e25dbc6d882fed1647f0f6ce2f54d515c131b708e6a6759a4c6f8e0ee15",
+  "purpose": "primary_unseen_student_evaluation",
+  "ratios": {
+    "test": 0.15,
+    "train": 0.7,
+    "val": 0.15
+  },
+  "seed": 7,
+  "source_sha256": "162ef8d2d28bcbfea6591a282994062bd8d5eaa00636544292a0d268dca6e5da",
+  "student_counts": {
+    "test": 633,
+    "train": 2951,
+    "val": 633
+  },
+  "students": 4217
+}
