@@ -1,0 +1,53 @@
+{
+  "adaptation": {
+    "global_parameters_frozen": true,
+    "initialization": "mean training-student embedding logits",
+    "learning_rate": 0.1,
+    "optimizer": "SGD",
+    "prior_penalty": 0.1,
+    "unsupported_items": "no prediction or update",
+    "update_timing": "after current response",
+    "updates_per_supported_observation": 1
+  },
+  "calibration": {
+    "descriptive_ece_10": 0.03048190589542367,
+    "diagnostics_sha256": "8f94d492d4e52c7dd3b2448ba5511b6f66babd9d410b7f4a89529bd21630fc5f",
+    "transformation": "none"
+  },
+  "checkpoint_epoch": 2,
+  "checkpoint_relative_path": "results/neuralcd/full_train_v1/epoch_02.pt",
+  "checkpoint_sha256": "75342dd941a9c6c1c5251dca715e72e01891c7c3f8edfb029c4c3bcd077a3883",
+  "data_identity": {
+    "processed_sha256": "452a1e25dbc6d882fed1647f0f6ce2f54d515c131b708e6a6759a4c6f8e0ee15",
+    "q_sha256": "60b7a0af15f02b5f35e1c9e477658817fa917274b6752f6e992f792b4e45daa2",
+    "split_assignment_sha256": "07a56030f27efb3ce8bc04212cb6bcd67cc2d28f7d133fc9bf0f90d9b6a2f4da"
+  },
+  "scientific_scope": "Predicts observed binary responses; latent proficiency is not independently verified mastery.",
+  "source_code_sha256": {
+    "scripts/train_neuralcd.py": "b806d5cb6f15afc268005cfa4343431ba3b828aa197d7000d8e32e4d64210633",
+    "scripts/validate_neuralcd.py": "ac3e4e5e181e4c6d6bba1bcc8b2aeceb2e5d22226000daf503531dcc1a30647e",
+    "scripts/validate_neuralcd_grid.py": "75c750468decde0f2af8f03ce512026bf354e3cfcfac1b48ec483e9f2f5e07d4",
+    "src/evaluation/neuralcd_online.py": "ebb1336714e7dc4f96186d68c8d0009cf8819b92cb20e92de3c4dbd7ffd70342",
+    "src/evaluation/neuralcd_stream.py": "c4b83ce6957764c7158d0b1f4d662c005d49f2b82c7623e2b3de747e7d5b32e0",
+    "src/models/neuralcd.py": "caadaec55ecf7b855ec8c9e3e0870c3a78dacb4272428ff530fd43e060844224"
+  },
+  "status": "frozen_uncalibrated_baseline",
+  "test_evaluated": false,
+  "test_permission": "Not yet: final test protocol must be frozen separately.",
+  "trained_items": 17146,
+  "training_students": 2951,
+  "training_tagged_interactions": 188223,
+  "validation": {
+    "accuracy_at_0_5": 0.7025944341023164,
+    "brier": 0.19485577374385568,
+    "history_access_sha256": "8bffb8de46ee62ad36ca325e13463879603abce86e280e0996f544240317ec5f",
+    "matched_known_item_targets": 42437,
+    "nll": 0.5736185606457903,
+    "predictions_sha256": "de025192c21a1863d5db71fdbcb18cf55d03ad80f9a1e2f3b0259f63f81a3085",
+    "report_sha256": "1233a16ed8690ebc3192a649e05a8599736f2ff051311f6f7fb607b53ee83e70",
+    "roc_auc": 0.7231505420999944,
+    "selection_sha256": "a4dcba6d93797c22ce33d5283b6e3046074a36c7c84b3e80ced2899b49acc1ed",
+    "unsupported_primary_targets": 311
+  },
+  "version": "neuralcd_v1"
+}

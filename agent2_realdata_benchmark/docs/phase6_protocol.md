@@ -496,3 +496,39 @@ Observed binary responses, including help-request outcomes, are
 not independent ground-truth measurements of student mastery.
 
 The test partition remains locked.
+
+### Frozen NeuralCD baseline v1
+
+The selected uncalibrated NeuralCD configuration is frozen as
+neuralcd_v1.
+
+Configuration:
+- Training checkpoint: epoch 2 of full_train_v1.
+- Student initialization: mean training embedding logits.
+- Local optimizer: SGD.
+- Adaptation learning rate: 0.1.
+- Prior penalty: 0.1.
+- Exactly one update after each supported observed interaction.
+- Globally trained parameters remain frozen.
+
+The selection used the preregistered 45-configuration grid and
+minimum matched-validation NLL.
+
+The model is intentionally frozen without a probability
+calibration transformation.
+
+Descriptive calibration diagnostics showed lower overall NLL
+and Brier score than BKT but higher ten-bin ECE. Zero-history
+and long-history calibration discrepancies remain limitations.
+
+A future calibrated variant must have a separate identifier,
+fitting protocol and evaluation record. It must not silently
+replace neuralcd_v1.
+
+Validation performance is not independent test performance.
+
+The model predicts observed binary responses rather than
+independently verified true student mastery.
+
+The final test protocol must be frozen separately before test
+records are accessed.
