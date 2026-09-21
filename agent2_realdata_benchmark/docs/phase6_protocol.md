@@ -604,3 +604,42 @@ The signal dataset is a development artifact and contains
 no independent test results.
 
 The held-out test gate remains closed.
+
+### Deterministic event detector v1
+
+The event detector accepts only a validated, label-free
+predictive-signal record and a separately specified configuration.
+
+The implemented control and candidate policies are:
+- no_trigger
+- risk_only
+- entropy_only
+- risk_or_entropy
+- risk_and_entropy
+
+Risk and entropy thresholds must be finite values in [0, 1].
+
+A supported prediction may produce flag or no_flag.
+An unsupported prediction always produces abstain.
+Abstention must not be counted as an ordinary no-flag decision.
+
+The detector checks that risk and entropy are consistent with
+the supplied probability. Unexpected input fields, including
+response labels, are rejected.
+
+Risk and entropy are deterministic transformations of the same
+forecast. Combining them does not introduce an independent
+uncertainty estimate.
+
+The numerical thresholds used in unit tests are illustrative.
+No operational thresholds have been selected.
+
+A flag indicates that an event-detection rule was satisfied.
+It is not an intervention, a verified learning difficulty,
+an improvement in learning, or a claim of causal recovery.
+
+Candidate thresholds, policy-selection rules and offline
+evaluation measures must be registered before examining
+validation outcomes for this detector.
+
+The held-out test gate remains closed.
