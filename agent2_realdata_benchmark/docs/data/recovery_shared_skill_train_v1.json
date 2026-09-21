@@ -1,0 +1,66 @@
+{
+  "audit_code_sha256": "bb624bd8b48545fcb6a6d9dd10b15106b3a85fc18409a17c8d4cc7ff5e3b9cb0",
+  "by_current_first_action": {
+    "0": {
+      "cross_assistment_followups": 162522,
+      "current_main_problems": 166078,
+      "positive_rate_among_next_attempts": 0.7462519804745812,
+      "positive_responses_among_next_attempts": 81484,
+      "shared_skill_followups": 113877,
+      "shared_skill_next_answer_attempts": 109191,
+      "shared_skill_next_hint_requests": 3485,
+      "shared_skill_next_missing_actions": 0,
+      "shared_skill_next_scaffold_requests": 1201
+    },
+    "1": {
+      "cross_assistment_followups": 12393,
+      "current_main_problems": 12895,
+      "positive_rate_among_next_attempts": 0.5988950276243094,
+      "positive_responses_among_next_attempts": 2710,
+      "shared_skill_followups": 9733,
+      "shared_skill_next_answer_attempts": 4525,
+      "shared_skill_next_hint_requests": 5036,
+      "shared_skill_next_missing_actions": 0,
+      "shared_skill_next_scaffold_requests": 172
+    },
+    "2": {
+      "cross_assistment_followups": 4117,
+      "current_main_problems": 4222,
+      "positive_rate_among_next_attempts": 0.524390243902439,
+      "positive_responses_among_next_attempts": 817,
+      "shared_skill_followups": 3385,
+      "shared_skill_next_answer_attempts": 1558,
+      "shared_skill_next_hint_requests": 133,
+      "shared_skill_next_missing_actions": 0,
+      "shared_skill_next_scaffold_requests": 1694
+    }
+  },
+  "limitations": [
+    "A shared skill does not establish equal difficulty.",
+    "Conditioning on a next answer attempt selects a nonrandom subset of subsequent interactions.",
+    "Help-seeking is voluntary, not randomized treatment.",
+    "The next problem is an observed follow-up, not a verified recovery or counterfactual outcome.",
+    "Within-problem action timing is unavailable.",
+    "Only registered training-student rows were returned."
+  ],
+  "main_problems": 183195,
+  "manifest_sha256": "6684271c9badf0701e5fbb24bf41b9eca65d19ba1dae6811199ced2a56b5b41a",
+  "outcome_definition": "First action and correctness on the immediately next main problem, restricted to a known different ASSISTment and at least one shared annotated skill.",
+  "previous_audit_sha256": "419f002489832f5e021c3e57852ecad2143a03a203d95c667a53cc260f66e270",
+  "source_sha256": "452a1e25dbc6d882fed1647f0f6ce2f54d515c131b708e6a6759a4c6f8e0ee15",
+  "status": "training_only_descriptive_outcome_eligibility",
+  "test_gate": "closed",
+  "test_outcomes_evaluated": false,
+  "test_rows_returned": 0,
+  "train_students_sha256": "7eef9ce681630ccb4c2e9165a742b3936a8dfafb23f151f32bcff01006f97add",
+  "training_interactions": 230387,
+  "training_students": 2951,
+  "transition_counts": {
+    "at_least_one_missing_skill_annotation": 11874,
+    "both_skill_annotated_with_overlap": 126995,
+    "both_skill_annotated_without_overlap": 40163,
+    "different_assistment": 179032
+  },
+  "validation_rows_returned": 0,
+  "version": "recovery_shared_skill_train_v1"
+}
