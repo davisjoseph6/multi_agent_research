@@ -27,7 +27,7 @@ SEED = 7
 BATCH_SIZE = 256
 LEARNING_RATE = 0.002
 MAX_BATCHES = 3
-RUN_ID = "smoke_three_batches_v1"
+RUN_ID = "smoke_three_batches_v2"
 
 
 def sha256(path: Path) -> str:
@@ -155,9 +155,9 @@ def main() -> None:
     if student_ids.isna().any():
         raise RuntimeError("A nontraining student entered the dataset")
 
-    student_ids = student_ids.to_numpy(dtype=np.int64)
-    item_ids = tagged["item_idx"].to_numpy(dtype=np.int64)
-    labels = tagged["correct"].to_numpy(dtype=np.float32)
+    student_ids = np.array(student_ids, dtype=np.int64, copy=True)
+    item_ids = np.array(tagged["item_idx"], dtype=np.int64, copy=True)
+    labels = np.array(tagged["correct"], dtype=np.float32, copy=True)
 
     if np.any(item_ids < 0) or np.any(item_ids >= len(q)):
         raise RuntimeError("Item ID out of range")

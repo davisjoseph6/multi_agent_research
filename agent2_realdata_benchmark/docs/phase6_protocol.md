@@ -181,3 +181,38 @@ The smoke-test checkpoint is incomplete and must not be reported
 as a trained benchmark model.
 
 No validation or test predictions are generated during this test.
+
+### NeuralCD cold-start adaptation contract
+
+The adapted NeuralCD baseline is distinct from the original
+transductive NeuralCD architecture.
+
+For each unseen learner:
+
+1. Initialize local student logits from the mean training-student
+   embedding logits.
+2. Freeze all globally fitted model parameters.
+3. Disable dropout during adaptation and prediction.
+4. Predict each eligible current response before observing its label.
+5. After observing the response, update only local student logits.
+6. Use earlier tagged scaffolding interactions when their item
+   parameters were trained.
+7. Skip adaptation for untrained items and unknown concept tags.
+8. Reset the local state independently for every new learner.
+
+Initial adaptation hyperparameters:
+- SGD learning rate: 0.1
+- Prior penalty: 0.01
+- One update after each eligible observed interaction.
+
+These values are provisional and must be selected using validation
+data only. They are not final benchmark hyperparameters.
+
+The adaptation algorithm must never be run on the incomplete
+three-batch smoke-test checkpoint to report benchmark metrics.
+
+Original NeuralCD, adapted NeuralCD and any future inductive
+student model must be identified as distinct methods.
+
+Latent proficiency outputs are not independently verified measures
+of actual student mastery.
