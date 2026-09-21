@@ -8,7 +8,7 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "data/raw/assist2009/skill_builder_data.csv"
+SOURCE = ROOT / "data/raw/assist2009/skill_builder_data_corrected_collapsed.csv"
 OUTPUT = ROOT / "results/data_audit_assist2009.json"
 
 COLUMNS = [
