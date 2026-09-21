@@ -1,0 +1,26 @@
+{
+  "bkt_alerts_on_neuralcd_unsupported": 87,
+  "bkt_equivalent_failure_risk_threshold": 0.3691277489845117,
+  "bkt_equivalent_probability_cutoff": 0.6308722510154883,
+  "bkt_exact_decision_mismatches": 0,
+  "bkt_selected_policy": "risk_or_entropy",
+  "individual_response_labels_read": false,
+  "interpretation": "The selected BKT OR policy is equivalent to a single probability cutoff. This is a mathematical description, not a new registered candidate or a revised policy selection. Overlap is descriptive.",
+  "matched_flag_overlap": {
+    "bkt_only_flag": 4834,
+    "both_flag": 7055,
+    "neither_flags": 26008,
+    "neuralcd_only_flag": 4540
+  },
+  "matched_targets": 42437,
+  "neuralcd_abstentions": 311,
+  "neuralcd_exact_decision_mismatches": 0,
+  "registration_sha256": "844796f2cbf08c9b6f8bf55741566db482d4be5dbef287bdb85cd6cc1a3f8f6a",
+  "selected_decisions_sha256": "2766031296552f456bd1918216a1c72dc5f623742799465cba6e210125e53604",
+  "signals_sha256": "3bd53b03d44f6ecc6f93a586adeb971f556a2fc0b731d5f24ea1878a0eab359b",
+  "status": "selected_policy_structure_verified",
+  "test_evaluated": false,
+  "test_gate": "closed",
+  "validation_report_sha256": "cc81c25df1249958d32777a463b444daa31b5bde6bcbff2c1c8ac63de1163fa7",
+  "version": "event_detection_structure_audit_v1"
+}

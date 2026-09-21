@@ -727,3 +727,34 @@ counterfactual measure of intervention need.
 No pedagogical intervention was administered or evaluated.
 
 The held-out test gate remains closed.
+
+### Selected event-policy structure audit v1
+
+A post-selection, label-free audit verifies the exact decisions
+produced by the two selected event-detection policies.
+
+For the selected BKT rule, risk >= 0.5 OR normalized binary
+entropy >= 0.95 is mathematically equivalent to one threshold
+on predicted correctness.
+
+The equivalent threshold is derived analytically and verified
+against every saved BKT decision.
+
+This derived threshold is not a newly selected policy and does
+not modify the preregistered experiment.
+
+Binary predictive entropy is a deterministic function of
+predicted correctness. The selected BKT combination therefore
+does not demonstrate an independent information contribution
+from entropy.
+
+The audit also measures overlap between BKT and NeuralCD
+alerts on identical matched validation targets.
+
+Alert overlap is descriptive and does not measure intervention
+effectiveness.
+
+The original selected policies and validation reports remain
+unchanged.
+
+The held-out test gate remains closed.
