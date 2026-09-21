@@ -1,0 +1,50 @@
+{
+  "combined_tests_passed": 180,
+  "current_protocol_sha256": "6c9961ae1127a3897c55fb08609e84f9e45e8ac6749855f533e858498807ab68",
+  "execution_implementation_commit": "ef568d5",
+  "held_out_test_evaluated": false,
+  "implementation_sha256": "62f2c7d4d2035d8c1bbc25230db6743b8ea51e226b5b03e803416e66922577d0",
+  "limitations": "Results establish tested local SQLite and simulated process behavior only. They do not establish distributed exactly-once delivery, authenticated consent, or pedagogical effectiveness.",
+  "original_protocol_sha256": "6c9961ae1127a3897c55fb08609e84f9e45e8ac6749855f533e858498807ab68",
+  "original_registration_commit": "b655964",
+  "process_log_sha256": "38fc33a8f95d41c435480b8a9a6ef6d2540f6af5e943cead083a109445ca35bb",
+  "process_test_sha256": "c22321c9966e5c8adade1c46798e392487d60a4ce8c23b9c84ec4e05e8e80a15",
+  "process_tests_passed": 3,
+  "protocol_edited_after_registration": false,
+  "python_version": "3.12.3",
+  "real_assistance_delivered": false,
+  "regression_log_sha256": "6a9bb766044bb3e005688225f71ed912b75132d8dfba8f6f2f018dab5e611b31",
+  "report_source_commit": "b65596415e07a11d220d26a2d89b0c245ee8d7f0",
+  "scenarios": {
+    "crash_after_dispatch": {
+      "expected_process_exit": 74,
+      "passed": true,
+      "reconciliation_state": "outcome_unknown",
+      "recorded_simulator_calls": 1,
+      "reservation_survives": true,
+      "restart_dispatches_again": false
+    },
+    "crash_before_dispatch": {
+      "expected_process_exit": 73,
+      "passed": true,
+      "reconciliation_state": "outcome_unknown",
+      "recorded_simulator_calls": 0,
+      "reservation_survives": true,
+      "restart_dispatches_again": false
+    },
+    "two_processes_same_operation": {
+      "durable_operation_records": 1,
+      "final_state": "simulated_succeeded",
+      "journal_events": 2,
+      "passed": true,
+      "recorded_simulator_calls": 1
+    }
+  },
+  "sqlite_integrity_verified_by_tests": true,
+  "sqlite_version": "3.45.1",
+  "status": "synthetic_process_fault_tests_passed",
+  "student_learning_effect_evaluated": false,
+  "test_gate": "closed",
+  "validation_or_test_data_used": false,
+  "version": "recovery_fault_evaluation_v1"
+}
