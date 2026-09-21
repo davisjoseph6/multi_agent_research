@@ -62,3 +62,30 @@ preserved in the canonical data.
 
 This split evaluates generalization to unseen students from a known
 question bank. It does not establish unseen-item generalization.
+
+## BKT baseline specification
+
+The first BKT benchmark uses one shared set of parameters:
+initial mastery L0, learning T, slip S and guess G.
+
+Multi-concept questions use a factorized conjunctive approximation.
+This extension is reported separately from ordinary single-skill BKT.
+
+Parameters are fitted using the training students only, by minimizing
+mean sequential negative log-likelihood on eligible primary targets.
+
+Each student's mastery is initialized independently. For every tagged
+interaction, the model predicts before seeing the outcome, then updates
+its mastery using the observed outcome.
+
+Tagged scaffolding interactions update learner history but are not
+scored as primary targets. Untagged interactions produce no BKT concept
+update.
+
+Validation students are processed sequentially with globally frozen
+parameters. No test-student predictions are generated during fitting
+or validation model selection.
+
+The predicted target is the dataset's recorded binary outcome, which
+can include help requests among zero-valued labels. This is not a
+direct measurement of true knowledge.
