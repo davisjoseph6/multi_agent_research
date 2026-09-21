@@ -411,3 +411,26 @@ must not be modified.
 Grid results are development estimates. The test partition
 remains locked until configuration selection and all planned
 sensitivity analyses are finalized.
+
+### Joint NeuralCD grid selection v1
+
+The preregistered grid consists of 45 combinations of five
+training checkpoints, three learning rates and three prior penalties.
+
+The selection procedure independently verifies all 45 prediction
+files, target identities, checkpoint identities and BKT comparisons.
+
+Selection minimizes matched validation NLL. Exact ties are
+resolved by earlier epoch, lower learning rate and lower penalty.
+
+The selected configuration and runner-up are recorded in
+docs/data/neuralcd_grid_selection_v1.json.
+
+This selection is conditional on the successful annotation-history
+audit and remains a development-set selection.
+
+The test partition has not been evaluated.
+
+The small NLL difference between the selected configuration and
+runner-up must not be interpreted as established evidence that
+their generalization performance differs.

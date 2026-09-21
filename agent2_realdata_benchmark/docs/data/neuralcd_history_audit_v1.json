@@ -1,0 +1,13 @@
+{
+  "affected_students": 0,
+  "known_primary_targets": 42437,
+  "later_known_targets_potentially_affected": 0,
+  "processed_sha256": "452a1e25dbc6d882fed1647f0f6ce2f54d515c131b708e6a6759a4c6f8e0ee15",
+  "split_assignment_sha256": "07a56030f27efb3ce8bc04212cb6bcd67cc2d28f7d133fc9bf0f90d9b6a2f4da",
+  "status": "annotation_eligibility_consistent",
+  "tagged_but_empty_q": 0,
+  "test_evaluated": false,
+  "unannotated_but_currently_supported": 0,
+  "validation_interactions": 58525,
+  "validation_primary_targets": 42748
+}
