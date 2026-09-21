@@ -571,3 +571,36 @@ All threshold selection and policy development must occur
 without accessing held-out test outcomes.
 
 The held-out test gate remains closed.
+
+### Frozen-model uncertainty bridge v1
+
+The uncertainty bridge uses frozen BKT v1 and uncalibrated
+NeuralCD v1 validation prediction files.
+
+It reads only:
+- source_row
+- student_id
+- predicted_probability
+
+It does not read response labels.
+
+There are two signal records for every eligible primary target:
+one for BKT and one for NeuralCD.
+
+BKT must have a supported prediction for every eligible target.
+
+NeuralCD targets without a trained item embedding receive
+status unsupported_training_item. Their probability, risk and
+entropy fields are null, not zero, one or one-half.
+
+For supported predictions, the bridge records predicted
+correctness, failure risk and predictive entropy using the
+model-independent mathematical interface.
+
+No event trigger, intervention threshold or recovery policy
+is applied during signal generation.
+
+The signal dataset is a development artifact and contains
+no independent test results.
+
+The held-out test gate remains closed.

@@ -1,0 +1,31 @@
+{
+  "bkt_predictions_sha256": "3beb9130da238d5d912ee21f5a51d2d2fc556ae25c425671505a8dbffc130102",
+  "bkt_supported": 42748,
+  "eligible_primary_targets": 42748,
+  "frozen_neuralcd_sha256": "86494866b02305b80a77af99384b830a0eb112761a03ac52fa458ad4bbb078c5",
+  "neuralcd_predictions_sha256": "de025192c21a1863d5db71fdbcb18cf55d03ad80f9a1e2f3b0259f63f81a3085",
+  "neuralcd_supported": 42437,
+  "neuralcd_unsupported": 311,
+  "no_intervention_policy_applied": true,
+  "no_response_labels_read": true,
+  "output_columns": [
+    "source_row",
+    "student_id",
+    "model",
+    "status",
+    "p_correct",
+    "failure_risk",
+    "predictive_entropy_nats",
+    "normalized_predictive_entropy"
+  ],
+  "output_sha256": "3bd53b03d44f6ecc6f93a586adeb971f556a2fc0b731d5f24ea1878a0eab359b",
+  "source_columns_read": [
+    "source_row",
+    "student_id",
+    "predicted_probability"
+  ],
+  "status": "label_free_validation_signals",
+  "test_evaluated": false,
+  "total_signal_records": 85496,
+  "version": "uncertainty_validation_bridge_v1"
+}
