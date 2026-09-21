@@ -1,0 +1,60 @@
+{
+  "adaptation_learning_rate": 0.1,
+  "adaptation_prior_penalty": 0.01,
+  "candidates": [
+    {
+      "checkpoint_sha256": "949b29bf0a88f4e7fd49afcd8f308a96b04b292d392fd9e841fd6d6c8d857572",
+      "epoch": 1,
+      "predictions_sha256": "e31ab8c6858a775cc9516bbd628f4edf6f2d2749ad6fc52f4a0a0bd3c8027e70",
+      "validation_auc": 0.6852319240815883,
+      "validation_brier": 0.22208714682929326,
+      "validation_nll": 0.6359645753226235
+    },
+    {
+      "checkpoint_sha256": "75342dd941a9c6c1c5251dca715e72e01891c7c3f8edfb029c4c3bcd077a3883",
+      "epoch": 2,
+      "predictions_sha256": "d0258e8ee5a2d190941ba3e436116bb1c8c2c2033ba6f06866b3bfee856c3387",
+      "validation_auc": 0.7230798624494272,
+      "validation_brier": 0.1948709517051633,
+      "validation_nll": 0.5736541815783067
+    },
+    {
+      "checkpoint_sha256": "e4a81c8100ca0dd9b511ef77891958b1058ed354faf7021f6a62c32eb688e496",
+      "epoch": 3,
+      "predictions_sha256": "10276db09bf3a33546cf104003621cb6a5e975950f501296a7dfece536b34c4f",
+      "validation_auc": 0.7266173617840639,
+      "validation_brier": 0.1976860082680146,
+      "validation_nll": 0.5818082305608161
+    },
+    {
+      "checkpoint_sha256": "f15291a0985788ac54d392e71347c602ff9079b37de96ffa8e2e80e13ea78235",
+      "epoch": 4,
+      "predictions_sha256": "d5331d85ee6f9ecaf269ee8d6419e65c93254fd6645a62b141667a523abf9abe",
+      "validation_auc": 0.7287433663283904,
+      "validation_brier": 0.20250106565272777,
+      "validation_nll": 0.59591157977262
+    },
+    {
+      "checkpoint_sha256": "c1cceba3baa36df54c7c544b1f0961a1db6cca1976987ded1dcf922b068dc581",
+      "epoch": 5,
+      "predictions_sha256": "023a6d1e6905fa7c6dd2ea2601a89ca2a11aecbc4e1f08ac4f0a3713af11de5d",
+      "validation_auc": 0.7278764426882195,
+      "validation_brier": 0.20691718041141038,
+      "validation_nll": 0.610586402173095
+    }
+  ],
+  "matched_targets": 42437,
+  "note": "Epoch selection is conditional on provisional adaptation settings. If adaptation settings change, jointly re-evaluate checkpoint selection.",
+  "selected": {
+    "checkpoint_sha256": "75342dd941a9c6c1c5251dca715e72e01891c7c3f8edfb029c4c3bcd077a3883",
+    "epoch": 2,
+    "predictions_sha256": "d0258e8ee5a2d190941ba3e436116bb1c8c2c2033ba6f06866b3bfee856c3387",
+    "validation_auc": 0.7230798624494272,
+    "validation_brier": 0.1948709517051633,
+    "validation_nll": 0.5736541815783067
+  },
+  "selection_rule": "Minimum matched validation NLL; earlier epoch breaks ties",
+  "status": "selected_under_provisional_adaptation",
+  "test_evaluated": false,
+  "version": "neuralcd_checkpoint_selection_v1"
+}

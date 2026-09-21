@@ -315,3 +315,25 @@ known-item population for NeuralCD and frozen BKT.
 
 No validation outcomes are used to update global model weights.
 The test partition remains locked.
+
+### Initial NeuralCD checkpoint selection
+
+Five training checkpoints, epochs 1 through 5, were evaluated
+on the same 42437 known-item validation targets.
+
+Adaptation settings were held fixed:
+- SGD learning rate: 0.1
+- Prior penalty: 0.01
+- One local update after each supported observation.
+
+The prespecified minimum-validation-NLL rule selected epoch 2.
+
+This checkpoint selection is conditional on the provisional
+adaptation configuration. Any subsequent adaptation-hyperparameter
+search must reconsider checkpoint selection jointly.
+
+Paired student-cluster bootstrap comparisons with frozen BKT
+are development analyses conditional on the selected models.
+They do not correct for checkpoint-selection bias.
+
+No test outcomes have been evaluated.

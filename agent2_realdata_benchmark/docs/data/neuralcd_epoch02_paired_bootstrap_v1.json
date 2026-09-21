@@ -1,0 +1,48 @@
+{
+  "bkt_predictions_sha256": "3beb9130da238d5d912ee21f5a51d2d2fc556ae25c425671505a8dbffc130102",
+  "limitations": "Conditional on training, checkpoint selection and provisional adaptation. Does not correct for validation-based model selection.",
+  "matched_targets": 42437,
+  "method": "paired_student_cluster_bootstrap",
+  "neural_predictions_sha256": "d0258e8ee5a2d190941ba3e436116bb1c8c2c2033ba6f06866b3bfee856c3387",
+  "results": {
+    "accuracy_gain_neuralcd_minus_bkt": {
+      "ci95": [
+        -0.003186163061962107,
+        0.009356003467017822
+      ],
+      "estimate": 0.0032283149138723284,
+      "replicates": 1000
+    },
+    "auc_gain_neuralcd_minus_bkt": {
+      "ci95": [
+        0.040816542027089286,
+        0.06432656553751914
+      ],
+      "estimate": 0.0530780956929463,
+      "replicates": 300
+    },
+    "brier_gain_bkt_minus_neuralcd": {
+      "ci95": [
+        0.005441699386986841,
+        0.010483318095249113
+      ],
+      "estimate": 0.007983491774082743,
+      "replicates": 1000
+    },
+    "nll_gain_bkt_minus_neuralcd": {
+      "ci95": [
+        0.014771091790732225,
+        0.02611702045956185
+      ],
+      "estimate": 0.020487653836963868,
+      "replicates": 1000
+    }
+  },
+  "seed": 20260921,
+  "selected_epoch": 2,
+  "split_assignment_sha256": "07a56030f27efb3ce8bc04212cb6bcd67cc2d28f7d133fc9bf0f90d9b6a2f4da",
+  "status": "conditional_validation_analysis",
+  "students_in_split": 633,
+  "students_with_matched_targets": 626,
+  "test_evaluated": false
+}
