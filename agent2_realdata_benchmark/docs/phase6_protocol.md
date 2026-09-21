@@ -162,3 +162,22 @@ predict current target, reveal response, then update local student state.
 
 The network's nonnegative prediction-layer constraint is enforced
 after every optimizer update.
+
+### NeuralCD training smoke test
+
+Before full training, a three-batch training-only smoke test verifies:
+
+- Compact training-student indexing.
+- Frozen data and split identities.
+- Skill-annotated training-row eligibility.
+- Q-matrix and item-index alignment.
+- Valid binary training labels.
+- Forward and backward passes.
+- Adam optimization.
+- Post-update nonnegative prediction-layer weights.
+- Checkpoint serialization and reconstruction.
+
+The smoke-test checkpoint is incomplete and must not be reported
+as a trained benchmark model.
+
+No validation or test predictions are generated during this test.
