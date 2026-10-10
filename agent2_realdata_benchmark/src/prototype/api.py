@@ -10,6 +10,8 @@ from uuid import uuid4
 
 from flask import Flask, abort, jsonify, request
 
+from src.prototype.belief import DemoBeliefTracker
+
 
 _DEMO_ITEMS = (
     {
@@ -97,6 +99,8 @@ def create_app() -> Flask:
         sessions[session_id] = {
             "index": 0,
             "responses": [],
+            "belief_tracker": DemoBeliefTracker(),
+            "belief_events": [],
         }
 
         return jsonify({
@@ -158,11 +162,23 @@ def create_app() -> Flask:
                 "error": "Invalid answer choice"
             }), 400
 
+        is_correct = choice == item["correct_id"]
+
         session["responses"].append({
             "item_id": item["id"],
             "kind": item["kind"],
-            "correct": choice == item["correct_id"],
+            "correct": is_correct,
         })
+
+        # Practice updates the internal learner belief.
+        # Independent assessment does not update this
+        # practice model before the probe outcome is recorded.
+        if item["kind"] == "practice":
+            event = session[
+                "belief_tracker"
+            ].observe_practice(correct=is_correct)
+
+            session["belief_events"].append(event)
 
         session["index"] += 1
 
