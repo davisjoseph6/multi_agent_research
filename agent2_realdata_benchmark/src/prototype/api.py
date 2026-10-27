@@ -12,54 +12,11 @@ from uuid import uuid4
 from flask import Flask, abort, jsonify, request
 
 from src.prototype.belief import DemoBeliefTracker
+from src.prototype.item_bank import demo_items_as_dicts
 from src.prototype.shadow_planner import propose_shadow_recovery
 
 
-_DEMO_ITEMS = (
-    {
-        "id": "demo_main_1",
-        "kind": "practice",
-        "concept_id": "loss_aversion",
-        "prompt": (
-            "Which concept describes losses being felt more "
-            "strongly than equivalent gains?"
-        ),
-        "choices": (
-            {"id": "A", "text": "Anchoring"},
-            {"id": "B", "text": "Loss aversion"},
-            {"id": "C", "text": "Mental accounting"},
-        ),
-        "correct_id": "B",
-    },
-    {
-        "id": "demo_probe_1",
-        "kind": "independent_probe",
-        "concept_id": "loss_aversion",
-        "prompt": (
-            "Which observation is most consistent with "
-            "loss aversion?"
-        ),
-        "choices": (
-            {
-                "id": "A",
-                "text": (
-                    "Avoiding a loss matters more than "
-                    "an equally sized gain"
-                ),
-            },
-            {
-                "id": "B",
-                "text": "Losses and gains always feel identical",
-            },
-            {
-                "id": "C",
-                "text": "Prior prices never affect decisions",
-            },
-        ),
-        "correct_id": "A",
-    },
-)
-
+_DEMO_ITEMS = demo_items_as_dicts()
 
 def _public_question(item: dict) -> dict:
     """Never expose answer keys through the question API."""
