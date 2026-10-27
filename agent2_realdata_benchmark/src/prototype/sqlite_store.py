@@ -267,6 +267,27 @@ class SQLiteQuizRepository:
             for row in rows
         )
 
+    def _before_new_response(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        session_id: str,
+        position: int,
+    ) -> None:
+        """Optional policy check inside the submission transaction."""
+        return None
+
+    def _after_new_response(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        session_id: str,
+        position: int,
+        item: QuizItem,
+    ) -> None:
+        """Optional policy event inside the same transaction."""
+        return None
+
     def submit(
         self,
         *,
@@ -360,6 +381,12 @@ class SQLiteQuizRepository:
             ):
                 raise ValueError("Invalid answer choice")
 
+            self._before_new_response(
+                connection,
+                session_id=session_id,
+                position=position,
+            )
+
             correct = choice_id == item.correct_id
 
             connection.execute(
@@ -402,6 +429,13 @@ class SQLiteQuizRepository:
                 raise ResponseConflict(
                     "Concurrent session position change"
                 )
+
+            self._after_new_response(
+                connection,
+                session_id=session_id,
+                position=position,
+                item=item,
+            )
 
             record = ResponseRecord(
                 bank_version=self._version,
