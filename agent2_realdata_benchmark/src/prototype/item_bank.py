@@ -189,3 +189,44 @@ def demo_items_as_dicts() -> tuple[dict, ...]:
     """Preserve the existing development API's internal format."""
 
     return tuple(item.internal_dict() for item in DEMO_ITEMS)
+
+# Illustrative multi-practice content, not a validated instrument.
+INSTRUCTIONAL_DEMO_VERSION = "loss_aversion_multipractice_demo_v1"
+
+INSTRUCTIONAL_DEMO_ITEMS = (
+    DEMO_ITEMS[0],
+    QuizItem(
+        item_id="demo_main_2",
+        kind="practice",
+        concept_id="loss_aversion",
+        bloom_level=2,
+        prompt=(
+            "A participant says losing a €20 voucher would "
+            "feel more painful than receiving the same voucher "
+            "would feel pleasant. Which concept best describes "
+            "this pattern?"
+        ),
+        choices=(
+            ("A", "Present bias"),
+            ("B", "Loss aversion"),
+            ("C", "Base-rate neglect"),
+        ),
+        correct_id="B",
+    ),
+    QuizItem(
+        item_id="demo_main_3",
+        kind="practice",
+        concept_id="loss_aversion",
+        bloom_level=2,
+        prompt="Which pair of reactions is most consistent with loss aversion?",
+        choices=(
+            ("A", "An unexpected €10 fee feels exactly as bad as a €10 discount feels good"),
+            ("B", "An unexpected €10 fee feels more unpleasant than a €10 discount feels pleasant"),
+            ("C", "An unexpected €10 discount feels more pleasant than a €10 fee feels unpleasant"),
+        ),
+        correct_id="B",
+    ),
+    DEMO_ITEMS[1],
+)
+
+validate_item_bank(INSTRUCTIONAL_DEMO_ITEMS)
