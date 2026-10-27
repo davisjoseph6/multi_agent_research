@@ -1,7 +1,8 @@
 """Local-only IJCAI quiz API demonstration.
 
+Uses internal BKT beliefs and synthetic shadow planning.
 Not for real participant recruitment or research data collection.
-No persistence, learner modelling, intervention delivery, or POMCP.
+No persistence or student-facing intervention delivery.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from uuid import uuid4
 from flask import Flask, abort, jsonify, request
 
 from src.prototype.belief import DemoBeliefTracker
+from src.prototype.shadow_planner import propose_shadow_recovery
 
 
 _DEMO_ITEMS = (
@@ -101,6 +103,7 @@ def create_app() -> Flask:
             "responses": [],
             "belief_tracker": DemoBeliefTracker(),
             "belief_events": [],
+            "shadow_decisions": [],
         }
 
         return jsonify({
@@ -179,6 +182,30 @@ def create_app() -> Flask:
             ].observe_practice(correct=is_correct)
 
             session["belief_events"].append(event)
+
+            # Synthetic shadow planning for a hypothetical future
+            # practice opportunity. This does not modify BKT or
+            # influence the independent recovery probe.
+            try:
+                diagnostic = propose_shadow_recovery(
+                    session["belief_tracker"],
+                    source_row=index,
+                    session_id=session_id,
+                    simulated_permission_to_offer=True,
+                    hint_available=True,
+                    scaffold_available=True,
+                )
+            except Exception:
+                # Shadow planning is optional and never delivers
+                # assistance. A planner failure must not cause
+                # an already accepted response to be retried.
+                # Record failure without exposing internal errors.
+                diagnostic = {
+                    "mode": "hypothetical_shadow_only",
+                    "status": "failed",
+                }
+
+            session["shadow_decisions"].append(diagnostic)
 
         session["index"] += 1
 
