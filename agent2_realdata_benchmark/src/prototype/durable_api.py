@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 
 from src.prototype.belief import DemoBeliefTracker
 from src.prototype.item_bank import (
@@ -62,6 +62,27 @@ def create_durable_app(
             "status": "ok",
             "mode": "local_demo_only",
         })
+
+    @app.get("/demo")
+    def local_browser_demo():
+        response = app.make_response(
+            render_template("durable_quiz.html")
+        )
+
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self'; "
+            "connect-src 'self'; "
+            "object-src 'none'; "
+            "base-uri 'none'; "
+            "frame-ancestors 'none'"
+        )
+
+        return response
 
     @app.post("/api/v1/durable/sessions")
     def create_session():
