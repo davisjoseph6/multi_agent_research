@@ -9,10 +9,15 @@ Not authorized for collecting real participant data.
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 
+from src.prototype.assistance_store import AssistanceConflict
+from src.prototype.gated_assistance_store import (
+    SQLiteFixedSummaryQuizRepository,
+)
 from src.prototype.belief import DemoBeliefTracker
 from src.prototype.item_bank import (
     BANK_VERSION,
@@ -35,13 +40,29 @@ def create_durable_app(
     *,
     items: tuple[QuizItem, ...] = DEMO_ITEMS,
     bank_version: str = BANK_VERSION,
+    fixed_summary: bool = False,
 ) -> Flask:
     """Create an isolated, file-backed development API."""
 
-    repository = SQLiteQuizRepository(
+    if type(fixed_summary) is not bool:
+        raise TypeError("fixed_summary must be boolean")
+
+    repository_class = (
+        SQLiteFixedSummaryQuizRepository
+        if fixed_summary
+        else SQLiteQuizRepository
+    )
+
+    repository = repository_class(
         database_path,
         items=items,
         bank_version=bank_version,
+    )
+
+    api_mode = (
+        "fixed_summary_demo_only"
+        if fixed_summary
+        else "local_demo_only"
     )
 
     app = Flask(__name__)
@@ -60,11 +81,17 @@ def create_durable_app(
     def health():
         return jsonify({
             "status": "ok",
-            "mode": "local_demo_only",
+            "mode": api_mode,
         })
 
     @app.get("/demo")
     def local_browser_demo():
+        if fixed_summary:
+            return error(
+                "fixed_summary_browser_not_yet_supported",
+                409,
+            )
+
         response = app.make_response(
             render_template("durable_quiz.html")
         )
@@ -91,7 +118,7 @@ def create_durable_app(
         return jsonify({
             "session_id": session_id,
             "bank_version": bank_version,
-            "mode": "local_demo_only",
+            "mode": api_mode,
         }), 201
 
     @app.get(
@@ -105,12 +132,41 @@ def create_durable_app(
         except ItemBankMismatch:
             return error("item_bank_mismatch", 409)
 
-        return jsonify({
+        offer = (
+            repository.current_offer(session_id)
+            if fixed_summary and not progress.completed
+            else None
+        )
+
+        pending = (
+            offer is not None
+            and offer.status in ("offered", "accepted")
+        )
+
+        response = {
             "complete": progress.completed,
             "position": progress.position,
             "bank_version": progress.bank_version,
-            "question": progress.current_question,
-        })
+            "question": (
+                None if pending else progress.current_question
+            ),
+        }
+
+        if fixed_summary:
+            response["assistance_pending"] = pending
+            response["assistance"] = (
+                {
+                    "source_position": offer.source_position,
+                    "target_position": offer.target_position,
+                    "resource_id": offer.resource_id,
+                    "title": offer.title,
+                    "status": offer.status,
+                }
+                if offer is not None
+                else None
+            )
+
+        return jsonify(response)
 
     @app.post(
         "/api/v1/durable/sessions/<session_id>/responses"
@@ -132,7 +188,14 @@ def create_durable_app(
             return error("unknown_session", 404)
         except ItemBankMismatch:
             return error("item_bank_mismatch", 409)
-        except ResponseConflict:
+        except ResponseConflict as exc:
+            if (
+                fixed_summary
+                and str(exc)
+                == "Assistance decision or delivery is pending"
+            ):
+                return error("assistance_pending", 409)
+
             return error("response_conflict", 409)
         except ValueError:
             return error("invalid_submission", 400)
@@ -216,15 +279,108 @@ def create_durable_app(
                     "status": "failed",
                 })
 
-        # Student-facing behavior remains fixed.
-        # Correctness, BKT beliefs, and simulated actions
-        # must not be exposed here.
+        next_action = "no_offer"
+
+        if fixed_summary:
+            offer = repository.current_offer(session_id)
+
+            if (
+                offer is not None
+                and offer.status in ("offered", "accepted")
+            ):
+                next_action = "assistance_pending"
+
+        # Correctness, BKT beliefs, and simulated planner
+        # actions must never be included in this response.
         return jsonify({
             "accepted": True,
             "replayed": receipt.replayed,
             "complete": receipt.completed,
             "feedback": "withheld",
-            "next_action": "no_offer",
+            "next_action": next_action,
         })
+
+
+    # Only fixed-summary mode registers assistance routes.
+    if fixed_summary:
+
+        def assistance_error(exc):
+            if isinstance(exc, SessionNotFound):
+                return error("unknown_session", 404)
+            if isinstance(exc, ItemBankMismatch):
+                return error("item_bank_mismatch", 409)
+            if isinstance(exc, AssistanceConflict):
+                return error("assistance_conflict", 409)
+            return error("invalid_assistance_request", 400)
+
+        @app.get(
+            "/api/v1/durable/sessions/<session_id>/assistance"
+        )
+        def current_assistance(session_id: str):
+            try:
+                offer = repository.current_offer(session_id)
+            except (SessionNotFound, ItemBankMismatch) as exc:
+                return assistance_error(exc)
+            return jsonify({"offer": asdict(offer) if offer else None})
+
+        @app.post(
+            "/api/v1/durable/sessions/<session_id>"
+            "/assistance/decision"
+        )
+        def assistance_decision(session_id: str):
+            payload = request.get_json(silent=True)
+            if (
+                not isinstance(payload, dict)
+                or set(payload) != {"source_position", "accept"}
+            ):
+                return error("invalid_assistance_request", 400)
+
+            source = payload["source_position"]
+            accept = payload["accept"]
+            if (
+                type(source) is not int
+                or source < 0
+                or type(accept) is not bool
+            ):
+                return error("invalid_assistance_request", 400)
+
+            try:
+                offer = repository.decide(
+                    session_id=session_id,
+                    source_position=source,
+                    accept=accept,
+                )
+            except (
+                SessionNotFound, ItemBankMismatch, AssistanceConflict
+            ) as exc:
+                return assistance_error(exc)
+            return jsonify({"offer": asdict(offer)})
+
+        @app.post(
+            "/api/v1/durable/sessions/<session_id>"
+            "/assistance/delivery"
+        )
+        def assistance_delivery(session_id: str):
+            payload = request.get_json(silent=True)
+            if (
+                not isinstance(payload, dict)
+                or set(payload) != {"source_position"}
+            ):
+                return error("invalid_assistance_request", 400)
+
+            source = payload["source_position"]
+            if type(source) is not int or source < 0:
+                return error("invalid_assistance_request", 400)
+
+            try:
+                offer = repository.deliver(
+                    session_id=session_id,
+                    source_position=source,
+                )
+            except (
+                SessionNotFound, ItemBankMismatch, AssistanceConflict
+            ) as exc:
+                return assistance_error(exc)
+            return jsonify({"offer": asdict(offer)})
 
     return app
