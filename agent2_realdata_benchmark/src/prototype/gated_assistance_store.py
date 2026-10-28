@@ -25,6 +25,8 @@ class SQLiteFixedSummaryQuizRepository(
 ):
     """An explicitly enabled fixed-summary demonstration policy."""
 
+    REPOSITORY_MODE = "fixed_summary"
+
     def _before_new_response(
         self,
         connection: sqlite3.Connection,

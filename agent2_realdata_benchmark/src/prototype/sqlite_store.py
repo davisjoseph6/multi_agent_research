@@ -21,6 +21,10 @@ from src.prototype.session_engine import (
 )
 
 
+class RepositoryModeMismatch(ValueError):
+    """Database cannot be opened under another policy mode."""
+
+
 class SessionNotFound(ValueError):
     pass
 
@@ -54,6 +58,8 @@ class SubmissionReceipt:
 class SQLiteQuizRepository:
     """Single-bank, file-backed, transactional local repository."""
 
+    REPOSITORY_MODE = "unassisted"
+
     def __init__(
         self,
         database_path: str | Path,
@@ -86,6 +92,7 @@ class SQLiteQuizRepository:
         ).hexdigest()
 
         self._initialize_database()
+        self._initialize_repository_mode()
 
     @contextmanager
     def _connection(self):
@@ -123,6 +130,17 @@ class SQLiteQuizRepository:
         with self._connection() as connection:
             connection.executescript(
                 """
+                CREATE TABLE IF NOT EXISTS repository_config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS repository_mode_stamp (
+                    singleton INTEGER PRIMARY KEY
+                        CHECK(singleton = 1),
+                    value TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS sessions (
                     session_id TEXT PRIMARY KEY,
                     bank_version TEXT NOT NULL,
@@ -152,11 +170,113 @@ class SQLiteQuizRepository:
                 """
             )
 
+    def _check_repository_mode(
+        self,
+        connection: sqlite3.Connection,
+    ) -> None:
+        row = connection.execute(
+            """
+            SELECT value FROM repository_config
+            WHERE key = 'repository_mode'
+            """
+        ).fetchone()
+
+        if (
+            row is None
+            or row["value"] != self.REPOSITORY_MODE
+        ):
+            raise RepositoryModeMismatch(
+                "Database repository mode does not match"
+            )
+
+    def _initialize_repository_mode(self) -> None:
+        with self._write_transaction() as connection:
+            row = connection.execute(
+                """
+                SELECT value FROM repository_config
+                WHERE key = 'repository_mode'
+                """
+            ).fetchone()
+
+            stamp = connection.execute(
+                """
+                SELECT value FROM repository_mode_stamp
+                WHERE singleton = 1
+                """
+            ).fetchone()
+
+            if (
+                stamp is not None
+                and stamp["value"] != self.REPOSITORY_MODE
+            ):
+                raise RepositoryModeMismatch(
+                    "Persistent repository stamp does not match"
+                )
+
+            if row is not None:
+                self._check_repository_mode(connection)
+            else:
+                existing = connection.execute(
+                    "SELECT COUNT(*) FROM sessions"
+                ).fetchone()[0]
+
+                if (
+                    existing
+                    and self.REPOSITORY_MODE != "unassisted"
+                ):
+                    raise RepositoryModeMismatch(
+                        "Existing sessions lack gated-mode metadata"
+                    )
+
+                if existing and stamp is None:
+                    table_exists = connection.execute(
+                        """
+                        SELECT 1 FROM sqlite_master
+                        WHERE type = 'table'
+                          AND name = 'assistance_offers'
+                        """
+                    ).fetchone()
+
+                    if table_exists is not None:
+                        assistance_exists = connection.execute(
+                            """
+                            SELECT 1 FROM assistance_offers
+                            LIMIT 1
+                            """
+                        ).fetchone()
+
+                        if assistance_exists is not None:
+                            raise RepositoryModeMismatch(
+                                "Ambiguous legacy database with "
+                                "assistance history"
+                            )
+
+                connection.execute(
+                    """
+                    INSERT INTO repository_config(key, value)
+                    VALUES ('repository_mode', ?)
+                    """,
+                    (self.REPOSITORY_MODE,),
+                )
+
+            if stamp is None:
+                connection.execute(
+                    """
+                    INSERT INTO repository_mode_stamp(
+                        singleton, value
+                    )
+                    VALUES (1, ?)
+                    """,
+                    (self.REPOSITORY_MODE,),
+                )
+
     def _session_row(
         self,
         connection: sqlite3.Connection,
         session_id: str,
     ) -> sqlite3.Row:
+        self._check_repository_mode(connection)
+
         row = connection.execute(
             """
             SELECT bank_version, bank_digest, position
@@ -195,6 +315,8 @@ class SQLiteQuizRepository:
         session_id = uuid4().hex
 
         with self._write_transaction() as connection:
+            self._check_repository_mode(connection)
+
             connection.execute(
                 """
                 INSERT INTO sessions
