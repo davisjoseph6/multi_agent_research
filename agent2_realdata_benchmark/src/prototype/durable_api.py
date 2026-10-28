@@ -86,15 +86,12 @@ def create_durable_app(
 
     @app.get("/demo")
     def local_browser_demo():
-        if fixed_summary:
-            return error(
-                "fixed_summary_browser_not_yet_supported",
-                409,
-            )
-
-        response = app.make_response(
-            render_template("durable_quiz.html")
+        template = (
+            "fixed_summary_quiz.html"
+            if fixed_summary
+            else "durable_quiz.html"
         )
+        response = app.make_response(render_template(template))
 
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"

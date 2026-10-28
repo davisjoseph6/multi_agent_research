@@ -1,0 +1,13 @@
+/* Fixed-summary page only; the ordinary quiz stylesheet is unchanged. */
+#assistance-panel { border-left: 4px solid #314f94; }
+#assistance-panel h2 { margin-top: 0; }
+.resource-panel {
+  background: #f4f6fa;
+  border: 1px solid #d9deea;
+  border-radius: 10px;
+  padding: 18px;
+  margin-top: 16px;
+  line-height: 1.6;
+}
+.resource-panel h3 { margin-top: 0; }
+#offer-message { line-height: 1.55; }

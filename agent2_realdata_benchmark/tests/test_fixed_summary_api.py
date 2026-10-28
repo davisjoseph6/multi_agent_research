@@ -203,8 +203,8 @@ def test_repository_mode_cannot_be_bypassed(tmp_path):
         )
 
 
-def test_browser_disabled_until_step22(tmp_path):
+def test_fixed_browser_is_enabled_for_step22(tmp_path):
     client = fixed_app(tmp_path / "browser.sqlite3").test_client()
     response = client.get("/demo")
-    assert response.status_code == 409
-    assert response.get_json()["error"] == "fixed_summary_browser_not_yet_supported"
+    assert response.status_code == 200
+    assert b"fixed_summary_quiz.js" in response.data
