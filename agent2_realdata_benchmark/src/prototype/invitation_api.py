@@ -21,7 +21,7 @@ from functools import wraps
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request, send_file
 
 from src.prototype.assistance_store import (
     AssistanceConflict,
@@ -446,5 +446,52 @@ def create_invitation_app(
             return error("assistance_conflict", 409)
 
         return jsonify({"offer": asdict(offer)})
+
+
+    @app.get("/trial-invite")
+    def invitation_browser():
+        response = app.make_response(
+            render_template("invitation_quiz.html")
+        )
+
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self'; "
+            "connect-src 'self'; "
+            "object-src 'none'; "
+            "base-uri 'none'; "
+            "frame-ancestors 'none'; "
+            "form-action 'self'"
+        )
+
+        return response
+
+    @app.get("/trial-invite/app.js")
+    def invitation_browser_javascript():
+        return send_file(
+            Path(__file__).resolve().parent
+            / "static"
+            / "invitation_quiz.js",
+            mimetype="text/javascript",
+        )
+
+    @app.get("/trial-invite/base.css")
+    def invitation_browser_base_css():
+        return send_file(
+            Path(__file__).resolve().parent
+            / "static"
+            / "durable_quiz.css",
+            mimetype="text/css",
+        )
+
+    @app.get("/trial-invite/assistance.css")
+    def invitation_browser_assistance_css():
+        return send_file(
+            Path(__file__).resolve().parent
+            / "static"
+            / "fixed_summary_quiz.css",
+            mimetype="text/css",
+        )
 
     return app
