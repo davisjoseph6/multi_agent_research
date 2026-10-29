@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, render_template, request
 
@@ -57,6 +58,34 @@ def create_experimental_app(
     )
 
     app = Flask(__name__)
+
+    # Defense in depth for the local-only development API.
+    # This is not authentication or trial authorization.
+    # Never deploy this application for participant use.
+
+    @app.before_request
+    def require_loopback_access():
+
+        remote = request.remote_addr
+
+        try:
+            hostname = urlsplit(
+                "//" + request.host
+            ).hostname
+        except ValueError:
+            hostname = None
+
+        allowed = {"localhost", "127.0.0.1", "::1"}
+
+        if (
+            remote not in {"127.0.0.1", "::1"}
+            or hostname not in allowed
+        ):
+            return jsonify({
+                "error": "development_local_only"
+            }), 403
+
+        return None
 
     app.extensions["trial_dev_allocator"] = allocator
     app.extensions["trial_dev_quiz"] = quiz
