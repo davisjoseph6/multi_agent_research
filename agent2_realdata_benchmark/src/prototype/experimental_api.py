@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 
 from src.prototype.assistance_store import AssistanceConflict
 from src.prototype.experimental_session_store import (
@@ -60,6 +60,24 @@ def create_experimental_app(
 
     app.extensions["trial_dev_allocator"] = allocator
     app.extensions["trial_dev_quiz"] = quiz
+
+    @app.get("/trial-dev")
+    def experimental_browser():
+        response = app.make_response(
+            render_template("experimental_quiz.html")
+        )
+
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self'; "
+            "connect-src 'self'; "
+            "object-src 'none'; "
+            "base-uri 'none'; "
+            "frame-ancestors 'none'"
+        )
+
+        return response
 
     def error(code, status):
         return jsonify({"error": code}), status
