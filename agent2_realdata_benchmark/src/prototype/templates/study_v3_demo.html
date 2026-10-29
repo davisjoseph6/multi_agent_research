@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Eight-concept synthetic protocol demonstration</title>
+<link rel="stylesheet" href="/trial-v3/base.css"><script defer src="/trial-v3/app.js"></script>
+</head><body><main>
+<h1>IJCAI — Synthetic three-session development demo</h1>
+<p class="warning">SYNTHETIC DEVELOPMENT ONLY. FICTIONAL PARTICIPANTS ONLY. Not an approved research study. Questions, resource text and fatigue responses are synthetic fixtures, not validated educational materials.</p>
+<form id="start-form" autocomplete="off">
+<label>Private local development token <input id="token" type="password" required autocomplete="off"></label>
+<label>Synthetic participant ID <input id="pid" type="text" value="SYN_BROWSER_001" required pattern="SYN_[A-Za-z0-9_-]{3,50}"></label>
+<label>Test arm <select id="arm"><option value="A">A — experimental POMCP</option><option value="B">B — greedy</option><option value="C">C — fixed</option></select></label>
+<button type="submit">Start or resume synthetic session</button></form>
+<p id="status" role="status" aria-live="polite">Enter a synthetic development credential.</p>
+<section id="study" hidden>
+<p id="progress"></p><div id="activity"></div><button type="button" id="refresh">Refresh progress</button>
+<button type="button" id="forget">Clear credential from page</button>
+</section></main></body></html>

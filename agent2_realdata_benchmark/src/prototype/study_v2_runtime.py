@@ -218,7 +218,14 @@ class SyntheticProtocolEngine:
                 if option_id not in [x[0] for x in item.options]:
                     raise ProtocolError("invalid option ID")
                 correct = option_id == item.answer_id
-                if s["stage"] in ("pretest", "practice"):
+                if s["stage"] == "pretest":
+                    # Baseline assessment gives observation evidence, but
+                    # must NOT apply the BKT *instructional learning* transition.
+                    # This fixes an unearned .10 mastery increase in the
+                    # provisional v2 runtime after every pre-test item.
+                    s["mastery"][item.concept] = BKT().posterior(
+                        s["mastery"][item.concept], correct)
+                elif s["stage"] == "practice":
                     belief = Belief(s["mastery"].copy())
                     belief.observe(item.concept, correct)
                     s["mastery"] = belief.mastery
