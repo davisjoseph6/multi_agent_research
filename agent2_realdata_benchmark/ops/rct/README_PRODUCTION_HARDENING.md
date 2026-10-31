@@ -60,6 +60,65 @@ code is not compatible with unmodified NASA-TLX administration.
 
 ---
 
+## 2026-10-31 extension — test results, browser dependency, recovery and Raw-TLX draft
+
+Verified by the researcher on the prior commit (not rerun yet after this extension):
+- Focused test suite: **46 passed**; full suite **1271 passed**.
+- Fictional 30-person/8-thread load: **30 complete**, **10 per arm**, **11130 HTTP test-client calls**, **0 pending**. Request p95 **68.067 ms**, maximum **6845.083 ms**, including a **6837.752 ms** action request. These are in-process measurements, not production performance.
+- Chromium installation: succeeded, but test **failed before starting** because Linux lacked \`libnspr4.so\`. This is a host dependency, not an RCT controller test failure.
+- Content review packet: generated successfully, but **95 questions and 32 resources remain unreviewed**.
+
+### Fix Chromium Linux shared libraries
+
+Official supported method (requires permission to install OS packages):
+
+\`\`\`bash
+python -m playwright install-deps chromium
+python -m scripts.rct_browser_qa --out /tmp/rct_chromium_02.json
+\`\`\`
+
+On Ubuntu/Debian without administrative privileges, an **optional developer-QA-only** wrapper attempts to extract missing distro-packaged libraries (including \`libnspr4\`) into the user's cache. It does not install system packages or enable live enrollment:
+
+\`\`\`bash
+bash ops/rct/qa_browser_userlibs.sh python -m scripts.rct_browser_qa --out /tmp/rct_chromium_02.json
+\`\`\`
+
+The wrapper requires working \`apt-get download\` package indexes/network and can legitimately fail if the distro lacks compatible packages. If so, record \`ldd\` missing-library results, and ask the machine's administrator to install supported dependencies. Do not disable browser security controls to work around missing libraries.
+
+### Full-browser and recovery tests (fictional only)
+
+\`\`\`bash
+bash ops/rct/qa_browser_userlibs.sh python -m scripts.rct_browser_qa --full --out /tmp/rct_chromium_full_01.json
+python -m scripts.rct_restore_drill --out /tmp/rct_restore_01.json
+python -m pytest -q tests/test_rct_candidate.py tests/test_rct_operational_load.py tests/test_rct_content_review_packet.py tests/test_rct_restore_drill.py tests/test_rct_questionnaire_scales.py
+python -m pytest -q
+\`\`\`
+
+The restore drill backs up a fictional SQLite study after an action is offered,
+restores into another file, confirms the exact pending action, completes the
+journey and ensures the source backup snapshot remains independent. This is
+not an offsite/encrypted backup or failover test.
+
+### NASA Raw-TLX workload draft: separate opt-in *rehearsal* variant
+
+The default questionnaire **remains the six unvalidated five-point fatigue fixtures**.
+A new *unreviewed* \`fatigue_NASA_RAW_TLX_DRAFT.json\` and
+\`settings_raw_tlx_REHEARSAL.json\` demonstrate six workload ratings on a
+0–100 response scale in steps of five, including the reversed performance
+anchor ("good" to "poor"). Response validation and version/hash binding
+apply to either 1–5 or 0–100 variants.
+
+\`\`\`bash
+bash ops/rct/qa_browser_userlibs.sh python -m scripts.rct_browser_qa --settings docs/rct_candidate_v1/settings_raw_tlx_REHEARSAL.json --full --out /tmp/rct_raw_tlx_full_01.json
+\`\`\`
+
+This is only **an implementation candidate** and does not certify official wording,
+validity, permissions, scoring or protocol suitability. Raw TLX is **workload**,
+not a fatigue-specific scale. No new user instrument should enter the real
+trial without formal review, frozen analysis and a separate valid release gate.
+
+---
+
 ## Status and separation of duties
 
 - Core three-arm transactional prototype: passes locally reported 1,263 regression tests; nine fictional participants completed in earlier HTTP rehearsal.
