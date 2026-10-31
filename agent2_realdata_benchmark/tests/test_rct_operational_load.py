@@ -10,7 +10,10 @@ def test_three_concurrent_fictional_journeys_complete():
     assert result["actual_network_tls_devices_tested"] is False
     assert result["real_people"] is False
     assert result["requests"]>result["actions"]
-    assert set(result["assigned_arm_counts"])=={"A","B","C"}
+    # The first three places of a randomized block of six or nine need not
+    # include all three treatment arms. Test only valid arms and total count.
+    assert set(result["assigned_arm_counts"]).issubset({"A","B","C"})
+    assert sum(result["assigned_arm_counts"].values()) == 3
 
 
 @pytest.mark.parametrize("people,workers",[(0,3),(121,3),(3,0),(3,25),(True,2)])
