@@ -61,6 +61,7 @@ def rehearsal():
                     page.locator("#consent button").click()
                     expect(page.locator("#study")).to_be_visible()
                     expect(page.locator("#progress")).to_contain_text("question 1 of 16")
+                    expect(page.locator("#activity h2")).to_be_focused()
                     expect(page.locator("#activity input[type='radio']")).to_have_count(4)
 
                     page.locator("#activity input[type='radio']").first.check()
