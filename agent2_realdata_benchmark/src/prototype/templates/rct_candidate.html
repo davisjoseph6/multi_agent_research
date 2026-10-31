@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Learning study</title><link rel="stylesheet" href="/app.css"><script defer src="/app.js"></script></head>
+<body><main><p class="eyebrow">Decision making · Learning study</p><h1>Welcome</h1>
+{% if rehearsal %}<p class="warning">LOCAL REHEARSAL — fictional records only. Content awaits independent review. This is not participant recruitment.</p>{% endif %}
+<p id="notice" role="status" aria-live="polite">Enter your private invitation code.</p>
+<form id="login" autocomplete="off"><label for="invitation">Invitation code</label><input id="invitation" type="password" required autocomplete="off"><button>Continue</button></form>
+<section id="agreement" hidden><h2>Information and participation agreement</h2><div id="information"></div>
+<form id="consent"><label class="choice"><input id="agree" type="checkbox" required> I have read the information and agree to participate.</label><button>Begin</button></form></section>
+<section id="study" hidden><p id="progress"></p><div id="activity"></div></section>
+<nav id="controls" hidden aria-label="Session controls"><button id="resume" type="button">Resume current activity</button><button id="clear" type="button">Sign out on this device</button><button id="stop" type="button">Stop participation</button></nav>
+</main></body></html>

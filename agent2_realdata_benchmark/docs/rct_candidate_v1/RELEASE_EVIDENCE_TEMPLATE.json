@@ -1,0 +1,13 @@
+{
+  "study_id": "",
+  "responsible_institution": "",
+  "candidate_sha256": "",
+  "decision": "pending",
+  "reviews": {
+    "protocol_and_analysis": {"decision":"pending","reviewer":"","date":"","evidence_file":"","sha256":""},
+    "content_and_measurement": {"decision":"pending","reviewer":"","date":"","evidence_file":"","sha256":""},
+    "ethics_pathway": {"decision":"pending","reviewer":"","date":"","evidence_file":"","sha256":""},
+    "privacy": {"decision":"pending","reviewer":"","date":"","evidence_file":"","sha256":""},
+    "deployment_and_independent_qa": {"decision":"pending","reviewer":"","date":"","evidence_file":"","sha256":""}
+  }
+}

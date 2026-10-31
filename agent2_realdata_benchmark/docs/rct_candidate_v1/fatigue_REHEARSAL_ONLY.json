@@ -1,0 +1,21 @@
+{
+  "version": "REHEARSAL_ONLY_UNVALIDATED_6_ITEMS_V1",
+  "items": [
+    "Rehearsal fixture 1: I feel mentally tired.",
+    "Rehearsal fixture 2: I find it difficult to concentrate.",
+    "Rehearsal fixture 3: I would like a break.",
+    "Rehearsal fixture 4: Thinking feels effortful.",
+    "Rehearsal fixture 5: I feel less alert.",
+    "Rehearsal fixture 6: Continuing feels tiring."
+  ],
+  "labels": {
+    "1": "1 \u2014 Strongly disagree",
+    "2": "2 \u2014 Disagree",
+    "3": "3 \u2014 Neither agree nor disagree",
+    "4": "4 \u2014 Agree",
+    "5": "5 \u2014 Strongly agree"
+  },
+  "review_decision": "pending",
+  "reviewer_record": "",
+  "review_date": ""
+}

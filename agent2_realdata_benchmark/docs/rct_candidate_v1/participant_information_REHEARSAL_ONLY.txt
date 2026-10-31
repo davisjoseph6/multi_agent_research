@@ -1,0 +1,7 @@
+LOCAL SOFTWARE REHEARSAL ONLY
+
+Use fictional records. This is not recruitment, research consent, or an approved study.
+
+The rehearsal records answers, practice and recovery delivery, questionnaire fixture responses and event times in a local database. No real names, emails or student records should be entered. The software assigns a condition privately. You may stop at any time. Stopping locks participation; stored records are not automatically deleted.
+
+Before a human study, replace this file with the institution-approved information: sponsor and contacts, purpose, eligibility, duration, randomization and treatment descriptions, risks and benefits without efficacy promises, voluntary participation and withdrawal, data controller and lawful basis, data collected, hosting, recipients, retention, rights and complaint route, compensation and relevant approval references. Obtain the appropriate decisions before collecting personal data.
