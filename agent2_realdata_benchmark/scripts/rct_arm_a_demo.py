@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-from datetime import datetime, timezone
+import os
 import json
 from pathlib import Path
 
@@ -61,7 +61,9 @@ def prepare(*, database, output, settings=DEFAULT_SETTINGS):
         "warning": "Keep this file private. Never publish the token or use these data as human RCT evidence.",
     }
     output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("x", encoding="utf-8") as stream:
+    # Create mode 0600 atomically even if the caller has a permissive umask.
+    descriptor = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
         json.dump(payload, stream, indent=2)
         stream.write("\n")
     output.chmod(0o600)
