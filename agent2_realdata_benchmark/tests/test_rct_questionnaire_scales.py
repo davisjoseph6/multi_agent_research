@@ -24,16 +24,18 @@ def test_raw_tlx_draft_is_unreviewed_and_has_correct_levels():
 def test_raw_tlx_draft_enforces_scale_without_changing_default(tmp_path):
     _,bundle,_=load_settings(REHEARSAL_RAW)
     engine=RCTCandidateEngine(tmp_path/"raw_tlx.sqlite3",bundle,simulations=41)
-    invitation=engine.issue_invitation()["invitation"]
+    issued=engine.issue_invitation()
+    invitation=issued["invitation"]
+    pid=issued["participant_id"]
     engine.enroll(invitation,agreed=True,information_version=bundle.hashes["information"])
     with engine._transaction() as db:
         row=db.execute("SELECT state FROM rct_people WHERE pid=?",
-                       (invitation and engine.export_private()["outcomes"][0]["pid"],)).fetchone()
+                       (pid,)).fetchone()
         state=json.loads(row["state"])
         state.update(stage="fatigue",session=1,index=0,pending=None)
         db.execute("UPDATE rct_people SET state=? WHERE pid=?",
                    (json.dumps(state,sort_keys=True,separators=(",",":")),
-                    engine.export_private()["outcomes"][0]["pid"]))
+                    pid))
     action=engine.next_action(invitation)
     assert action["action"]=="FATIGUE"
     assert action["questionnaire"]["scale"]["maximum"]==100
