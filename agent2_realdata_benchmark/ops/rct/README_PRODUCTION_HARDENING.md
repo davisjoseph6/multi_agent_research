@@ -3,6 +3,63 @@
 Branch: `feature/rct-production-hardening-20261031`.
 All files in `ops/rct` are **templates**. None indicates that a server, domain, TLS certificate, expert review, or deployment exists. The existing live-enrollment release gate is preserved.
 
+## 2026-10-31 validation update — randomized block and browser QA
+
+The first user-run 30-participant synthetic test completed **30/30** fictional journeys,
+with **11,130** test-client requests, **0** pending actions, 8 worker threads and
+maximum request latency approximately **5.86 seconds**. This is only a snapshot
+on the user's workstation; no production-capacity assertion follows.
+
+An initial three-participant focused test failed because the *load harness*
+incorrectly required all three arms to appear among the first three
+assignments. Since allocation uses randomized blocks of 6 or 9, a partially
+filled block need not be balanced. The harness and its test now validate
+the overall counts and require balance only in complete allocation blocks.
+The controller and allocation logic were **not** changed.
+
+The revised harness also records p95 and maximum latency by API route to
+identify any unusual contention or planner delays. Previous report files
+must remain untouched; use fresh output names.
+
+### Run the latest tests from the repository benchmark folder
+
+```bash
+python -m pytest -q tests/test_rct_candidate.py tests/test_rct_operational_load.py tests/test_rct_content_review_packet.py
+python -m scripts.rct_operational_load --participants 30 --workers 8 --out /tmp/rct_load_30_02.json
+python -m scripts.rct_content_review_packet --out-dir /tmp/rct_review_worklists_01
+python -m pytest -q
+```
+
+The review packet writes 95 item worklist entries and 32 resource worklist
+entries with **empty expert assessment fields** and source hashes. It does not
+modify the source content, resolve any expert assessment, or make the
+fatigue instrument valid.
+
+### Optional Chromium-engine localhost test
+
+```bash
+python -m pip install -r ops/rct/requirements-browser-qa.txt
+python -m playwright install chromium
+python -m scripts.rct_browser_qa --out /tmp/rct_chromium_01.json
+```
+
+This browser check exercises a fictional participant's invitation,
+consent, assessment, first answer, heading keyboard focus, browser reload,
+session persistence and mobile-width layout with a real Chromium engine
+over local HTTP. **No public network, TLS, physical tablet/phone,
+screen reader, or independent security assessor is involved.**
+
+If Chromium installation is prevented by OS permissions or missing Linux
+libraries, preserve the error; do not make unsupported deployment claims.
+Continue to use the in-process test results as rehearsal evidence, not
+as proof that the browser check passed.
+
+Review `ops/rct/MEASUREMENT_DECISION_REQUIRED.md` before selecting NASA-TLX
+(workload) or a validated fatigue-specific scale. The existing 1–5 response
+code is not compatible with unmodified NASA-TLX administration.
+
+---
+
 ## Status and separation of duties
 
 - Core three-arm transactional prototype: passes locally reported 1,263 regression tests; nine fictional participants completed in earlier HTTP rehearsal.
