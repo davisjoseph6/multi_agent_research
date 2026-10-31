@@ -1,0 +1,28 @@
+{
+  "status": "REVIEW-PENDING DRAFT ONLY",
+  "source_item_sha256": "d7258353e90df6c25857f1abca13a86a1030cd2ab969ec03a469b67a30a8f3f8",
+  "task_csv_sha256": "d13cb2eedd8ed2ca2e7609ab6984f0463aae73793842d52bd6a9f51c47c97eda",
+  "task_count": 8,
+  "source_bank_changed": false,
+  "current_mc_create_warnings_resolved": false,
+  "independent_expert_reviews": 0,
+  "human_study_authorized": false,
+  "requires_runtime_constructed_response_support": true,
+  "requires_independent_rater_training_and_reliability": true,
+  "rubric": {
+    "criteria": [
+      "domain_accuracy",
+      "original_design_quality",
+      "reasoning_and_justification",
+      "clarity_and_constraints"
+    ],
+    "levels": {
+      "0": "Absent, substantively incorrect, or non-responsive",
+      "1": "Partially meets criterion; material ambiguity or omission",
+      "2": "Meets criterion with no material conceptual error"
+    },
+    "total_min": 0,
+    "total_max": 8,
+    "note": "Proposed analytic rubric only. Training, double scoring, disagreement adjudication and reliability study are NOT completed. Do not infer mastery from numeric scores until validated."
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "status": "DRAFT; NOT EXPERT-APPROVED; NOT VALIDATED FOR HUMAN STUDY",
+  "original_items_sha256": "d80adfb754cd44c5e19146974cc72fcaef9da7985ab74eb2f84ffac3bd220c79",
+  "original_resources_sha256": "b5e33fa2062853557e6fff48770f850c057ddfee2dc4468ecccaacc4ca40336b",
+  "new_items_sha256": "d7258353e90df6c25857f1abca13a86a1030cd2ab969ec03a469b67a30a8f3f8",
+  "new_resources_sha256": "b5e33fa2062853557e6fff48770f850c057ddfee2dc4468ecccaacc4ca40336b",
+  "unchanged_resource_bytes": true,
+  "revised_item_ids": [
+    "BE_PRETEST_001",
+    "BE_PRETEST_002",
+    "BE_PRETEST_003",
+    "BE_PRETEST_004",
+    "BE_PRETEST_005",
+    "BE_PRETEST_006",
+    "BE_PRETEST_007",
+    "BE_PRETEST_008",
+    "BE_PRETEST_009",
+    "BE_PRETEST_010",
+    "BE_PRETEST_011",
+    "BE_PRETEST_012",
+    "BE_PRETEST_013",
+    "BE_PRETEST_014",
+    "BE_PRETEST_015",
+    "BE_PRETEST_016",
+    "BE_POSTTEST_001",
+    "BE_POSTTEST_002",
+    "BE_POSTTEST_003",
+    "BE_POSTTEST_004",
+    "BE_POSTTEST_005",
+    "BE_POSTTEST_006",
+    "BE_POSTTEST_007",
+    "BE_POSTTEST_008",
+    "BE_POSTTEST_009",
+    "BE_POSTTEST_010",
+    "BE_POSTTEST_011",
+    "BE_POSTTEST_012",
+    "BE_POSTTEST_013",
+    "BE_POSTTEST_014",
+    "BE_POSTTEST_015",
+    "BE_POSTTEST_016"
+  ],
+  "revised_count": 32,
+  "review_pending_count": 127,
+  "before_severity_counts": {
+    "construct": 8,
+    "high": 78
+  },
+  "after_severity_counts": {
+    "construct": 8
+  },
+  "before_flag_counts": {
+    "create_is_multiple_choice": 8,
+    "shared_choice_set": 62,
+    "shared_prepost_rationale": 16
+  },
+  "after_flag_counts": {
+    "create_is_multiple_choice": 8
+  },
+  "limits": [
+    "Mechanically distinct assessments are not psychometrically parallel.",
+    "No expert factual or answer-key review has occurred.",
+    "Bloom create remains multiple-choice and therefore unvalidated.",
+    "Practice resources, practice answer sets and DROP_2 content are unchanged.",
+    "No original source or reviewed bank is overwritten."
+  ]
+}

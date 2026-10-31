@@ -1,0 +1,20 @@
+{
+  "original_items_sha256": "5c0ddc9f234d2c68a2e358c7f47187c7790d76784a536589f352e4f8f236be5c",
+  "original_resources_sha256": "c563e0e6afd99ef1b250b2437543f5e3b0e792bca78904fe78f04f37c519419b",
+  "authored_items_sha256": "d80adfb754cd44c5e19146974cc72fcaef9da7985ab74eb2f84ffac3bd220c79",
+  "authored_resources_sha256": "b5e33fa2062853557e6fff48770f850c057ddfee2dc4468ecccaacc4ca40336b",
+  "item_count": 95,
+  "resource_count": 32,
+  "reviewed_count": 0,
+  "authorized_for_human_study": false,
+  "empirical_difficulty_estimated": false,
+  "free_response_create_competency_validated": false,
+  "limitations": [
+    "Draft questions; answer keys and source alignment require expert audit.",
+    "Review decisions remain pending with empty reviewer records.",
+    "Bloom create represented as recognition of good designs, not actual content creation.",
+    "Parallel pre/post forms and psychometrics unvalidated.",
+    "Generated prompts sharing a concept/Bloom may need stronger independence or alternate forms.",
+    "Each resource may need timing, reading-level and delivery validation."
+  ]
+}
