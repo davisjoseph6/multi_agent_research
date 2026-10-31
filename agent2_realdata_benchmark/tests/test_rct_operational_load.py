@@ -10,6 +10,9 @@ def test_three_concurrent_fictional_journeys_complete():
     assert result["actual_network_tls_devices_tested"] is False
     assert result["real_people"] is False
     assert result["requests"]>result["actions"]
+    assert all(route in result["latency_by_route"] for route in
+               ("information","enroll","next","rendered","act"))
+    assert sum(v["requests"] for v in result["latency_by_route"].values()) == result["requests"]
     # The first three places of a randomized block of six or nine need not
     # include all three treatment arms. Test only valid arms and total count.
     assert set(result["assigned_arm_counts"]).issubset({"A","B","C"})
