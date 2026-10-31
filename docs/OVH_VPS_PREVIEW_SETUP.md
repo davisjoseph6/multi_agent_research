@@ -28,8 +28,11 @@ Check current billing commitment, VAT, renewal price and region before paying.
 
 Local SSH key setup, **on your laptop** (do not replace an existing key):
 ```bash
-test ! -e ~/.ssh/ijcai_preview_ed25519 || { echo "Key already exists; stop and inspect"; exit 1; }
-ssh-keygen -t ed25519 -a 100 -f ~/.ssh/ijcai_preview_ed25519 -C ijcai-static-preview
+if [ -e ~/.ssh/ijcai_preview_ed25519 ]; then
+    echo "SSH key already exists; reuse or inspect it (do not overwrite)."
+else
+    ssh-keygen -t ed25519 -a 100 -f ~/.ssh/ijcai_preview_ed25519 -C ijcai-static-preview
+fi
 cat ~/.ssh/ijcai_preview_ed25519.pub
 ```
 The `.pub` line is what goes into the hosting dashboard. Do not share the
@@ -78,8 +81,8 @@ path exists. Keep database and development ports closed.
 
 **From laptop**, repository root, after source-check:
 ```bash
+cd ~/multi_agent_research/agent2_realdata_benchmark
 python -m scripts.rct_public_preview_check
-# Run the above from agent2_realdata_benchmark, then return to repo root:
 cd ..
 scp -i ~/.ssh/ijcai_preview_ed25519 docs/index.html LOGIN_USER@ACTUAL_VPS_IPV4:/tmp/ijcai-preview-index.html
 ```
