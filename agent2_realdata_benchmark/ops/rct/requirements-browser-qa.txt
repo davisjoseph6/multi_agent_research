@@ -1,0 +1,2 @@
+# Developer QA only. Separate from the audited runtime dependency lock.
+playwright>=1.50,<2
