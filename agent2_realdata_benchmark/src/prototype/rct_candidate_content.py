@@ -87,11 +87,26 @@ class ContentBundle:
         if set(self.resources) != {(c, a) for c in CONCEPTS for a in RECOVERY_ACTIONS}:
             raise ValueError("expected exactly eight concepts by four recovery resources")
         self.fatigue = json.loads(paths["fatigue"].read_text(encoding="utf-8"))
+        scale = self.fatigue.get("scale", {"minimum": 1, "maximum": 5, "step": 1})
+        if (not isinstance(scale, dict) or
+                set(scale) != {"minimum", "maximum", "step"} or
+                any(type(scale[key]) is not int for key in scale) or
+                scale["minimum"] < 0 or scale["maximum"] > 100 or
+                scale["step"] < 1 or
+                scale["minimum"] >= scale["maximum"] or
+                (scale["maximum"] - scale["minimum"]) % scale["step"] != 0):
+            raise ValueError("invalid questionnaire response scale")
+        valid_values = range(scale["minimum"], scale["maximum"] + 1, scale["step"])
         if (len(self.fatigue.get("items", [])) != 6 or
-                any(not isinstance(s, str) or not s.strip() for s in self.fatigue["items"]) or
-                set(self.fatigue.get("labels", {})) != {str(i) for i in range(1, 6)} or
-                not self.fatigue.get("version")):
-            raise ValueError("six fatigue prompts, version and labels 1..5 required")
+                any(not isinstance(item, str) or not item.strip()
+                    for item in self.fatigue["items"]) or
+                set(self.fatigue.get("labels", {})) != {str(i) for i in valid_values} or
+                any(not isinstance(label, str) or not label.strip()
+                    for label in self.fatigue["labels"].values()) or
+                not isinstance(self.fatigue.get("version"), str) or
+                not self.fatigue["version"].strip()):
+            raise ValueError("six questionnaire prompts, version and complete scale labels required")
+        self.fatigue["scale"] = scale
         self.information = paths["information"].read_text(encoding="utf-8").strip()
         if not self.information:
             raise ValueError("participant information is empty")
