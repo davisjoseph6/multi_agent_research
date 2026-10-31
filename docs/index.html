@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex,nofollow">
+<title>Adaptive Learning — Fictional Interactive Research Preview</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#192d41;background:#f1f5f9}
+*{box-sizing:border-box}body{margin:0}main{max-width:860px;margin:auto;padding:28px 20px 80px}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+small{font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#425d78}
+h1{font-size:clamp(1.8rem,5vw,2.8rem);line-height:1.17;margin:13px 0}h2{font-size:1.35rem;margin:0 0 12px}
+p{line-height:1.6}a{color:#175a9c}.notice{background:#ffefcf;border-left:5px solid #946500;padding:15px 18px;border-radius:6px;margin:24px 0;font-weight:650}
+.card{background:white;border:1px solid #d8e3ed;border-radius:15px;padding:clamp(20px,4vw,38px);box-shadow:0 5px 30px #153b6010}
+.stage{color:#51697d;font-weight:650;margin:0 0 20px}.answer{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #c6d5e1;border-radius:9px;margin:9px 0;cursor:pointer}
+.answer:has(input:checked){background:#e9f3ff;border-color:#1362a6}input[type=radio]{margin-top:5px;width:18px;height:18px}
+button{background:#164f81;color:white;border:0;border-radius:9px;padding:13px 18px;font-size:1rem;font-weight:650;cursor:pointer}
+button:hover{background:#103a5e}button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #ce8200;outline-offset:3px}
+button:disabled{background:#6e7f8d;cursor:not-allowed}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:22px}
+.alt{background:#e5edf4;color:#194563}.alt:hover{background:#d5e3f0}.foot{font-size:.92rem;color:#50677d;margin-top:22px}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+</style>
+</head>
+<body>
+<main>
+<header><small>Decision making · research software preview</small><small>Illustrative · no study enrollment</small></header>
+<h1>Adaptive Learning and Recovery</h1>
+<p>This short interactive preview explains how the proposed three-arm study separates assessment, practice and POMCP-selected recovery support.</p>
+<div class="notice" role="note">FICTIONAL READ-ONLY PREVIEW. This is not the RCT application, recruitment, research consent, or evidence of learning efficacy. No answers are transmitted, stored or scored. Recovery is shown here by a scripted example, not a live POMCP decision.</div>
+<section class="card" aria-label="Illustrative prototype walkthrough">
+  <p id="stage" class="stage" aria-live="polite">Stage 1 of 4 · Initial assessment</p>
+  <div id="panel">
+    <h2 tabindex="-1" id="heading">Initial assessment</h2>
+    <p>What is expected utility when an outcome has a utility of 8 with probability ½ and a utility of 2 otherwise?</p>
+    <fieldset style="border:0;padding:0;margin:0"><legend>Choose one answer (illustrative, unscored)</legend>
+    <label class="answer"><input type="radio" name="initial"> 2 utility units</label>
+    <label class="answer"><input type="radio" name="initial"> 5 utility units</label>
+    <label class="answer"><input type="radio" name="initial"> 8 utility units</label>
+    </fieldset>
+  </div>
+  <div class="row"><button id="previous" class="alt" disabled>Previous</button><button id="next">Next stage</button></div>
+  <div id="message" role="status" class="foot">This example uses fictional content only.</div>
+</section>
+<p class="foot">Research status: software rehearsal and synthetic planning experiments only; no human efficacy conclusion, production enrollment authorization, or independent instructional review. <a href="https://github.com/davisjoseph6/multi_agent_research">Source repository</a>.</p>
+</main>
+<script>
+"use strict";
+const stages = [
+ {title:"Initial assessment",kind:"Pretest · 16 questions in the proposed protocol",body:`<p>What is expected utility when an outcome has a utility of 8 with probability ½ and a utility of 2 otherwise?</p><fieldset style="border:0;padding:0;margin:0"><legend>Choose one answer (illustrative, unscored)</legend><label class="answer"><input type="radio" name="initial">2 utility units</label><label class="answer"><input type="radio" name="initial">5 utility units</label><label class="answer"><input type="radio" name="initial">8 utility units</label></fieldset>`},
+ {title:"Practice and concept selection",kind:"Practice · 20 / 20 / 15 question schedule",body:`<p>The experiment has three distinct conditions:</p><p><strong>Arm A:</strong> POMCP may select a practice question or one of four recovery resources. <strong>Arm B:</strong> greedy adaptive selection. <strong>Arm C:</strong> balanced fixed sequence.</p><p>Learning is not proved by a simulated mastery estimate. In the RCT software, the pretest, practice and posttest are recorded separately.</p>`},
+ {title:"Socratic-style guided prompt",kind:"Illustrative recovery content · NOT a live POMCP selection",body:`<p><strong>Concept: Anchoring.</strong> Before hearing a suggested price, what independent benchmark could you construct?</p><p>This is a <strong>static prompt</strong>, not an interactive dialogue. The actual arm-A controller can choose this action; it does not guarantee that any individual participant will receive it.</p>`},
+ {title:"Scientific and deployment boundaries",kind:"Preview complete",body:`<p>The prototype has completed fictional multi-arm rehearsal journeys, but no human educational benefit has been established. Release still requires expert review of all instructional items and resources, a validated measurement instrument, institutional/ethics and privacy decisions, host-level TLS and operational testing, and independent accessibility/security assessment.</p><p><strong>This page is not a production participant application.</strong></p>`}
+];
+let index=0;
+const panel=document.getElementById("panel"),heading=document.getElementById("heading"),stage=document.getElementById("stage"),back=document.getElementById("previous"),next=document.getElementById("next");
+function render(){
+ const s=stages[index];
+ stage.textContent="Stage "+(index+1)+" of "+stages.length+" · "+s.kind;
+ panel.innerHTML='<h2 tabindex="-1" id="heading">'+s.title+'</h2>'+s.body;
+ back.disabled=index===0;next.textContent=index===stages.length-1?"Restart preview":"Next stage";
+ document.getElementById("heading").focus();
+ document.getElementById("message").textContent="Local demonstration only: no answer submitted, stored or scored.";
+}
+back.addEventListener("click",()=>{if(index>0){index--;render()}});
+next.addEventListener("click",()=>{index=(index+1)%stages.length;render()});
+</script>
+</body>
+</html>
