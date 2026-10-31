@@ -9,6 +9,7 @@ See docs/step102_exact_dose_ablation_PLAN.md.
 """
 from __future__ import annotations
 
+from collections import Counter
 from hashlib import sha256
 import argparse
 import json
