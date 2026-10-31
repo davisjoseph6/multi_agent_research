@@ -1,7 +1,7 @@
 """Tests for separately labeled manual recovery content preview."""
 import pytest
 
-from scripts.rct_recovery_gallery import render_html
+from scripts.rct_recovery_gallery import render_html, is_gallery_path
 
 
 def test_manual_gallery_has_all_eight_socratic_hints_without_study_treatment():
@@ -14,3 +14,11 @@ def test_manual_gallery_has_all_eight_socratic_hints_without_study_treatment():
     assert "NOT an interactive Socratic dialogue" in html
     assert "Guided prompt:" in html
     assert "LOCAL REHEARSAL" not in html  # different page from participant UX
+
+
+def test_gallery_ignores_tracking_query_string_but_restricts_other_paths():
+    assert is_gallery_path("/")
+    assert is_gallery_path("/?utm_source=chatgpt.com")
+    assert is_gallery_path("/index.html?utm_source=chatgpt.com")
+    assert not is_gallery_path("/favicon.ico")
+    assert not is_gallery_path("/api/private")
