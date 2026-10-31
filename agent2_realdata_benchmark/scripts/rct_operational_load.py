@@ -36,10 +36,13 @@ def exercise(participants=30, workers=8, settings=DEFAULT_SETTINGS):
             headers={"Authorization": "Bearer "+token}
             count=0
             latencies=[]
+            route_latencies=[]
             def post(route,data):
                 started=perf_counter()
                 response=client.post("/api/rct/"+route, json=data, headers=headers)
-                latencies.append(perf_counter()-started)
+                elapsed=perf_counter()-started
+                latencies.append(elapsed)
+                route_latencies.append((route,elapsed))
                 if response.status_code != 200:
                     raise AssertionError((route,response.status_code,response.get_json()))
                 return response.get_json()
@@ -63,7 +66,7 @@ def exercise(participants=30, workers=8, settings=DEFAULT_SETTINGS):
                 count+=1
             else:
                 raise AssertionError("participant did not complete")
-            return count,latencies
+            return count,latencies,route_latencies
         began=perf_counter()
         with ThreadPoolExecutor(max_workers=workers) as executor:
             results=list(executor.map(journey,invitations))
@@ -94,8 +97,20 @@ def exercise(participants=30, workers=8, settings=DEFAULT_SETTINGS):
             if all(pid is not None for _,pid in entries):
                 assigned=Counter(arm for arm,_ in entries)
                 assert len(set(assigned.values()))==1
-        latencies=[d for _,xs in results for d in xs]
+        latencies=[d for _,xs,_ in results for d in xs]
         sorted_l=sorted(latencies)
+        by_route={}
+        for _,_,route_values in results:
+            for route,seconds_elapsed in route_values:
+                by_route.setdefault(route,[]).append(seconds_elapsed)
+        route_latency_ms={
+            route: {
+                "requests":len(values),
+                "p95_ms":round(sorted(values)[int(.95*(len(values)-1))]*1000,3),
+                "max_ms":round(max(values)*1000,3),
+            }
+            for route,values in sorted(by_route.items())
+        }
         return {
             "status":"SYNTHETIC_IN_PROCESS_LOAD_ONLY",
             "actual_network_tls_devices_tested":False,
@@ -103,12 +118,13 @@ def exercise(participants=30, workers=8, settings=DEFAULT_SETTINGS):
             "participants":participants,"workers":workers,
             "completed":audit["people"]["complete"],
             "assigned_arm_counts":dict(counts),
-            "actions":sum(x for x,_ in results),
+            "actions":sum(x for x,_,_ in results),
             "requests":len(latencies),
             "wall_seconds":round(seconds,3),
             "mean_request_ms":round(mean(latencies)*1000,3),
             "p95_request_ms":round(sorted_l[int(.95*(len(sorted_l)-1))]*1000,3),
             "max_request_ms":round(sorted_l[-1]*1000,3),
+            "latency_by_route":route_latency_ms,
             "audit_pending_actions":audit["pending_actions"],
             "limitations":["In-process Flask clients, not Nginx, TLS, Gunicorn or browsers",
                            "Unrealistic instantaneous fictional users; no human think-time",
