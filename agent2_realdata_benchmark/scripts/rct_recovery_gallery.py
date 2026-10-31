@@ -14,6 +14,7 @@ from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from scripts.rct_candidate_cli import DEFAULT_SETTINGS, load_settings
 from src.prototype.study_v2 import CONCEPTS, RECOVERY_ACTIONS
@@ -67,7 +68,7 @@ def serve(port=8088):
     body=render_html().encode("utf-8")
     class GalleryHandler(BaseHTTPRequestHandler):
         def do_GET(self):
-            if self.path != "/":
+            if urlsplit(self.path).path not in ("/", "/index.html"):
                 self.send_error(404)
                 return
             self.send_response(200)
