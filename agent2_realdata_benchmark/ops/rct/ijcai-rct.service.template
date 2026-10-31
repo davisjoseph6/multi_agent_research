@@ -1,0 +1,25 @@
+# TEMPLATE ONLY. Needs administrator, dedicated service account and real reviewed configuration.
+[Unit]
+Description=IJCAI RCT Candidate (release-gated)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ijcai-rct
+Group=ijcai-rct
+WorkingDirectory=/srv/ijcai-rct/agent2_realdata_benchmark
+EnvironmentFile=/etc/ijcai-rct/rct.env
+UMask=0077
+ExecStart=/srv/ijcai-rct/venv/bin/gunicorn --config ops/rct/gunicorn.conf.py scripts.rct_candidate_cli:make_wsgi_app()
+Restart=on-failure
+RestartSec=5
+StateDirectory=ijcai-rct
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ReadWritePaths=/var/lib/ijcai-rct
+
+[Install]
+WantedBy=multi-user.target
