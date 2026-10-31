@@ -9,10 +9,13 @@ from src.prototype.step99_inventory_aware_pomcp import (
 from src.prototype.study_v3_pomcp import CONCEPTS, PRACTICE
 
 
-def test_initial_bank_has_exactly_55_questions_and_40_actions():
+def test_initial_bank_has_55_questions_and_forces_question_warmup():
     p = InventoryProgress()
     assert sum(p.remaining) == 55
-    assert len(p.legal()) == 40
+    assert len(p.legal()) == 8
+    assert all(kind == PRACTICE for kind, _ in p.legal())
+    after_first = p.after((PRACTICE, CONCEPTS[0]))
+    assert len(after_first.legal()) == 40
 
 
 def test_practice_consumes_one_without_affecting_resource_budget():
@@ -23,10 +26,10 @@ def test_practice_consumes_one_without_affecting_resource_budget():
 
 
 def test_resource_consumes_slot_not_question():
-    p = InventoryProgress()
+    p = InventoryProgress().after((PRACTICE, CONCEPTS[0]))
     q = p.after(("WORKED_EXAMPLE", CONCEPTS[0]))
     assert q.remaining == p.remaining
-    assert q.answered_in_session == 0
+    assert q.answered_in_session == 1
     assert q.resources_left == 1
     q = q.after(("SOCRATIC_HINT", CONCEPTS[0]))
     assert q.resources_left == 0
@@ -37,13 +40,16 @@ def test_twenty_twenty_fifteen_questions_and_resource_resets():
     p = InventoryProgress()
     sessions = (20, 20, 15)
     for index, count in enumerate(sessions):
-        # Earlier sessions can exhaust Utility. Resource targeting must
-        # respect the same finite per-concept inventory as practice.
+        # First action of each session must consume a normal question.
+        assert all(a[0] == PRACTICE for a in p.legal())
+        warmup = next(a for a in p.legal() if a[0] == PRACTICE)
+        p = p.after(warmup)
+        # Earlier sessions may exhaust Utility. Always select a resource
+        # attached to an available practice concept.
         resource = next(a for a in p.legal() if a[0] == "CONCEPT_SUMMARY")
-        assert resource in p.legal()
         p = p.after(resource)
         assert p.resources_left == 1
-        for _ in range(count):
+        for _ in range(count - 1):
             action = next(a for a in p.legal() if a[0] == PRACTICE)
             p = p.after(action)
         assert p.session == index + 1
@@ -78,6 +84,7 @@ def test_root_selection_is_feasible_and_deterministic_for_seed():
     first = planner.choose(beliefs, p, seed=79)
     again = planner.choose(beliefs, p, seed=79)
     assert (first.action, first.concept) in p.legal()
+    assert first.action == PRACTICE
     assert first == again
     assert first.synthetic_only
 
@@ -111,6 +118,18 @@ def test_last_session_terminal_and_no_post_question_recovery():
     assert p.resources_left == 0
     with pytest.raises(ValueError):
         p.after(("SOCRATIC_HINT", CONCEPTS[0]))
+
+
+def test_no_resource_is_allowed_before_first_question_of_any_session():
+    p = InventoryProgress()
+    for session_length in (20, 20):
+        assert all(a[0] == PRACTICE for a in p.legal())
+        with pytest.raises(ValueError, match="not feasible"):
+            p.after(("CONCEPT_SUMMARY", CONCEPTS[-1]))
+        for _ in range(session_length):
+            p = p.after(next(a for a in p.legal() if a[0] == PRACTICE))
+    assert p.session == 2
+    assert all(a[0] == PRACTICE for a in p.legal())
 
 
 def test_invalid_belief_rejected():
