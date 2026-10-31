@@ -1,0 +1,47 @@
+{
+  "version": "NASA_RAW_TLX_WORKLOAD_DRAFT_V1__UNREVIEWED",
+  "instrument": "Raw NASA Task Load Index (Raw TLX) — DRAFT integration",
+  "construct": "subjective task workload, not a fatigue-specific questionnaire",
+  "items": [
+    "Mental Demand — How mentally demanding was the task? (Low to High)",
+    "Physical Demand — How physically demanding was the task? (Low to High)",
+    "Temporal Demand — How hurried or rushed was the pace of the task? (Low to High)",
+    "Performance — How successful were you in accomplishing what you were asked to do? (Good to Poor, reverse anchor direction)",
+    "Effort — How hard did you have to work to accomplish your level of performance? (Low to High)",
+    "Frustration — How insecure, discouraged, irritated, stressed or annoyed versus secure, gratified, content, relaxed and complacent did you feel? (Low to High)"
+  ],
+  "scale": {
+    "minimum": 0,
+    "maximum": 100,
+    "step": 5
+  },
+  "labels": {
+    "0": "0 (left endpoint)",
+    "5": "5",
+    "10": "10",
+    "15": "15",
+    "20": "20",
+    "25": "25",
+    "30": "30",
+    "35": "35",
+    "40": "40",
+    "45": "45",
+    "50": "50",
+    "55": "55",
+    "60": "60",
+    "65": "65",
+    "70": "70",
+    "75": "75",
+    "80": "80",
+    "85": "85",
+    "90": "90",
+    "95": "95",
+    "100": "100 (right endpoint)"
+  },
+  "proposed_scoring": "Raw TLX = arithmetic mean of six numeric 0..100 ratings (no pairwise weighting); not yet integrated into production outcome analysis.",
+  "source": "NASA official TLX overview and paper-and-pencil manual, https://www.nasa.gov/human-systems-integration-division/nasa-task-load-index-tlx/",
+  "review_decision": "pending",
+  "reviewer_record": "",
+  "review_date": "",
+  "warning": "UNREVIEWED: proposed Raw TLX scale and descriptions; not a valid study measure until wording, scoring, provenance and protocol receive genuine review."
+}
