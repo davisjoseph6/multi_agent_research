@@ -37,7 +37,12 @@ def test_twenty_twenty_fifteen_questions_and_resource_resets():
     p = InventoryProgress()
     sessions = (20, 20, 15)
     for index, count in enumerate(sessions):
-        p = p.after(("CONCEPT_SUMMARY", CONCEPTS[0]))
+        # Earlier sessions can exhaust Utility. Resource targeting must
+        # respect the same finite per-concept inventory as practice.
+        resource = next(a for a in p.legal() if a[0] == "CONCEPT_SUMMARY")
+        assert resource in p.legal()
+        p = p.after(resource)
+        assert p.resources_left == 1
         for _ in range(count):
             action = next(a for a in p.legal() if a[0] == PRACTICE)
             p = p.after(action)
