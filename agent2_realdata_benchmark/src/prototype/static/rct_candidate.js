@@ -25,7 +25,7 @@
     if(pending){await call("act",pending);pending=null;persist();say("Previous response confirmed.");}
     const a=await call("next");el("activity").replaceChildren();el("agreement").hidden=true;el("study").hidden=false;
     const parent=el("activity");
-    if(a.action==="COMPLETE"){el("progress").textContent="Complete";add("h2","Thank you. Your session is complete.",parent);return;}
+    if(a.action==="COMPLETE"){el("progress").textContent="Complete";const h=add("h2","Thank you. Your session is complete.",parent);h.tabIndex=-1;h.focus();return;}
     el("progress").textContent=`${a.stage === "practice" ? `Learning session ${a.session} · ${a.index} practice questions completed` : a.stage === "fatigue" ? `Session ${a.session} questionnaire` : `${a.stage === "pretest" ? "Initial" : "Final"} assessment · question ${a.index+1} of 16`}`;
     if(a.resource){add("h2",a.action.replaceAll("_"," ").toLowerCase(),parent);add("p",a.resource.text,parent,"resource-text");if(a.resource.source)add("p",a.resource.source,parent,"source");}
     if(a.question){
@@ -43,6 +43,10 @@
     } else if(a.resource) {
       button("I have finished this resource",parent,()=>send(a,{status:"completed"}));button("Skip this resource",parent,()=>send(a,{status:"skipped"}));
     } else { throw Error("Unexpected activity. Contact the study team."); }
+    // The previous submit button was removed by replaceChildren(): move
+    // keyboard/screen-reader focus to the newly presented activity heading.
+    const heading=parent.querySelector("h2");
+    if(heading){heading.tabIndex=-1;heading.focus();}
     // Client telemetry means DOM delivery was reported, not that learning occurred.
     await call("rendered",{action_id:a.action_id});
   }
