@@ -27,15 +27,19 @@ def analyze(path):
     # Use SQLite URI mode=ro; no connection to the running Flask application.
     with sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=5) as db:
         db.row_factory=sqlite3.Row
-        config=db.execute(
-            "SELECT value FROM sqlite_master JOIN rct_config ON 1=1 "
-            "WHERE sqlite_master.name='rct_config' AND rct_config.id=1"
-        ).fetchone()
+        available={x[0] for x in db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )}
+        if "rct_config" not in available:
+            raise ValueError("Not a recognized RCT candidate database")
+        config=db.execute("SELECT value FROM rct_config WHERE id=1").fetchone()
         if config is None:
             raise ValueError("Not a recognized RCT candidate database")
         settings=json.loads(config["value"])
         if settings.get("mode")!="rehearsal":
             raise ValueError("Refusing to inspect potentially real-participant data")
+        if not {"rct_actions","rct_people","rct_events"}.issubset(available):
+            raise ValueError("Incomplete rehearsal database schema")
         rows=db.execute(
             "SELECT a.selected,a.public,a.rendered_at,a.completed_at,a.response,"
             "p.state,p.status FROM rct_actions a "
