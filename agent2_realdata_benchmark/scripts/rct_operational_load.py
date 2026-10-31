@@ -72,7 +72,28 @@ def exercise(participants=30, workers=8, settings=DEFAULT_SETTINGS):
         counts=Counter(o["assigned_arm"] for o in engine.export_private()["outcomes"])
         assert audit["people"].get("complete")==participants
         assert audit["pending_actions"]==0
-        assert set(counts)=={"A","B","C"}
+        # Permuted random blocks have length 6 or 9. A partial block (e.g.
+        # first three enrollments) can legitimately contain just one arm.
+        # Only *fully assigned* blocks must have equal A/B/C counts.
+        assert set(counts).issubset({"A","B","C"})
+        assert sum(counts.values())==participants
+        import sqlite3
+        with sqlite3.connect(db) as conn:
+            allocations=conn.execute(
+                "SELECT block,arm,pid FROM rct_allocation ORDER BY block,seq"
+            ).fetchall()
+        assert len({pid for _,_,pid in allocations if pid})==participants
+        blocks={}
+        for block,arm,pid in allocations:
+            assert arm in ("A","B","C")
+            blocks.setdefault(block, []).append((arm,pid))
+        for entries in blocks.values():
+            assert len(entries) in (6,9)
+            planned=Counter(arm for arm,_ in entries)
+            assert len(set(planned.values()))==1
+            if all(pid is not None for _,pid in entries):
+                assigned=Counter(arm for arm,_ in entries)
+                assert len(set(assigned.values()))==1
         latencies=[d for _,xs in results for d in xs]
         sorted_l=sorted(latencies)
         return {
