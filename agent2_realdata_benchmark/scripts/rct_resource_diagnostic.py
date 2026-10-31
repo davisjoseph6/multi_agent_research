@@ -111,12 +111,18 @@ def analyze(path, *, demo_invite_file=None):
             demonstration = json.loads(
                 Path(demo_invite_file).expanduser().read_text(encoding="utf-8")
             )
-            if demonstration.get("purpose") != "FICTIONAL_OPERATOR_SELECTED_ARM_A_BROWSER_DEMO_ONLY":
-                raise ValueError("Not an operator-selected fictional Arm-A invitation")
+            # Accept the initial operator-demo credential OR a rotated
+            # fictional invitation. The latter is produced by the CLI and has
+            # {"mode": "rehearsal", "participant_id": ..., "invitation": ...}.
+            operator_demo = demonstration.get("purpose") == "FICTIONAL_OPERATOR_SELECTED_ARM_A_BROWSER_DEMO_ONLY"
+            rotated_rehearsal = demonstration.get("mode") == "rehearsal"
+            if not (operator_demo or rotated_rehearsal):
+                raise ValueError("Not a recognized private fictional-rehearsal invitation")
             pid = demonstration.get("participant_id")
             token = demonstration.get("invitation")
-            if not isinstance(pid, str) or not isinstance(token, str):
-                raise ValueError("Malformed private demonstration invitation")
+            if (not isinstance(pid, str) or not pid.startswith("SYN_")
+                    or not isinstance(token, str) or not 32 <= len(token) <= 128):
+                raise ValueError("Malformed private fictional demonstration invitation")
             matched = db.execute(
                 "SELECT state,status,token_hash FROM rct_people WHERE pid=?", (pid,)
             ).fetchone()
@@ -135,6 +141,8 @@ def analyze(path, *, demo_invite_file=None):
             root_decisions = 0
             socratic_root_visited = 0
             resource_concepts = []
+            repeated = []
+            first_resource_in_session = {}
             for row in chosen_actions:
                 action = json.loads(row["selected"])
                 public = json.loads(row["public"])
@@ -144,9 +152,29 @@ def analyze(path, *, demo_invite_file=None):
                     completed_in_stages[stage_name] += 1
                 if action["action"] in RECOVERY_ACTIONS:
                     selected_recovery[action["action"]] += 1
+                    resource_key = (public.get("session"), action["action"], action["concept"])
+                    response_record = json.loads(row["response"]) if row["response"] else {}
+                    response_status = response_record.get("response", {}).get("status")
                     resource_concepts.append(dict(
-                        action=action["action"], concept=action["concept"]
+                        resource_number=len(resource_concepts)+1,
+                        session=public.get("session"),
+                        question_index=public.get("index"),
+                        action=action["action"],
+                        concept=action["concept"],
+                        rendered=row["rendered_at"] is not None,
+                        completed=row["completed_at"] is not None,
+                        response_status=response_status,
                     ))
+                    if resource_key in first_resource_in_session:
+                        repeated.append(dict(
+                            session=public.get("session"),
+                            action=action["action"],
+                            concept=action["concept"],
+                            original_resource_number=first_resource_in_session[resource_key],
+                            repeated_resource_number=len(resource_concepts),
+                        ))
+                    else:
+                        first_resource_in_session[resource_key] = len(resource_concepts)
                     if row["rendered_at"] is not None:
                         rendered_recovery[action["action"]] += 1
                 trace = action.get("planning_trace")
@@ -170,6 +198,7 @@ def analyze(path, *, demo_invite_file=None):
                 selected_resources_by_kind=dict(selected_recovery),
                 rendered_resources_by_kind=dict(rendered_recovery),
                 selected_resource_sequence=resource_concepts,
+                repeated_same_resource_in_session=repeated,
                 pomcp_root_decisions=root_decisions,
                 socratic_actions_explored_at_root=socratic_root_visited,
                 private_invitation_code_disclosed=False,
@@ -206,7 +235,7 @@ def main():
     parser.add_argument("--db",type=Path,required=True)
     parser.add_argument("--out",type=Path,help="Optional new JSON file, not an existing one")
     parser.add_argument("--demo-invite-file",type=Path,
-                        help="Private operator-selected Arm A invitation; never printed")
+                        help="Private original or rotated fictional Arm A invitation; never printed")
     args=parser.parse_args()
     result=analyze(args.db,demo_invite_file=args.demo_invite_file)
     print(json.dumps(result,indent=2))
