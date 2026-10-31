@@ -17,7 +17,7 @@ if [ -z "$BROWSER" ]; then
 fi
 CACHE="$HOME/.cache/ijcai-rct-qa-browser-libs"
 mkdir -p "$CACHE/debs" "$CACHE/root"
-ARCH="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+ARCH="$(uname -m)-linux-gnu"
 LD_LIBRARY_PATH="$CACHE/root/usr/lib/$ARCH:$CACHE/root/lib/$ARCH:$LD_LIBRARY_PATH"
 export LD_LIBRARY_PATH
 attempt=0
