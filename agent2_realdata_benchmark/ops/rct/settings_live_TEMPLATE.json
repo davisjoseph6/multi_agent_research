@@ -1,0 +1,14 @@
+{
+  "mode": "live",
+  "simulations": 240,
+  "control": "greedy",
+  "content": {
+    "items": "content/items.csv",
+    "resources": "content/resources.csv",
+    "fatigue": "content/fatigue_reviewed.json",
+    "information": "content/participant_information_reviewed.txt"
+  },
+  "release_evidence": "RELEASE_EVIDENCE.json",
+  "allowed_hosts": ["REPLACE_WITH_REAL_STUDY_HOST.example.invalid"],
+  "behind_one_local_tls_proxy": true
+}
