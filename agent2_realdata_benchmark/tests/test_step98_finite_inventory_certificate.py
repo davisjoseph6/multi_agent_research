@@ -95,7 +95,7 @@ def test_invalid_remaining_and_distributions_fail_closed():
     with pytest.raises(ValueError):
         PracticeInventory((-1,) + COUNTS[1:], 2)
     inv = PracticeInventory(COUNTS, 2)
-    with pytest.raises(ValueError, match="unavailable"):
+    with pytest.raises(ValueError, match="Invalid action"):
         robust_statewise_certificate(
             inv, {("NOT_AN_ACTION", CONCEPTS[0]): 1},
             learning_lower=P, forgetting_upper=F)
