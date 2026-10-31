@@ -62,13 +62,18 @@ def render_html(settings=DEFAULT_SETTINGS):
     )
 
 
+def is_gallery_path(raw_path):
+    """Permit query strings attached by browsers while restricting page paths."""
+    return urlsplit(raw_path).path in ("/", "/index.html")
+
+
 def serve(port=8088):
     if type(port) is not int or not 1024 <= port <= 65535:
         raise ValueError("Choose an unprivileged loopback port")
     body=render_html().encode("utf-8")
     class GalleryHandler(BaseHTTPRequestHandler):
         def do_GET(self):
-            if urlsplit(self.path).path not in ("/", "/index.html"):
+            if not is_gallery_path(self.path):
                 self.send_error(404)
                 return
             self.send_response(200)
