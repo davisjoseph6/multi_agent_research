@@ -18,3 +18,41 @@ agent2_realdata_benchmark/results/
 
 # Windows download metadata
 *:Zone.Identifier
+
+# Downloaded release archives (keep source files in Git)
+*.zip
+*.tar
+*.tar.*
+*.tgz
+*.tbz
+*.tbz2
+*.txz
+*.7z
+*.rar
+
+# Additional Python tooling outputs
+**/.mypy_cache/
+**/.ruff_cache/
+**/.tox/
+**/.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local study state and generated diagnostic output
+/ijcai_private/
+/calibration_smoke.json
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.log
+
+# Editor and operating-system temporary files
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
