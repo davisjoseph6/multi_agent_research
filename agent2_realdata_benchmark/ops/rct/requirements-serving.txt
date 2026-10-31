@@ -1,0 +1,3 @@
+# Deployment-only WSGI server. Install in a dedicated virtual environment.
+# Resolve and lock approved exact versions before production release.
+gunicorn>=22,<25
