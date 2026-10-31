@@ -1,7 +1,7 @@
 name: RCT rehearsal QA
 on:
   push:
-    branches: [feature/rct-production-hardening-20261031]
+    branches: [feature/rct-production-hardening-20261031, feature/rct-https-staging-20261101]
   pull_request:
     paths:
       - 'agent2_realdata_benchmark/**'
