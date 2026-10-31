@@ -1,0 +1,17 @@
+# STATIC ILLUSTRATIVE PREVIEW ONLY — NOT THE FLASK RCT APPLICATION.
+# Replace preview.example.fr with the subdomain you actually control.
+# DNS A must point to the VPS IPv4 and inbound 80/443 must be accessible.
+# Publish ONLY docs/index.html to /srv/ijcai-preview/index.html.
+# Never copy a SQLite database, invitation file or release secret to this folder.
+preview.example.fr {
+    root * /srv/ijcai-preview
+    encode zstd gzip
+    header {
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+        X-Frame-Options "DENY"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    }
+    file_server
+}
