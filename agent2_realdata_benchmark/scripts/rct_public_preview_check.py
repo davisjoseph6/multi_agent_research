@@ -17,9 +17,9 @@ def check_preview(path=PREVIEW):
     for item in required:
         if item not in lower:
             raise ValueError("Missing explicit preview boundary: "+item)
-    if re.search(r"<form\\b",content,re.I):
+    if re.search(r"<form\b",content,re.I):
         raise ValueError("Static preview must never submit a form")
-    if re.search(r"fetch\\s*\\(|xmlhttprequest|websocket|sendbeacon|localstorage|sessionstorage",content,re.I):
+    if re.search(r"fetch\s*\(|xmlhttprequest|websocket|sendbeacon|localstorage|sessionstorage",content,re.I):
         raise ValueError("Static preview must not persist or transmit responses")
     if "http://127.0.0.1:8077" in content or "/api/rct/" in content:
         raise ValueError("Static preview must not call study APIs")
