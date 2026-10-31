@@ -74,6 +74,14 @@ class InventoryProgress:
             return ()
         active = tuple(c for c, n in zip(CONCEPTS, self.remaining) if n)
         question_actions = tuple((PRACTICE, c) for c in active)
+        # The online V3 study requires a QUESTION as the first action in
+        # each session (a warmup). Enforce the same constraint throughout
+        # POMCP tree expansion AND random rollouts, not just at the root.
+        # The actual V3 warmup *selects* its item greedily by belief,
+        # difficulty and item_id. This reduced model lacks item identity,
+        # so choosing among legal warmup questions is still a fidelity gap.
+        if self.answered_in_session == 0:
+            return question_actions
         resource_actions = (
             tuple((kind, c) for c in active for kind in RECOVERY_ACTIONS)
             if self.resources_left else ()
@@ -255,6 +263,7 @@ if __name__ == "__main__":
         "planner": result.version,
         "first_selected_action": [result.action, result.concept],
         "root_actions": len(result.root_visits),
+        "warmup_question_enforced": result.action == PRACTICE,
         "initial_practice_questions": sum(initial.remaining),
         "full_55_item_schedule_verified": True,
         "human_efficacy": False,
