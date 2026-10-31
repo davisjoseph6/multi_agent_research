@@ -205,7 +205,7 @@ one transaction. A completed submission cannot be applied to a later action.
         if selected["action"] in RECOVERY_ACTIONS:
             public["resource"] = self.bundle.resources[selected["concept"], selected["action"]]
         if selected["action"] == "FATIGUE":
-            public["questionnaire"] = {key: self.bundle.fatigue[key] for key in ("version", "items", "labels")}
+            public["questionnaire"] = {key: self.bundle.fatigue[key] for key in ("version", "items", "labels", "scale")}
         return json.loads(canonical(public))
 
     def next_action(self, token):
@@ -286,9 +286,12 @@ one transaction. A completed submission cannot be applied to a later action.
                     state["index"] += 1
             elif kind == "FATIGUE":
                 values = response.get("values")
+                scale = self.bundle.fatigue["scale"]
+                minimum, maximum, step = (scale[key] for key in ("minimum", "maximum", "step"))
                 if (set(response) != {"values"} or not isinstance(values, list) or len(values) != 6 or
-                        any(type(v) is not int or not 1 <= v <= 5 for v in values)):
-                    raise ProtocolError("six integers from 1 to 5 required")
+                        any(type(v) is not int or not minimum <= v <= maximum or
+                            (v - minimum) % step != 0 for v in values)):
+                    raise ProtocolError("six responses matching the frozen questionnaire scale required")
             elif kind in RECOVERY_ACTIONS:
                 if set(response) != {"status"} or response["status"] not in ("completed", "skipped"):
                     raise ProtocolError("resource status must be completed or skipped")
