@@ -1,0 +1,18 @@
+{
+  "mode": "rehearsal",
+  "simulations": 240,
+  "control": "greedy",
+  "content": {
+    "items": "items.csv",
+    "resources": "resources.csv",
+    "fatigue": "fatigue_NASA_RAW_TLX_DRAFT.json",
+    "information": "participant_information_REHEARSAL_ONLY.txt"
+  },
+  "release_evidence": null,
+  "allowed_hosts": [
+    "127.0.0.1",
+    "localhost",
+    "::1"
+  ],
+  "behind_one_local_tls_proxy": false
+}
