@@ -58,11 +58,22 @@ one transaction. A completed submission cannot be applied to a later action.
 """
     def __init__(self, database, bundle, *, simulations=240, control="greedy",
                  mode="rehearsal", release_path=None, deployment=None):
-        if mode not in ("rehearsal", "live"):
-            raise ValueError("mode must be rehearsal or live")
+        if mode not in ("rehearsal", "operator_demo", "live"):
+            raise ValueError("mode must be rehearsal, operator_demo, or live")
         self.bundle = bundle
         self.policy = policy_record(simulations, control, deployment=deployment)
         self.release = release_report(bundle, self.policy, release_path)
+        if mode == "operator_demo":
+            # A distinct unapproved, operator-only fictional demonstration:
+            # it MUST have a local TLS reverse proxy, a public host allowlist,
+            # and no attempted production approval/evidence.
+            cfg = self.policy["deployment"]
+            hosts = cfg["allowed_hosts"]
+            if release_path is not None or not cfg["behind_one_local_tls_proxy"]:
+                raise ValueError("operator demo requires TLS proxy and no release evidence")
+            if not hosts or any(host in ("localhost", "127.0.0.1", "::1") or
+                                host.endswith(".invalid") for host in hosts):
+                raise ValueError("operator demo requires actual non-local approved hostname")
         if mode == "live" and not self.release["mechanical_gate_passed"]:
             raise ProtocolError("Live enrollment blocked: " + "; ".join(self.release["blockers"]))
         self.mode = mode
@@ -117,7 +128,7 @@ one transaction. A completed submission cannot be applied to a later action.
         if type(lifetime_hours) not in (int, float) or not 0 < lifetime_hours <= 8760:
             raise ValueError("invitation lifetime must be in (0,8760] hours")
         token = secrets.token_urlsafe(32)
-        pid = ("SYN_" if self.mode == "rehearsal" else "P_") + uuid.uuid4().hex
+        pid = ("SYN_" if self.mode in ("rehearsal", "operator_demo") else "P_") + uuid.uuid4().hex
         with self._transaction() as db:
             db.execute("INSERT INTO rct_people VALUES(?,?,?,'invited',NULL,NULL,NULL)",
                        (pid, sha256(token.encode()).hexdigest(), time.time() + lifetime_hours * 3600))
