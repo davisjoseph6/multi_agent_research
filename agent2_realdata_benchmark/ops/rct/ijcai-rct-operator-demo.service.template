@@ -1,0 +1,26 @@
+# OPERATOR DEMO ONLY. NEVER POINT AT A HUMAN RCT DATABASE OR LIVE SETTINGS.
+[Unit]
+Description=IJCAI fictional operator-only demo (NO HUMAN ENROLLMENT)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ijcai-demo
+Group=ijcai-demo
+WorkingDirectory=/srv/ijcai-rct-demo/agent2_realdata_benchmark
+EnvironmentFile=/etc/ijcai-rct-demo/demo.env
+UMask=0077
+ExecStart=/srv/ijcai-rct-demo/venv/bin/gunicorn --config ops/rct/gunicorn.conf.py 'scripts.rct_operator_demo:make_demo_app()'
+Restart=on-failure
+RestartSec=5
+StateDirectory=ijcai-rct-demo
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ReadWritePaths=/var/lib/ijcai-rct-demo
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target
