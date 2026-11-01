@@ -95,9 +95,7 @@ overwrites an existing DB or invitation file.
 Install the template
 `agent2_realdata_benchmark/ops/rct/ijcai-rct-operator-demo.service.template`
 as `/etc/systemd/system/ijcai-rct-operator-demo.service`.
-**Adjust its WorkingDirectory** to:
-`/srv/ijcai-rct-demo/repo/agent2_realdata_benchmark`
-(its template has an intentionally different repository path).
+The template's WorkingDirectory matches the checkout path above.
 
 Create `/etc/ijcai-rct-demo/demo.env` (mode 0640, owner root, group
 `ijcai-demo`) containing:
