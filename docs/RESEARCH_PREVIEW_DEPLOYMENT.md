@@ -15,3 +15,18 @@ GitHub Pages is **not** intended to host the private study backend or confidenti
 ## Actual human RCT production deployment
 
 The separate release-gated Flask app requires an institution-approved host, DNS, valid TLS, independent application security testing, legal/privacy approval and completion of the genuine content and measurement review. Review `agent2_realdata_benchmark/ops/rct/README_PRODUCTION_HARDENING.md`. Do not bypass its mechanical live-enrollment gate or use the static preview as a substitute for an approved study deployment.
+
+## Separate restricted interactive fictional demo (staging only)
+
+A distinct, staff-accessible **real POMCP-controller** operator demo is now
+implemented on branch `feature/rct-https-staging-20261101`, with
+`operator_demo` mode, a mandatory same-host HTTPS proxy, explicit hostname,
+pre-enrolled synthetic-only invitations and disabled public HTTP enrollment.
+It has **not** been deployed or independently penetration-tested. The operator
+must run the new regression tests, obtain a VPS and DNS, install a protected
+Caddy/Gunicorn service and externally verify TLS. See
+[`FULL_INTERACTIVE_OPERATOR_DEMO_DEPLOYMENT.md`](FULL_INTERACTIVE_OPERATOR_DEMO_DEPLOYMENT.md).
+
+It is **not** a path around human study ethics, data protection, LFS licensing,
+content review, or the real `live` release gate. Staff must not enter real
+participant/student responses into the fictional demo.
