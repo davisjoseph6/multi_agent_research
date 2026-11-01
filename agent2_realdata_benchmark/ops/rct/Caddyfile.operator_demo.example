@@ -1,0 +1,27 @@
+# OPERATOR-ONLY FICTIONAL INTERACTIVE DEMO, NEVER HUMAN RCT ENROLLMENT.
+# Replace demo.example.fr with actual subdomain.
+# Replace REPLACE_WITH_CADDY_HASH_PASSWORD with output of caddy hash-password.
+# Basic auth protects GET/static; POST API uses RCT bearer invitation instead
+# because both mechanisms cannot share the HTTP Authorization header.
+# Store no real participants, private invitations or plaintext passwords on the web root.
+demo.example.fr {
+    encode gzip
+    @frontend not path /api/rct/*
+    basic_auth @frontend {
+        operator REPLACE_WITH_CADDY_HASH_PASSWORD
+    }
+    reverse_proxy 127.0.0.1:8077 {
+        header_up Host {host}
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-For {remote_host}
+    }
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        X-Frame-Options DENY
+        X-Robots-Tag "noindex, nofollow"
+    }
+    log {
+        output discard
+    }
+}
