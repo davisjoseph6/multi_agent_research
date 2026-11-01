@@ -22,6 +22,8 @@ def create_app(engine, *, allowed_hosts=None, behind_one_local_tls_proxy=None):
     behind_one_local_tls_proxy = deployment["behind_one_local_tls_proxy"]
     if engine.mode == "rehearsal" and behind_one_local_tls_proxy:
         raise ValueError("rehearsal must not trust proxy headers")
+    if engine.mode == "operator_demo" and not behind_one_local_tls_proxy:
+        raise ValueError("operator demo must use its one trusted TLS proxy")
     if behind_one_local_tls_proxy:
         # Use only with the documented loopback-bound WSGI server and one trusted proxy.
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
@@ -36,7 +38,7 @@ def create_app(engine, *, allowed_hosts=None, behind_one_local_tls_proxy=None):
             return jsonify(error="unexpected host"), 403
         if engine.mode == "rehearsal" and request.remote_addr not in ("127.0.0.1", "::1"):
             return jsonify(error="rehearsal is local only"), 403
-        if engine.mode == "live" and not request.is_secure:
+        if engine.mode in ("live", "operator_demo") and not request.is_secure:
             return jsonify(error="HTTPS required"), 403
         origin = request.headers.get("Origin")
         if origin and origin != request.host_url.rstrip("/"):
@@ -50,7 +52,7 @@ def create_app(engine, *, allowed_hosts=None, behind_one_local_tls_proxy=None):
             "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
             "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
         })
-        if engine.mode == "live":
+        if engine.mode in ("live", "operator_demo"):
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         return response
 
@@ -73,7 +75,8 @@ def create_app(engine, *, allowed_hosts=None, behind_one_local_tls_proxy=None):
 
     @app.get("/")
     def page():
-        return render_template("rct_candidate.html", rehearsal=engine.mode == "rehearsal")
+        return render_template("rct_candidate.html", rehearsal=engine.mode == "rehearsal",
+                               operator_demo=engine.mode == "operator_demo")
 
     @app.get("/app.js")
     def javascript():
@@ -90,6 +93,10 @@ def create_app(engine, *, allowed_hosts=None, behind_one_local_tls_proxy=None):
 
     @app.post("/api/rct/enroll")
     def enroll():
+        if engine.mode == "operator_demo":
+            # Operator seeds synthetic participants OFFLINE before opening
+            # restricted staging. The HTTP endpoint must never recruit.
+            return jsonify(error="operator demonstration has no public enrollment"), 403
         token, data = body(("agreed", "information_version"))
         return jsonify(engine.enroll(token, **data))
 
