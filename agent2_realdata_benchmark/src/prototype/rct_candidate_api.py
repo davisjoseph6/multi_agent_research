@@ -38,6 +38,12 @@ def create_app(engine, *, allowed_hosts=None, behind_one_local_tls_proxy=None):
             return jsonify(error="unexpected host"), 403
         if engine.mode == "rehearsal" and request.remote_addr not in ("127.0.0.1", "::1"):
             return jsonify(error="rehearsal is local only"), 403
+        if engine.mode == "operator_demo":
+            # ProxyFix changes REMOTE_ADDR to the visitor address. Its stored
+            # original must be the SAME-HOST loopback reverse proxy.
+            original = request.environ.get("werkzeug.proxy_fix.orig", {})
+            if original.get("REMOTE_ADDR") not in ("127.0.0.1", "::1"):
+                return jsonify(error="trusted local proxy required"), 403
         if engine.mode in ("live", "operator_demo") and not request.is_secure:
             return jsonify(error="HTTPS required"), 403
         origin = request.headers.get("Origin")
@@ -54,6 +60,8 @@ def create_app(engine, *, allowed_hosts=None, behind_one_local_tls_proxy=None):
         })
         if engine.mode in ("live", "operator_demo"):
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
+        if engine.mode == "operator_demo":
+            response.headers["X-Robots-Tag"] = "noindex, nofollow"
         return response
 
     @app.errorhandler(ProtocolError)
