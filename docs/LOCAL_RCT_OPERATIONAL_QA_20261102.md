@@ -1,5 +1,7 @@
 # Fictional RCT staging — operational QA evidence (user-reported, 2026-11-02)
 
+**Update:** The previously blocked Chromium full-browser test subsequently PASSED. See [CHROMIUM_REHEARSAL_PASSED_20261102.md](CHROMIUM_REHEARSAL_PASSED_20261102.md). The failure below is preserved as the original incident history.
+
 **Status: local software rehearsal only. Not human-study approval, production
 capacity, actual public TLS, independent security or accessibility verification.**
 
