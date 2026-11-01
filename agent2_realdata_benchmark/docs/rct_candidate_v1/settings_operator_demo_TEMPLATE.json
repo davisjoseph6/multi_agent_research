@@ -1,0 +1,16 @@
+{
+  "mode": "operator_demo",
+  "simulations": 240,
+  "control": "greedy",
+  "content": {
+    "items": "items.csv",
+    "resources": "resources.csv",
+    "fatigue": "fatigue_REHEARSAL_ONLY.json",
+    "information": "participant_information_REHEARSAL_ONLY.txt"
+  },
+  "release_evidence": null,
+  "allowed_hosts": [
+    "demo.example.invalid"
+  ],
+  "behind_one_local_tls_proxy": true
+}
