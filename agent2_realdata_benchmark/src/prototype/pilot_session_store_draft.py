@@ -23,6 +23,7 @@ import sqlite3
 import uuid
 
 from .pilot_measurements_draft import MVAS_PROPOSED_VERSION
+from .pilot_item_bank_draft import PilotDraftItemBank
 from .pilot_session_flow_draft import (
     PilotSequenceError,
     PilotSessionFlow,
@@ -81,7 +82,14 @@ def _deserialize(raw: str) -> PilotSessionFlow:
 class SyntheticPilotStore:
     """Local synthetic record engine; never attach to a public API or human data."""
 
-    def __init__(self, path: str | Path):
+    def __init__(self, path: str | Path, *, items_path: str | Path | None = None):
+        self.question_bank = PilotDraftItemBank(items_path) if items_path is not None else None
+        # A bank-bound synthetic database and the count-only fixture have
+        # different schema identities; never silently mix either study mode.
+        self.schema_version = (
+            SCHEMA_VERSION if self.question_bank is None
+            else SCHEMA_VERSION + "_95_ITEM_BANK_" + self.question_bank.sha256
+        )
         self.path = Path(path)
         if self.path.is_symlink():
             raise PilotSequenceError("refuse symlink database path")
@@ -115,8 +123,8 @@ class SyntheticPilotStore:
                     db.execute(statement)
             row = db.execute("SELECT version FROM pilot_meta WHERE id=1").fetchone()
             if row is None:
-                db.execute("INSERT INTO pilot_meta VALUES(1,?)", (SCHEMA_VERSION,))
-            elif row["version"] != SCHEMA_VERSION:
+                db.execute("INSERT INTO pilot_meta VALUES(1,?)", (self.schema_version,))
+            elif row["version"] != self.schema_version:
                 raise PilotSequenceError("synthetic database schema mismatch; no migration")
         self.path.chmod(0o600)
 
@@ -190,7 +198,7 @@ class SyntheticPilotStore:
         return dict(accepted=True, visit=visit, stage=updated.stage)
 
     def next_action(self, pid: str, *, at: datetime | None = None) -> dict:
-        """Offer a synthetic placeholder action; no question text or answer key."""
+        """Offer an optional draft bank-backed MCQ, or a synthetic placeholder."""
         timestamp = _at(at)
         with self._transaction() as db:
             state = self._load(db, pid)
@@ -217,12 +225,20 @@ class SyntheticPilotStore:
             if kind == "MVAS":
                 public["instrument_proposed_version"] = MVAS_PROPOSED_VERSION
                 public["scale"] = dict(minimum=0, maximum=100, step=1)
+            elif self.question_bank is not None:
+                # Public Item.public() intentionally EXCLUDES the answer key.
+                public["question"] = self.question_bank.select(state).public()
+                public["draft_content_not_approved"] = True
             else:
-                # Intentionally no question bank, scoring or response correctness.
                 public["synthetic_count_only"] = True
+            # An Item.public() question contains tuple-valued options.
+            # Persist and return exactly the same JSON-compatible action:
+            # the first offer must equal any subsequent pending-action replay.
+            public_json = _json(public)
+            public = json.loads(public_json)
             db.execute(
                 "INSERT INTO pilot_actions VALUES(?,?,?,?,NULL,NULL,NULL)",
-                (action_id, pid, _json(public), timestamp.isoformat()),
+                (action_id, pid, public_json, timestamp.isoformat()),
             )
             self._event(db, pid, timestamp, "synthetic_action_offered",
                         action_id=action_id, stage=state.stage, action_kind=kind)
@@ -295,11 +311,27 @@ class SyntheticPilotStore:
             stage = public["stage"]
             if stage != state.stage or public["session"] != state.session or public["index"] != state.index:
                 raise PilotSequenceError("stale pending stage")
+            result_extra = {}
+            recorded_response = response
             if public["action"] == "QUESTION":
                 if (set(response) != {"choice_id"} or
                         type(response["choice_id"]) is not str or
-                        len(response["choice_id"]) != 1 or
-                        response["choice_id"] not in "ABCD"):
+                        len(response["choice_id"]) != 1):
+                    raise PilotSequenceError("one choice_id string required")
+                if self.question_bank is not None:
+                    expected_item = self.question_bank.select(state)
+                    visible = public.get("question", {})
+                    if visible.get("item_id") != expected_item.item_id:
+                        raise PilotSequenceError("bank item identity mismatch")
+                    allowed = {key for key, _ in expected_item.options}
+                    if response["choice_id"] not in allowed:
+                        raise PilotSequenceError("invalid option for frozen item")
+                    correct = response["choice_id"] == expected_item.answer_id
+                    recorded_response = dict(choice_id=response["choice_id"],
+                                             item_id=expected_item.item_id, correct=correct)
+                    if stage == "practice":
+                        result_extra["correct"] = correct
+                elif response["choice_id"] not in "ABCD":
                     raise PilotSequenceError("one synthetic A/B/C/D answer required")
                 updated = answer_question(state, at=timestamp)
             elif public["action"] == "MVAS":
@@ -310,10 +342,11 @@ class SyntheticPilotStore:
                 raise PilotSequenceError("unsupported synthetic action")
             db.execute(
                 "UPDATE pilot_actions SET completed_at=?,response=? WHERE action_id=?",
-                (timestamp.isoformat(), _json(response), action_id),
+                (timestamp.isoformat(), _json(recorded_response), action_id),
             )
             self._save(db, pid, updated)
-            result = dict(accepted=True, stage=updated.stage, session=updated.session)
+            result = dict(accepted=True, stage=updated.stage, session=updated.session,
+                          **result_extra)
             db.execute(
                 "INSERT INTO pilot_requests VALUES(?,?,?,?)",
                 (pid, request_id, payload, _json(result)),
@@ -321,6 +354,40 @@ class SyntheticPilotStore:
             self._event(db, pid, timestamp, "synthetic_action_completed",
                         action_id=action_id, stage=stage, session=state.session)
         return {**result, "replayed": False}
+
+    def scores(self, pid: str) -> dict:
+        """Return counts/scores for bank-backed synthetic assessments only."""
+        if self.question_bank is None:
+            raise PilotSequenceError("no item bank; no graded assessment")
+        with self._transaction() as db:
+            self._load(db, pid)
+            rows = db.execute(
+                "SELECT public,response FROM pilot_actions WHERE pid=? "
+                "AND completed_at IS NOT NULL ORDER BY offered_at,action_id",
+                (pid,),
+            ).fetchall()
+        totals = {form: dict(answered=0, correct=0) for form in
+                  ("pretest", "practice", "posttest")}
+        ids = set()
+        for row in rows:
+            action = json.loads(row["public"])
+            if action["action"] != "QUESTION":
+                continue
+            response = json.loads(row["response"])
+            item_id = response["item_id"]
+            if item_id in ids or item_id != action["question"]["item_id"]:
+                raise PilotSequenceError("duplicate or inconsistent item score")
+            ids.add(item_id)
+            form = action["stage"]
+            totals[form]["answered"] += 1
+            totals[form]["correct"] += int(response["correct"])
+        for form in ("pretest", "posttest"):
+            if totals[form]["answered"] != 16:
+                totals[form]["score"] = None
+            else:
+                totals[form]["score"] = totals[form]["correct"]
+        return dict(totals, bank_sha256=self.question_bank.sha256,
+                    draft_unapproved=True, synthetic_only=True)
 
     def snapshot(self, pid: str) -> dict:
         """Read only synthetic state, without any raw answer or personal fields."""
