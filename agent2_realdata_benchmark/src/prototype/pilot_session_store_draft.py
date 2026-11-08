@@ -231,9 +231,14 @@ class SyntheticPilotStore:
                 public["draft_content_not_approved"] = True
             else:
                 public["synthetic_count_only"] = True
+            # An Item.public() question contains tuple-valued options.
+            # Persist and return exactly the same JSON-compatible action:
+            # the first offer must equal any subsequent pending-action replay.
+            public_json = _json(public)
+            public = json.loads(public_json)
             db.execute(
                 "INSERT INTO pilot_actions VALUES(?,?,?,?,NULL,NULL,NULL)",
-                (action_id, pid, _json(public), timestamp.isoformat()),
+                (action_id, pid, public_json, timestamp.isoformat()),
             )
             self._event(db, pid, timestamp, "synthetic_action_offered",
                         action_id=action_id, stage=state.stage, action_kind=kind)
