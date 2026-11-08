@@ -17,13 +17,13 @@ For **two** planned comparisons A-vs-B and A-vs-C, use conservative Bonferroni t
 | Standardized effect d | Power at 25 completers/arm | Completers/arm for >=80% power | Approx. total recruitment at 16.7% dropout, balanced |
 |---|---:|---:|---:|
 | 0.3 | 11.4% | 213 | 768 |
-| 0.4 | ~? run script | 121 | 438 |
+| 0.4 | 19.4% | 121 | 438 |
 | 0.5 | 30.2% | 78 | 282 |
-| 0.6 | ~? run script | 55 | 198 |
+| 0.6 | 43.0% | 55 | 198 |
 | 0.8 | 69.6% | 31 | 114 |
 | 0.9 | 80.4% | 25 | 90 |
 
-Do **not** present this table as the exact enrollment requirement for an ANCOVA or bounded count outcome. Approx recruitment uses `3 * ceil(n_per_arm / (1-1/6))`, conservative balanced quotas. Intermediate rows should be replaced with fresh script output, not guessed.
+Do **not** present this table as the exact enrollment requirement for an ANCOVA or bounded count outcome. Approx recruitment uses `3 * ceil(n_per_arm / (1-1/6))`, conservative balanced quotas. All values are preliminary numerical model outputs; rerun the script in the target research environment.
 
 At **n=25 per arm**, the effect needed for **80%** power is approximately **d=0.896**. A moderate `d=0.50` has only ~30% power. If the real effect is smaller, a pilot is not a confirmatory treatment test.
 
