@@ -86,7 +86,7 @@ class SyntheticPilotStore:
             raise PilotSequenceError("refuse symlink database path")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._transaction() as db:
-            db.executescript("""CREATE TABLE IF NOT EXISTS pilot_meta (
+            schema_sql = """CREATE TABLE IF NOT EXISTS pilot_meta (
                 id INTEGER PRIMARY KEY CHECK(id=1), version TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS pilot_people (
                 pid TEXT PRIMARY KEY, state TEXT NOT NULL, created_at TEXT NOT NULL);
@@ -102,7 +102,12 @@ class SyntheticPilotStore:
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
                 pid TEXT NOT NULL REFERENCES pilot_people(pid),
                 at TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL);
-            """)
+            """
+            # executescript() would commit the explicit initialization
+            # transaction; individual statements keep schema+version atomic.
+            for statement in schema_sql.split(";"):
+                if statement.strip():
+                    db.execute(statement)
             row = db.execute("SELECT version FROM pilot_meta WHERE id=1").fetchone()
             if row is None:
                 db.execute("INSERT INTO pilot_meta VALUES(1,?)", (SCHEMA_VERSION,))
@@ -184,6 +189,8 @@ class SyntheticPilotStore:
         timestamp = _at(at)
         with self._transaction() as db:
             state = self._load(db, pid)
+            if state.last_event_at is not None and timestamp < state.last_event_at:
+                raise PilotSequenceError("action offered before last accepted event")
             if state.stage == "awaiting_visit":
                 return dict(action="AWAITING_SUPERVISOR", visit=state.session + 1)
             if state.stage == "complete":
@@ -223,12 +230,14 @@ class SyntheticPilotStore:
         with self._transaction() as db:
             self._load(db, pid)
             row = db.execute(
-                "SELECT completed_at FROM pilot_actions "
+                "SELECT offered_at,rendered_at,completed_at FROM pilot_actions "
                 "WHERE pid=? AND action_id=?",
                 (pid, action_id),
             ).fetchone()
             if row is None or row["completed_at"] is not None:
                 raise PilotSequenceError("unknown, completed or foreign action")
+            if timestamp < datetime.fromisoformat(row["offered_at"]):
+                raise PilotSequenceError("render event predates offer")
             changed = db.execute(
                 "UPDATE pilot_actions SET rendered_at=? "
                 "WHERE pid=? AND action_id=? AND rendered_at IS NULL",
@@ -275,13 +284,17 @@ class SyntheticPilotStore:
                 raise PilotSequenceError("stale, completed or foreign action")
             if row["rendered_at"] is None:
                 raise PilotSequenceError("render acknowledgement required")
+            if timestamp < datetime.fromisoformat(row["rendered_at"]):
+                raise PilotSequenceError("answer predates render acknowledgement")
             public = json.loads(row["public"])
             stage = public["stage"]
             if stage != state.stage or public["session"] != state.session or public["index"] != state.index:
                 raise PilotSequenceError("stale pending stage")
             if public["action"] == "QUESTION":
-                if set(response) != {"choice_id"} or response["choice_id"] not in "ABCD" \
-                        or type(response["choice_id"]) is not str or len(response["choice_id"]) != 1:
+                if (set(response) != {"choice_id"} or
+                        type(response["choice_id"]) is not str or
+                        len(response["choice_id"]) != 1 or
+                        response["choice_id"] not in "ABCD"):
                     raise PilotSequenceError("one synthetic A/B/C/D answer required")
                 updated = answer_question(state, at=timestamp)
             elif public["action"] == "MVAS":
