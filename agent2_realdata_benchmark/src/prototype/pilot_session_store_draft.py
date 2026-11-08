@@ -17,6 +17,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import sqlite3
 import uuid
@@ -85,6 +86,10 @@ class SyntheticPilotStore:
         if self.path.is_symlink():
             raise PilotSequenceError("refuse symlink database path")
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.path.exists():
+            # Never create a world-readable synthetic database, even briefly.
+            fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            os.close(fd)
         with self._transaction() as db:
             schema_sql = """CREATE TABLE IF NOT EXISTS pilot_meta (
                 id INTEGER PRIMARY KEY CHECK(id=1), version TEXT NOT NULL);
@@ -339,13 +344,16 @@ class SyntheticPilotStore:
     def backup(self, destination: str | Path) -> dict:
         """SQLite consistent copy for *synthetic-only* test and recovery drills."""
         target = Path(destination)
-        if target.exists():
-            raise FileExistsError("backup already exists")
         target.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.path) as src, sqlite3.connect(target) as dst:
-            src.backup(dst)
-            if dst.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-                raise PilotSequenceError("synthetic SQLite backup integrity check failed")
-        target.chmod(0o600)
+        fd = os.open(target, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        os.close(fd)
+        try:
+            with sqlite3.connect(self.path) as src, sqlite3.connect(target) as dst:
+                src.backup(dst)
+                if dst.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                    raise PilotSequenceError("synthetic SQLite backup integrity check failed")
+        except BaseException:
+            target.unlink(missing_ok=True)
+            raise
         return dict(sha256=sha256(target.read_bytes()).hexdigest(),
                     synthetic_only=True)
