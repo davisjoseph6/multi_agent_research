@@ -1,5 +1,6 @@
 """SQLite synthetic-only pilot flow regression checks; no real student records."""
 from datetime import datetime, timedelta, timezone
+from concurrent.futures import ThreadPoolExecutor
 import sqlite3
 import uuid
 
@@ -196,3 +197,39 @@ def test_database_version_and_synthetic_id_are_enforced(tmp_path):
     with pytest.raises(PilotSequenceError, match="schema mismatch"):
         SyntheticPilotStore(db)
     assert pid.startswith("SYN_PILOT_")
+
+
+def test_mid_action_restart_retains_pending_identity(tmp_path):
+    db = tmp_path / "synthetic.sqlite3"
+    a = SyntheticPilotStore(db)
+    pid = a.new_synthetic_participant(at=T0)
+    a.start_supervised_visit(pid, visit=1, at=T0, **AUTH)
+    offered = a.next_action(pid, at=T0+timedelta(seconds=1))
+
+    b = SyntheticPilotStore(db)
+    again = b.next_action(pid, at=T0+timedelta(seconds=2))
+    assert again["action_id"] == offered["action_id"]
+    b.mark_rendered(pid, offered["action_id"], at=T0+timedelta(seconds=3))
+    b.submit(pid, offered["action_id"], "resume-once",
+             {"choice_id": "C"}, at=T0+timedelta(seconds=4))
+    assert SyntheticPilotStore(db).snapshot(pid)["completed_actions"] == 1
+
+
+def test_simultaneous_next_action_keeps_single_pending_offer(tmp_path):
+    db = tmp_path / "synthetic.sqlite3"
+    store = SyntheticPilotStore(db)
+    pid = store.new_synthetic_participant(at=T0)
+    store.start_supervised_visit(pid, visit=1, at=T0, **AUTH)
+
+    def call(_):
+        return SyntheticPilotStore(db).next_action(
+            pid, at=T0+timedelta(minutes=1)
+        )["action_id"]
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        ids = list(pool.map(call, range(12)))
+    assert len(set(ids)) == 1
+    with sqlite3.connect(db) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM pilot_actions WHERE pid=?", (pid,)
+        ).fetchone()[0] == 1
