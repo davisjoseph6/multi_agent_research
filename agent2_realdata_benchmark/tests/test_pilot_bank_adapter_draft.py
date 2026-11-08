@@ -24,6 +24,10 @@ def submit_current(store, pid, at, *, correct=True, rating=30):
         response = {"rating": rating}
     else:
         question = action["question"]
+        # First offer and database replay must use identical JSON-native types.
+        assert isinstance(question["options"], list)
+        assert all(isinstance(option, list) and len(option) == 2
+                   for option in question["options"])
         assert "answer_id" not in question
         assert "difficulty" not in question
         item = store.question_bank.by_id[question["item_id"]]
