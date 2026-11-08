@@ -44,11 +44,15 @@ def main():
     for label, path, method, expected in checks:
         try:
             status, headers = request_status(path, method=method)
+            # HTTP header field names are case-insensitive; dict keys are not.
+            # Normalize here as well as at the transport boundary so mock
+            # responses and alternative client libraries behave consistently.
+            headers = {str(k).casefold(): str(v) for k, v in headers.items()}
             passed = status == expected
             if path == "/":
-                passed &= "basic" in headers.get("WWW-Authenticate", "").lower()
+                passed &= "basic" in headers.get("www-authenticate", "").casefold()
             if path == "/api/rct/enroll":
-                passed &= "no-store" in headers.get("Cache-Control", "")
+                passed &= "no-store" in headers.get("cache-control", "").casefold()
             outcomes.append({
                 "check": label, "passed": bool(passed),
                 "status": status, "expected": expected,
