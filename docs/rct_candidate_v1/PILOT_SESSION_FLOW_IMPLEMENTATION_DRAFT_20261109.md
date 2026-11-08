@@ -38,3 +38,25 @@ Run the new pure tests locally from agent2_realdata_benchmark with the existing 
     python -m pytest -q tests/test_pilot_session_flow_draft.py tests/test_pilot_measurements_draft.py
 
 Then run the full 1,312-plus tests. Never deploy this review branch to the VPS before all approval gates have been independently met.
+
+
+## Second iteration — isolated synthetic persistence (2026-11-09)
+
+Additive, disconnected modules:
+- src/prototype/pilot_session_store_draft.py
+- tests/test_pilot_session_store_draft.py
+
+A new, explicitly synthetic-only SQLite file format stores participant state, stage, offered/rendered/completed placeholder actions, request-level idempotency and an append-only synthetic event audit. Only IDs prefixed SYN_PILOT_ can be issued/read; this is not staff identity verification, eligibility verification, consent or allocation. It is deliberately **not** an extension of the live RCTCandidateEngine and does **not** provide MCQ content/scoring or a web endpoint. Only synthetic choice letters are recorded.
+
+The new tests cover three supervised visits and 93 completed actions (87 counted MCQ placeholders + six 0–100 M-VAS responses), failure to bypass session windows, invalid/duplicate responses, foreign IDs, persisted state and pending actions across restart, concurrent synthetic next-action calls, version mismatch rejection and an on-disk SQLite backup/restore with restrictive file permissions.
+
+Caveats: caller-controlled timestamps and booleans are only acceptable in this OFFLINE synthetic test harness; they are not a human-study admission gate. Real staff authorizations must be server-generated, role-checked and audited. Backups are not encrypted or off-server, do not meet research-data operational requirements. There is no student-identifying data, no UI, no effective randomization, no clinical instrument validation, no authenticated web release, and no human enrollment.
+
+**Run locally:** from agent2_realdata_benchmark (using its Python venv):
+
+    python -m pytest -q tests/test_pilot_session_store_draft.py tests/test_pilot_session_flow_draft.py tests/test_pilot_measurements_draft.py
+    python -m pytest -q
+
+Prior baseline was 1,319 passed; the added nine synthetic-persistence tests would increase collection to 1,328 if all pass, but the new code has not yet been tested in the user's WSL environment.
+
+**Do not merge/deploy this review branch to the existing operator demo or migrate its fictional database.**
