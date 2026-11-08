@@ -225,7 +225,7 @@ class SyntheticPilotStore:
                 (action_id, pid, _json(public), timestamp.isoformat()),
             )
             self._event(db, pid, timestamp, "synthetic_action_offered",
-                        action_id=action_id, stage=state.stage, kind=kind)
+                        action_id=action_id, stage=state.stage, action_kind=kind)
             return public
 
     def mark_rendered(
