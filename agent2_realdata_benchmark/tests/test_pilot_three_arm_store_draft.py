@@ -1,5 +1,7 @@
 """Offline three-arm rehearsal with unapproved content and synthetic records."""
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier, Event
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sqlite3
@@ -233,3 +235,96 @@ def test_synthetic_backup_retains_policy_and_action_integrity(tmp_path):
     restored = build(backup)
     assert restored.snapshot(pid) == before
     assert restored.scores(pid) == store.scores(pid)
+
+
+def _arm_a_at_planner_decision(store, pid):
+    """Open first practice session, answer initial warmup to reach POMCP."""
+    store.start_supervised_visit(pid, visit=1, at=T0, **AUTH)
+    when = T0 + timedelta(seconds=1)
+    for _ in range(16):
+        do_action(store, pid, when, expected="QUESTION")
+        when += timedelta(seconds=1)
+    do_action(store, pid, when, expected="MVAS")
+    when += timedelta(seconds=1)
+    do_action(store, pid, when, expected="QUESTION")
+    assert store.snapshot(pid)["stage"] == "practice"
+    assert store.snapshot(pid)["index"] == 1
+    return when + timedelta(seconds=1)
+
+
+def test_expensive_arm_a_selection_does_not_hold_global_sqlite_writer_lock(
+        tmp_path, monkeypatch):
+    """An unrelated Arm C can offer an action while A is still planning."""
+    store = build(tmp_path / "synthetic_offlock.sqlite3")
+    a = store.new_synthetic_participant(arm="A", at=T0)
+    c = store.new_synthetic_participant(arm="C", at=T0)
+    planned_at = _arm_a_at_planner_decision(store, a)
+    store.start_supervised_visit(c, visit=1, at=T0, **AUTH)
+    planning = Event()
+    resume = Event()
+    actual = store.selector._candidate
+
+    def held_planner(payload):
+        if payload["arm"] == "A" and payload["index"] == 1:
+            planning.set()
+            assert resume.wait(5), "Arm A planning test release missing"
+        return actual(payload)
+
+    monkeypatch.setattr(store.selector, "_candidate", held_planner)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        pending_a = pool.submit(store.next_action, a, at=planned_at)
+        try:
+            assert planning.wait(5), "Arm A planner was not entered"
+            pending_c = pool.submit(
+                store.next_action, c, at=T0 + timedelta(seconds=1),
+            )
+            # With expensive planning inside BEGIN IMMEDIATE, C is blocked.
+            result_c = pending_c.result(timeout=3)
+            assert result_c["action"] == "QUESTION"
+            assert result_c["synthetic_only"]
+            assert not pending_a.done(), "A planner did not remain blocked"
+        finally:
+            resume.set()
+        result_a = pending_a.result(timeout=5)
+        assert result_a["action"] in ("QUESTION", *RECOVERY_ACTIONS)
+    assert store.next_action(a, at=planned_at) == result_a
+    assert store.next_action(c, at=T0 + timedelta(seconds=1)) == result_c
+
+
+def test_simultaneous_arm_a_planners_commit_only_one_action_and_one_budget(
+        tmp_path, monkeypatch):
+    """Two same-participant proposals race but only one can be published."""
+    store = build(tmp_path / "synthetic_race.sqlite3")
+    a = store.new_synthetic_participant(arm="A", at=T0)
+    planned_at = _arm_a_at_planner_decision(store, a)
+    started = Barrier(2, timeout=5)
+    original = store.selector._candidate
+
+    def concurrent_planners(payload):
+        if payload["arm"] == "A" and payload["index"] == 1:
+            started.wait()
+        return original(payload)
+
+    monkeypatch.setattr(store.selector, "_candidate", concurrent_planners)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        pending = [
+            pool.submit(store.next_action, a, at=planned_at)
+            for _ in range(2)
+        ]
+        results = [future.result(timeout=10) for future in pending]
+    assert results[0] == results[1]
+    with sqlite3.connect(store.path) as db:
+        action_count = db.execute(
+            "SELECT COUNT(*) FROM pilot_actions "
+            "WHERE pid=? AND completed_at IS NULL", (a,),
+        ).fetchone()[0]
+        policy_raw = db.execute(
+            "SELECT policy FROM pilot_three_arm_people WHERE pid=?", (a,)
+        ).fetchone()[0]
+    import json
+    policy = json.loads(policy_raw)
+    assert action_count == 1
+    assert policy["recovery"].get("pomcp_resource_spent", 0) in (0, 1)
+    if results[0]["action"] in RECOVERY_ACTIONS:
+        assert policy["recovery"]["pomcp_resource_spent"] == 1
+    assert store.next_action(a, at=planned_at) == results[0]
