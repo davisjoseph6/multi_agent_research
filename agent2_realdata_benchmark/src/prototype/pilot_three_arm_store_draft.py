@@ -379,7 +379,7 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
 
     def snapshot(self, pid: str) -> dict:
         base = super().snapshot(pid)
-        with self._transaction() as db:
+        with self._read_transaction() as db:
             policy = self._policy(db, pid)
             rows = db.execute(
                 "SELECT a.public,a.completed_at FROM pilot_actions a "
@@ -398,7 +398,7 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
         )
 
     def audit_arms(self) -> dict:
-        with self._transaction() as db:
+        with self._read_transaction() as db:
             assigned = dict(db.execute(
                 "SELECT arm,COUNT(*) FROM pilot_three_arm_people GROUP BY arm"
             ).fetchall())
