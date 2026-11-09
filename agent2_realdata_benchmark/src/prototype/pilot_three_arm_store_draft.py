@@ -10,11 +10,13 @@ No code in the production RCT candidate imports this module.
 from __future__ import annotations
 
 from collections import Counter
+from contextlib import contextmanager
 from dataclasses import asdict, replace
 from datetime import datetime
 from hashlib import sha256
 import json
 from pathlib import Path
+import sqlite3
 import uuid
 
 from .pilot_item_bank_draft import PilotDraftItemBank
@@ -189,51 +191,97 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                         visit=visit, assigned_arm=policy["arm"])
         return dict(accepted=True, stage=updated.stage, visit=visit)
 
-    def next_action(self, pid: str, *, at: datetime | None = None) -> dict:
-        timestamp = _at(at)
-        with self._transaction() as db:
-            state = self._load(db, pid)
-            policy = self._policy(db, pid)
-            if state.last_event_at is not None and timestamp < state.last_event_at:
-                raise PilotSequenceError("action offered before previous event")
-            if state.stage == "awaiting_visit":
-                return dict(action="AWAITING_SUPERVISOR", visit=state.session + 1)
-            if state.stage == "complete":
-                return dict(action="COMPLETE")
-            if state.stage not in ("pretest", "practice", "posttest",
-                                   "mvas_pre", "mvas_post"):
-                raise PilotSequenceError("unexpected stage")
-            pending = db.execute(
-                "SELECT public FROM pilot_actions WHERE pid=? "
-                "AND completed_at IS NULL", (pid,)
-            ).fetchall()
-            if len(pending) > 1:
-                raise PilotSequenceError("multiple incomplete actions")
-            if pending:
-                return json.loads(pending[0]["public"])
+    @contextmanager
+    def _read_transaction(self):
+        """Short consistent reader; never holds SQLite's RESERVED writer lock.
 
+        A read snapshot is only a *proposal*, never an authorization to
+        commit. Every mutable state/policy field is compared again under
+        BEGIN IMMEDIATE before inserting the irreversible public action.
+        """
+        uri = self.path.resolve().as_uri() + "?mode=ro"
+        db = sqlite3.connect(uri, uri=True, isolation_level=None, timeout=30)
+        db.row_factory = sqlite3.Row
+        try:
+            db.execute("PRAGMA query_only=ON")
+            db.execute("PRAGMA busy_timeout=30000")
+            db.execute("BEGIN")
+            yield db
+            db.commit()
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    @staticmethod
+    def _existing_or_terminal_action(db, pid, state, timestamp):
+        if state.last_event_at is not None and timestamp < state.last_event_at:
+            raise PilotSequenceError("action offered before previous event")
+        if state.stage == "awaiting_visit":
+            return dict(action="AWAITING_SUPERVISOR", visit=state.session + 1)
+        if state.stage == "complete":
+            return dict(action="COMPLETE")
+        if state.stage not in ("pretest", "practice", "posttest",
+                               "mvas_pre", "mvas_post"):
+            raise PilotSequenceError("unexpected stage")
+        pending = db.execute(
+            "SELECT public FROM pilot_actions WHERE pid=? "
+            "AND completed_at IS NULL", (pid,)
+        ).fetchall()
+        if len(pending) > 1:
+            raise PilotSequenceError("multiple incomplete actions")
+        return json.loads(pending[0]["public"]) if pending else None
+
+    def next_action(self, pid: str, *, at: datetime | None = None) -> dict:
+        """Prepare a deterministic action off the SQLite writer lock.
+
+        A proposal is generated on a short consistent READ transaction,
+        with expensive Arm A POMCP performed after the reader closes.
+        Commit occurs in a brief BEGIN IMMEDIATE transaction only if the
+        complete participant state and policy still match the proposal.
+        Repeated and conflicting concurrent requests always obtain the
+        already committed pending action or retry with fresh state.
+        Never persist a recovery budget consumed by a losing proposal.
+        """
+        timestamp = _at(at)
+        for _attempt in range(32):
+            with self._read_transaction() as db:
+                state = self._load(db, pid)
+                original_policy = self._policy(db, pid)
+                existing = self._existing_or_terminal_action(
+                    db, pid, state, timestamp,
+                )
+                if existing is not None:
+                    return existing
+
+            # This computation may take many milliseconds for Arm A and
+            # must NOT monopolize the global SQLite write lock.
+            # Deep copy: _candidate mutates nested recovery budget counters.
+            proposed_policy = json.loads(_json(original_policy))
             if state.stage in ("mvas_pre", "mvas_post"):
                 selected = dict(action="MVAS")
             elif state.stage == "practice":
                 selector_state = dict(
-                    policy, stage="practice", session=state.session,
+                    proposed_policy, stage="practice", session=state.session,
                     index=state.index,
                 )
-                # V3 selects A planner+recovery, B greedy, C fixed.
-                # The planner can update the recovery-spent counter.
                 selected = self.selector._candidate(selector_state)
-                policy["recovery"] = selector_state["recovery"]
+                proposed_policy["recovery"] = selector_state["recovery"]
             else:
                 item = self.policy_bank.select(state)
                 selected = dict(
                     action="QUESTION", item_id=item.item_id,
-                    concept=item.concept
+                    concept=item.concept,
                 )
 
             kind = selected["action"]
             if kind != "MVAS" and kind not in QUESTION_ACTIONS \
                     and kind not in RECOVERY_ACTIONS:
                 raise PilotSequenceError("unknown selected policy action")
+
+            # Build complete immutable public payload before acquisition.
+            # Uncommitted IDs and prepared decisions are never observable.
             action_id = uuid.uuid4().hex
             public = dict(
                 action_id=action_id, action=kind, stage=state.stage,
@@ -253,26 +301,46 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                 if item.form != required_form:
                     raise PilotSequenceError("selector returned incorrect item form")
                 if kind == "QUESTION" and state.stage == "practice" \
-                        and item.item_id in policy["used"]:
+                        and item.item_id in proposed_policy["used"]:
                     raise PilotSequenceError("practice item already used")
                 public["question"] = item.public()
             if kind in RECOVERY_ACTIONS:
                 public["resource"] = self.resources[(selected["concept"], kind)]
             public["draft_content_not_approved"] = True
             public_json = _json(public)
-            db.execute(
-                "INSERT INTO pilot_actions VALUES(?,?,?,?,NULL,NULL,NULL)",
-                (action_id, pid, public_json, timestamp.isoformat()),
-            )
-            db.execute(
-                "INSERT INTO pilot_three_arm_selected(action_id,selected) "
-                "VALUES(?,?)", (action_id, _json(selected))
-            )
-            self._save_policy(db, pid, policy)
-            self._event(db, pid, timestamp, "synthetic_action_offered",
-                        action_id=action_id, assigned_arm=policy["arm"],
-                        action_kind=kind, stage=state.stage)
-            return json.loads(public_json)
+
+            with self._transaction() as db:
+                current_state = self._load(db, pid)
+                current_policy = self._policy(db, pid)
+                existing = self._existing_or_terminal_action(
+                    db, pid, current_state, timestamp,
+                )
+                if existing is not None:
+                    return existing
+                if current_state != state or current_policy != original_policy:
+                    # Another request advanced the state after our read.
+                    # The prepared selection is discarded, no side effects.
+                    continue
+
+                db.execute(
+                    "INSERT INTO pilot_actions VALUES(?,?,?,?,NULL,NULL,NULL)",
+                    (action_id, pid, public_json, timestamp.isoformat()),
+                )
+                db.execute(
+                    "INSERT INTO pilot_three_arm_selected(action_id,selected) "
+                    "VALUES(?,?)", (action_id, _json(selected)),
+                )
+                self._save_policy(db, pid, proposed_policy)
+                self._event(
+                    db, pid, timestamp, "synthetic_action_offered",
+                    action_id=action_id, assigned_arm=proposed_policy["arm"],
+                    action_kind=kind, stage=state.stage,
+                )
+                return json.loads(public_json)
+
+        raise PilotSequenceError(
+            "synthetic concurrent action changed repeatedly; retry later"
+        )
 
     def submit(
         self, pid: str, action_id: str, request_id: str, response: dict,
