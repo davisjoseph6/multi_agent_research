@@ -19,7 +19,7 @@ def test_paired_journal_comparison_runs_both_modes_with_no_human_authority():
     assert report["success_is_not_a_wal_speedup_claim"]
     assert report["not_repeated_identical_planner_randomness"]
     assert report["sqlite_wal_remains_single_writer"]
-    assert not report["not_external_https_load"] is False
+    assert report["not_external_https_load"]
     assert not report["human_enrollment_authorized"]
     assert not report["production_performance_approved"]
     assert not report["approved_slo"]
