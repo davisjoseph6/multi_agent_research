@@ -14,6 +14,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
 from pathlib import Path
+import sqlite3
 from time import perf_counter
 import tempfile
 import uuid
@@ -150,6 +151,7 @@ def _fictional_three_visits(
 
 def run_full_journey_rehearsal(
     *, participants: int = 3, workers: int = 3, simulations: int = 41,
+    journal_mode: str = "delete",
 ) -> dict:
     """Return JSON-safe summary; never expose participant IDs or use network."""
     if type(participants) is not int or not 3 <= participants <= 90 \
@@ -159,6 +161,8 @@ def run_full_journey_rehearsal(
         raise ValueError("workers must be 1..16")
     if type(simulations) is not int or not 41 <= simulations <= 240:
         raise ValueError("POMCP simulations must be 41..240")
+    if type(journal_mode) is not str or journal_mode not in ("delete", "wal"):
+        raise ValueError("journal mode must be 'delete' or 'wal'")
 
     content = Path(__file__).resolve().parents[2] / "docs/rct_candidate_v1"
     with tempfile.TemporaryDirectory(prefix="ijcai-fictional-3visits-") as tmp:
@@ -168,6 +172,15 @@ def run_full_journey_rehearsal(
             resources_path=content / "resources.csv",
             simulations=simulations,
         )
+        # Experiment on a brand-new disposable, strictly fictional DB only.
+        # PRAGMA journal_mode requires no open transactions. Do not modify
+        # an existing operator-demo or human-study SQLite database.
+        with sqlite3.connect(store.path, timeout=30) as setup_db:
+            actual_journal = setup_db.execute(
+                "PRAGMA journal_mode=" + journal_mode.upper()
+            ).fetchone()[0].lower()
+        if actual_journal != journal_mode:
+            raise RuntimeError("SQLite did not enable the requested journal mode")
         people = [
             (store.new_synthetic_participant(arm=arm, at=START), arm)
             for _ in range(participants // 3)
@@ -310,6 +323,10 @@ def run_full_journey_rehearsal(
             ),
             "workers": workers,
             "planner_simulations": simulations,
+            "sqlite_journal_mode": actual_journal,
+            "experimental_storage_only": True,
+            "sqlite_wal_not_a_multiwriter_database": True,
+            "journal_mode_comparison_not_a_capacity_certificate": True,
             "failures": failures,
             "not_scientific_validation": True,
         }
