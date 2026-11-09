@@ -33,12 +33,12 @@ From the new isolated review worktree under `agent2_realdata_benchmark`:
 
 ```bash
 PY="$HOME/multi_agent_research/agent2_realdata_benchmark/.venv/bin/python"
-"$PY" -m pytest -q tests/test_pilot_full_journey_rehearsal.py tests/test_pilot_synthetic_restart_recovery.py
+"$PY" -m pytest -q tests/test_pilot_full_journey_rehearsal.py tests/test_pilot_synthetic_restart_recovery.py tests/test_pilot_journal_pair_comparison.py
 # After copying the private frozen ASSIST2009 fixtures:
 "$PY" -m pytest -q
 ```
 
-The previous WSL full suite was 1,382 passing tests; this branch adds **two**, so 1,384 are expected **only if the new tests and all regression tests actually pass on WSL**.
+The previous WSL full suite was 1,382 passing tests; this branch adds **four**, so 1,386 are expected **only if the new tests and all regression tests actually pass on WSL**.
 
 Run on a locally idle WSL filesystem, **not** against VPS or any public server:
 
@@ -51,6 +51,17 @@ Run on a locally idle WSL filesystem, **not** against VPS or any public server:
   --participants 30 --workers 5 --simulations 240 --journal-mode wal \
   > "$HOME/ijcai_fulljourney_wal_240.json"
 ```
+
+To make these comparison runs less error-prone, use the new **automatic alternating-order paired harness** in a single isolated WSL command:
+
+```bash
+"$PY" -m scripts.pilot_journal_pair_comparison \
+  --participants 30 --workers 5 --simulations 240 --repetitions 3 \
+  > "$HOME/ijcai_journal_compare_30_240.json"
+"$PY" -m json.tool "$HOME/ijcai_journal_compare_30_240.json"
+```
+
+This performs **six** complete fictional runs, starting one DELETE/WAL pair, then reversing order in the next pair. It produces an explicit **median across run-specific quantiles**, not a pooled sample quantile; it records no participant identifiers. Do not interpret a completed comparison as a production pass or a statistically robust causal result.
 
 Run **at least three separate paired repetitions** of both modes before drawing a conclusion; alternate ordering across pairs (DELETE→WAL, WAL→DELETE). Record p50/p95/p99/max for the complete action and `sqlite_phase_latency_ms.sqlite_begin_total_ms`, number of actions over 1 second, CPU/RAM and wall clock. Do not accept WAL as superior based on a single sample; stop if any functional invariant, integrity, pending-action replay or restore regression occurs.
 
