@@ -6,6 +6,8 @@ on:
     paths:
       - 'agent2_realdata_benchmark/**'
       - 'docs/index.html'
+      - 'docs/pilot_release_evidence/**'
+      - 'docs/PILOT_RELEASE_ENGINEERING_MATRIX_20261109.md'
       - '.github/workflows/rct-hardening-ci.yml'
 jobs:
   rehearsal:
