@@ -1,0 +1,119 @@
+{
+  "schema_version": "IJCAI2027_PILOT_EVIDENCE_INDEX_V1",
+  "candidate_commit": "UNSET",
+  "disclaimer": "TEMPLATE ONLY. Place actual private signed evidence outside Git. Populating this index is never permission to enroll humans.",
+  "records": {
+    "responsible_institution_and_pi": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "institutional_authority",
+      "reviewed_at": null
+    },
+    "ethics_determination_and_approval": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "ethics_authority",
+      "reviewed_at": null
+    },
+    "privacy_dpo_and_retention": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "dpo",
+      "reviewed_at": null
+    },
+    "protocol_and_analysis_plan": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "pi_and_statistician",
+      "reviewed_at": null
+    },
+    "power_and_feasibility": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "statistician",
+      "reviewed_at": null
+    },
+    "item_resource_and_mvas_approval": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "content_and_measurement_reviewers",
+      "reviewed_at": null
+    },
+    "student_information_consent_language": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "institutional_authority",
+      "reviewed_at": null
+    },
+    "eligibility_recruitment_and_scheduling": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "pi",
+      "reviewed_at": null
+    },
+    "concealed_allocation_and_role_access": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "independent_qa",
+      "reviewed_at": null
+    },
+    "source_build_test_and_migration": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "engineering_reviewer",
+      "reviewed_at": null
+    },
+    "independent_security_and_accessibility": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "independent_qa",
+      "reviewed_at": null
+    },
+    "production_tls_load_device_monitoring": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "operations_reviewer",
+      "reviewed_at": null
+    },
+    "backup_restore_recovery_drills": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "operations_reviewer",
+      "reviewed_at": null
+    },
+    "final_written_institutional_go": {
+      "status": "pending",
+      "path": null,
+      "sha256": null,
+      "reviewer": null,
+      "reviewer_role": "institutional_authority",
+      "reviewed_at": null
+    }
+  }
+}
