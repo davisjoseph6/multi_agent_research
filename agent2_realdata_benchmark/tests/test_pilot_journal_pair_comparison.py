@@ -13,6 +13,8 @@ def test_paired_journal_comparison_runs_both_modes_with_no_human_authority():
     assert [r["journal_mode"] for r in report["runs"]] == ["delete", "wal"]
     assert all(r["result"] == "PASS" for r in report["runs"])
     assert all(r["completed_visits"] == 9 for r in report["runs"])
+    assert all(set(r["per_arm_latency"]) == {"A", "B", "C"} for r in report["runs"])
+    assert all(set(r["per_visit_latency"]) == {"1", "2", "3"} for r in report["runs"])
     assert all(r["failures"] == [] for r in report["runs"])
     assert report["summary"]["delete"]["pairs"] == 1
     assert report["summary"]["wal"]["pairs"] == 1
