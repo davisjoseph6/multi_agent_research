@@ -78,10 +78,16 @@ def _fictional_three_visits(
             submit_done = perf_counter()
             assert result["accepted"] and not result["replayed"]
             acquired = store.finish_action_capture()
-            if len(acquired) != 3:
+            held = store.finish_transaction_hold_capture()
+            if len(acquired) != 3 or len(held) != 3:
                 raise AssertionError(
-                    "expected next/render/submit SQLite transaction timing samples"
+                    "expected next/render/submit SQLite timing samples"
                 )
+            if any(
+                "body_ms" not in sample or "finalize_ms" not in sample
+                for sample in held
+            ):
+                raise AssertionError("incomplete SQLite hold timing")
             total_ms = (submit_done - t0) * 1000.0
             times_ms.append(total_ms)
             phase_samples.append({
@@ -97,6 +103,14 @@ def _fictional_three_visits(
                 "sqlite_begin_render_ms": acquired[1],
                 "sqlite_begin_submit_ms": acquired[2],
                 "sqlite_begin_total_ms": sum(acquired),
+                "sqlite_body_next_ms": held[0]["body_ms"],
+                "sqlite_body_render_ms": held[1]["body_ms"],
+                "sqlite_body_submit_ms": held[2]["body_ms"],
+                "sqlite_body_total_ms": sum(x["body_ms"] for x in held),
+                "sqlite_finalize_next_ms": held[0]["finalize_ms"],
+                "sqlite_finalize_render_ms": held[1]["finalize_ms"],
+                "sqlite_finalize_submit_ms": held[2]["finalize_ms"],
+                "sqlite_finalize_total_ms": sum(x["finalize_ms"] for x in held),
             })
 
             if kind in RECOVERY_ACTIONS:
@@ -205,6 +219,10 @@ def run_full_journey_rehearsal(
             "next_ms", "render_ms", "submit_ms",
             "sqlite_begin_next_ms", "sqlite_begin_render_ms",
             "sqlite_begin_submit_ms", "sqlite_begin_total_ms",
+            "sqlite_body_next_ms", "sqlite_body_render_ms",
+            "sqlite_body_submit_ms", "sqlite_body_total_ms",
+            "sqlite_finalize_next_ms", "sqlite_finalize_render_ms",
+            "sqlite_finalize_submit_ms", "sqlite_finalize_total_ms",
         )
         def metrics(values):
             return {
@@ -307,6 +325,12 @@ def run_full_journey_rehearsal(
             "sqlite_entry_timing_limitations": (
                 "Includes connection, PRAGMAs and BEGIN IMMEDIATE acquisition;"
                 " does not separately measure lock wait or planner CPU"
+            ),
+            "sqlite_writer_hold_timing_limitations": (
+                "Body duration includes all SQL and in-transaction POMCP; "
+                "finalize duration includes commit/rollback and close. "
+                "Both are wall times subject to process scheduling; "
+                "not pure CPU, syscall, IO or lock-wait measurements"
             ),
             "workers": workers,
             "planner_simulations": simulations,

@@ -40,20 +40,49 @@ class _MeasuredSyntheticStore(SyntheticThreeArmPilotStore):
 
     @contextmanager
     def _transaction(self):
+        # All instrumentation applies ONLY to a disposable synthetic store,
+        # not the state-machine implementation or production database.
         start = perf_counter()
+        held_sample = None
+        finalized_start = None
         with super()._transaction() as db:
             acquired_ms = (perf_counter() - start) * 1000.0
             current = getattr(self._measurements, "capture", None)
             if current is not None:
                 current.append(acquired_ms)
-            yield db
+
+            hold_capture = getattr(self._measurements, "hold_capture", None)
+            if hold_capture is not None:
+                held_sample = {"entry_ms": acquired_ms}
+                hold_capture.append(held_sample)
+            body_start = perf_counter()
+            try:
+                yield db
+            finally:
+                if held_sample is not None:
+                    held_sample["body_ms"] = (
+                        perf_counter() - body_start
+                    ) * 1000.0
+                # The parent context exits here, committing or rolling back
+                # and closing SQLite. Includes Python scheduling, not just IO.
+                finalized_start = perf_counter()
+        if held_sample is not None:
+            held_sample["finalize_ms"] = (
+                perf_counter() - finalized_start
+            ) * 1000.0
 
     def begin_action_capture(self):
         self._measurements.capture = []
+        self._measurements.hold_capture = []
 
     def finish_action_capture(self):
         samples = self._measurements.capture
         self._measurements.capture = None
+        return samples
+
+    def finish_transaction_hold_capture(self):
+        samples = self._measurements.hold_capture
+        self._measurements.hold_capture = None
         return samples
 
 

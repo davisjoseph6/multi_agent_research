@@ -78,3 +78,36 @@ def test_full_journey_phase_attribution_does_not_claim_real_study_slo():
     assert not report["approved_latency_thresholds"]
     assert not report["external_https_load"]
     assert not report["human_enrollment_authorized"]
+
+
+
+def test_full_journey_diagnoses_writer_hold_without_changing_store_semantics():
+    report = run_full_journey_rehearsal(
+        participants=3, workers=2, simulations=41,
+    )
+    assert report["result"] == "PASS", report["failures"]
+    for phase in (
+        "sqlite_body_next_ms", "sqlite_body_render_ms",
+        "sqlite_body_submit_ms", "sqlite_body_total_ms",
+        "sqlite_finalize_next_ms", "sqlite_finalize_render_ms",
+        "sqlite_finalize_submit_ms", "sqlite_finalize_total_ms",
+    ):
+        metrics = report["sqlite_phase_latency_ms"][phase]
+        assert 0 <= metrics["p50"] <= metrics["p95"] <= metrics["p99"] <= metrics["max"]
+    assert report["sqlite_phase_latency_ms"]["sqlite_body_next_ms"]["max"] >= 0
+    for observation in report["slowest_10_actions"]:
+        # Entry, work under RESERVED writer lock, and commit/close are
+        # entirely inside next/render/submit completion.
+        components = (
+            observation["sqlite_begin_total_ms"]
+            + observation["sqlite_body_total_ms"]
+            + observation["sqlite_finalize_total_ms"]
+        )
+        assert components <= observation["action_roundtrip_ms"] + 0.1
+        assert "pid" not in observation
+        assert "participant_id" not in observation
+    assert "process scheduling" in report["sqlite_writer_hold_timing_limitations"]
+    assert report["fictional_only"]
+    assert not report["human_enrollment_authorized"]
+    assert not report["external_https_load"]
+    assert not report["approved_latency_thresholds"]
