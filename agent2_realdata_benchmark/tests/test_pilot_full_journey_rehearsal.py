@@ -78,3 +78,35 @@ def test_full_journey_phase_attribution_does_not_claim_real_study_slo():
     assert not report["approved_latency_thresholds"]
     assert not report["external_https_load"]
     assert not report["human_enrollment_authorized"]
+
+
+
+def test_disposable_full_journey_wal_is_opt_in_and_preserves_invariants():
+    """WAL on isolated SYNTHETIC DB only; never indicates multi-writer scale."""
+    report = run_full_journey_rehearsal(
+        participants=3, workers=2, simulations=41, journal_mode="wal",
+    )
+    assert report["result"] == "PASS", report["failures"]
+    assert report["sqlite_journal_mode"] == "wal"
+    assert report["completed_participants"] == 3
+    assert report["completed_visits"] == 9
+    assert report["pretest_answers"] == 48
+    assert report["unique_practice_answers"] == 165
+    assert report["posttest_answers"] == 48
+    assert report["mvas_responses"] == 18
+    assert report["completed_by_arm"] == {"A": 1, "B": 1, "C": 1}
+    assert report["sqlite_wal_not_a_multiwriter_database"]
+    assert report["journal_mode_comparison_not_a_capacity_certificate"]
+    assert report["experimental_storage_only"]
+    assert not report["human_enrollment_authorized"]
+
+
+def test_disposable_journal_mode_default_and_invalid_values():
+    report = run_full_journey_rehearsal(
+        participants=3, workers=2, simulations=41,
+    )
+    assert report["result"] == "PASS", report["failures"]
+    assert report["sqlite_journal_mode"] == "delete"
+    for bad in ("WAL", "truncate", "", None, 1, True):
+        with pytest.raises(ValueError):
+            run_full_journey_rehearsal(journal_mode=bad)
