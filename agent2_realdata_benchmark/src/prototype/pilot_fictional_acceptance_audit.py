@@ -219,12 +219,20 @@ def audit_fictional_database(path: str | Path) -> dict:
                     if fatigue_by_visit[(visit, stage)] != 1:
                         problems.append(f"missing or duplicated {stage} in visit {visit}")
             ratings = state.get("ratings", [])
-            if len(ratings) != 3 or any(
-                len(pair) != 2 or any(
-                    type(value) is not int or not 0 <= value <= 100
-                    for value in pair
-                ) for pair in ratings
-            ):
+            # Incomplete fictional participants retain None placeholders.
+            # Reject them in the audit report, not with a TypeError.
+            rating_pairs_valid = (
+                isinstance(ratings, list)
+                and len(ratings) == 3
+                and all(
+                    isinstance(pair, list)
+                    and len(pair) == 2
+                    and all(type(value) is int and 0 <= value <= 100
+                            for value in pair)
+                    for pair in ratings
+                )
+            )
+            if not rating_pairs_valid:
                 problems.append("state must have six valid M-VAS recordings")
             elif len(rows):
                 # Cross-check that response values correspond to persisted
@@ -252,10 +260,10 @@ def audit_fictional_database(path: str | Path) -> dict:
                 "mvas_responses": counts["MVAS"],
                 "recovery_by_visit": [recovery_by_visit[v] for v in (1, 2, 3)],
                 "fatigue_pairs": ratings,
-                "fatigue_delta_by_visit": [
-                    pair[1] - pair[0] for pair in ratings
-                ] if len(ratings) == 3 and all(len(pair) == 2 for pair in ratings)
-                else [],
+                "fatigue_delta_by_visit": (
+                    [pair[1] - pair[0] for pair in ratings]
+                    if rating_pairs_valid else []
+                ),
                 "issues": problems,
             }
             failures.extend(f"Arm {arm}: {issue}" for issue in problems)
