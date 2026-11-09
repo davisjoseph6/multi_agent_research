@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="preview-nonce" content="{{ preview_nonce }}">
+  <meta name="robots" content="noindex,nofollow">
+  <title>IJCAI 2027 · Fictional Pilot Preview</title>
+  <link rel="stylesheet" href="/preview.css">
+  <script src="/preview.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell">
+      <p class="eyebrow">IJCAI 2027 · research engineering rehearsal</p>
+      <h1>Fictional pilot preview</h1>
+      <p class="lead">Local software demonstration only. These questions, recovery resources and fatigue measurements are drafts and have not been approved for research with students.</p>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="notice" role="note">
+      <strong>FICTIONAL DATA ONLY</strong>
+      <p>No human recruitment, enrollment, consent or real student information is supported here. The three records are synthetic. The virtual clock does not represent elapsed real-world time.</p>
+    </section>
+    <section class="panel" aria-labelledby="selection-title">
+      <h2 id="selection-title">Choose a fictional treatment arm</h2>
+      <label for="arm-select">Experimental condition</label>
+      <select id="arm-select" name="arm">
+        <option value="A">A · POMCP planner + optional recovery resources</option>
+        <option value="B">B · Greedy adaptive questions</option>
+        <option value="C">C · Balanced fixed question order</option>
+      </select>
+      <button type="button" id="reload-button" class="secondary">Refresh this fictional participant</button>
+      <div id="participant-status" class="status" role="status" aria-live="polite">Loading fictional state…</div>
+    </section>
+    <section class="panel" id="activity-panel" aria-labelledby="activity-title">
+      <p class="eyebrow" id="activity-stage">FICTIONAL SESSION</p>
+      <h2 id="activity-title" tabindex="-1">Activity</h2>
+      <div id="activity-description"></div>
+      <form id="answer-form" hidden>
+        <div id="answer-fields"></div>
+        <button type="submit" id="submit-button">Submit fictional response</button>
+      </form>
+    </section>
+    <section class="instructions" aria-label="Session instructions">
+      <h2>Simulated supervised visits</h2>
+      <p>After finishing Visit 1 or Visit 2, this browser will show a waiting screen. A separate WSL terminal command advances that arm's fictional clock by four days; the browser cannot authorize a new visit.</p>
+      <pre><code>python -m scripts.pilot_local_browser_preview --advance-arm A</code></pre>
+      <p>Replace A with B or C for the selected fictional arm, then select Refresh above. The command works only when the previous fictional visit is complete.</p>
+    </section>
+  </main>
+  <footer class="shell footer">
+    <p>Offline experimental interface · not validated pedagogy · not an authorized human RCT · no external services</p>
+  </footer>
+</body>
+</html>
