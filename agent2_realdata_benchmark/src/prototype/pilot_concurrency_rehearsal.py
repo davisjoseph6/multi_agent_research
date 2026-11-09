@@ -11,7 +11,6 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from statistics import median
 from time import perf_counter
 import tempfile
 import uuid
@@ -36,6 +35,7 @@ def _percentile(values: list[float], percent: float) -> float:
 
 def _visit_one(store: SyntheticThreeArmPilotStore, pid: str, arm: str) -> dict:
     calls: list[float] = []
+    phase_samples: list[dict] = []
     kinds = Counter()
     for idx in range(50):  # 38 base + at most two recovery actions
         snapshot = store.snapshot(pid)
@@ -44,8 +44,10 @@ def _visit_one(store: SyntheticThreeArmPilotStore, pid: str, arm: str) -> dict:
         at = START + timedelta(seconds=idx + 1)
         t0 = perf_counter()
         action = store.next_action(pid, at=at)
+        after_next = perf_counter()
         kinds[action["action"]] += 1
         assert store.mark_rendered(pid, action["action_id"], at=at)["accepted"]
+        after_render = perf_counter()
         if action["action"] in ("QUESTION", "DROP_2"):
             response = {"choice_id": action["question"]["options"][0][0]}
         elif action["action"] == "MVAS":
@@ -59,9 +61,20 @@ def _visit_one(store: SyntheticThreeArmPilotStore, pid: str, arm: str) -> dict:
         submission = store.submit(
             pid, action["action_id"], uuid.uuid4().hex, response, at=at,
         )
+        after_submit = perf_counter()
         if not submission["accepted"] or submission["replayed"]:
             raise AssertionError("response was not accepted exactly once")
-        calls.append((perf_counter() - t0) * 1000.0)
+        elapsed_ms = (after_submit - t0) * 1000.0
+        calls.append(elapsed_ms)
+        phase_samples.append({
+            "arm": arm, "stage": action["stage"], "action": action["action"],
+            "action_roundtrip_ms": elapsed_ms,
+            # Includes SQLite busy/BEGIN IMMEDIATE acquisition AND the
+            # planner selector; cannot assign root cause from these alone.
+            "next_ms": (after_next - t0) * 1000.0,
+            "render_ms": (after_render - after_next) * 1000.0,
+            "submit_ms": (after_submit - after_render) * 1000.0,
+        })
     else:
         raise AssertionError("first fictional visit did not terminate")
     snapshot = store.snapshot(pid)
@@ -78,6 +91,7 @@ def _visit_one(store: SyntheticThreeArmPilotStore, pid: str, arm: str) -> dict:
         raise AssertionError("control arm received recovery intervention")
     assert snapshot["fatigue_deltas"][0] == 15
     return dict(arm=arm, action_calls_ms=calls,
+                phase_samples=phase_samples,
                 question_actions=kinds["QUESTION"],
                 recovery_actions=sum(kinds[k] for k in RECOVERY_ACTIONS))
 
@@ -123,6 +137,36 @@ def run_synthetic_parallel_rehearsal(*, participants: int = 9, workers: int = 3,
         durations = [
             t for result in completed for t in result["action_calls_ms"]
         ]
+        phase_samples = [
+            sample for record in completed for sample in record["phase_samples"]
+        ]
+        phase_names = ("next_ms", "render_ms", "submit_ms")
+        phase_summary = {
+            phase: {
+                "p50": round(_percentile([x[phase] for x in phase_samples], 50), 3),
+                "p95": round(_percentile([x[phase] for x in phase_samples], 95), 3),
+                "p99": round(_percentile([x[phase] for x in phase_samples], 99), 3),
+                "max": round(max([x[phase] for x in phase_samples], default=0), 3),
+            }
+            for phase in phase_names
+        }
+        arm_summary = {
+            arm: {
+                "action_count": len(samples),
+                "p50_ms": round(_percentile([x["action_roundtrip_ms"] for x in samples], 50), 3),
+                "p95_ms": round(_percentile([x["action_roundtrip_ms"] for x in samples], 95), 3),
+                "p99_ms": round(_percentile([x["action_roundtrip_ms"] for x in samples], 99), 3),
+                "max_ms": round(max([x["action_roundtrip_ms"] for x in samples], default=0), 3),
+                "over_250ms_count": sum(x["action_roundtrip_ms"] > 250 for x in samples),
+                "over_1000ms_count": sum(x["action_roundtrip_ms"] > 1000 for x in samples),
+            }
+            for arm in "ABC"
+            for samples in ([x for x in phase_samples if x["arm"] == arm],)
+        }
+        slowest = sorted(
+            phase_samples,
+            key=lambda item: item["action_roundtrip_ms"], reverse=True,
+        )[:10]
         allocations = dict(Counter(result["arm"] for result in completed))
         passed = (not errors and len(completed) == participants
                   and allocations == {arm: participants // 3 for arm in "ABC"})
@@ -145,6 +189,25 @@ def run_synthetic_parallel_rehearsal(*, participants: int = 9, workers: int = 3,
                 "p99": round(_percentile(durations, 99), 3),
                 "max": round(max(durations) if durations else 0, 3),
             },
+            "phase_latency_ms": phase_summary,
+            "per_arm_latency_ms": arm_summary,
+            "tail_observations": {
+                "over_250ms_count": sum(x["action_roundtrip_ms"] > 250 for x in phase_samples),
+                "over_1000ms_count": sum(x["action_roundtrip_ms"] > 1000 for x in phase_samples),
+                "slowest_10_actions": [
+                    {key: round(value, 3) if isinstance(value, float) else value
+                     for key, value in sample.items()}
+                    for sample in slowest
+                ],
+            },
+            "latency_scope": (
+                "One synthetic action next/render/submit, excluding snapshot,"
+                " scores, network, browser, authentication and infrastructure"
+            ),
+            "attribution_limits": (
+                "next_ms includes SQLite BEGIN IMMEDIATE wait plus selection/"
+                "planning; timing alone cannot prove which is causal"
+            ),
             "failures": errors,
             "thresholds_pi_approved": False,
             "not_real_world_capacity_evidence": True,
