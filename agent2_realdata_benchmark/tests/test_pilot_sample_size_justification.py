@@ -85,7 +85,7 @@ def test_hypothetical_counts_are_consistent():
 
 
 def test_invalid_models_fail_closed_without_phantom_sample_size():
-    for bad in (0, 1, 24, -3):
+    for bad in (0, 1.01, 24, -3):
         with pytest.raises(ValueError):
             probability_all_arms_reach_target(30, 25, bad)
     for bad in (-.1, 0, 1.1, float("nan"), float("inf")):
