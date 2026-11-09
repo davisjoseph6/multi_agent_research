@@ -11,11 +11,13 @@ virtual and supervisor flags are fixtures. No HTTP or external VPS requests.
 from __future__ import annotations
 
 from collections import Counter
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
 from pathlib import Path
 from time import perf_counter
 import tempfile
+from threading import Condition
 import uuid
 
 from .pilot_concurrency_rehearsal import (
@@ -23,6 +25,52 @@ from .pilot_concurrency_rehearsal import (
 )
 from .pilot_three_arm_store_draft import SyntheticThreeArmPilotStore
 from .study_v2 import RECOVERY_ACTIONS
+
+
+class _FIFOMeasuredSyntheticStore(_MeasuredSyntheticStore):
+    """EXPERIMENTAL in-process FIFO admission to SQLite's single writer.
+
+    This is only a local disposable synthetic measurement wrapper. It does
+    not change SQL transactions or policy decisions, provide cross-process
+    coordination, guarantee production fairness, or authorize a human study.
+    """
+
+    def __init__(self, *args, **kwargs):
+        self._writer_turns = Condition()
+        self._next_writer_ticket = 0
+        self._current_writer_ticket = 0
+        super().__init__(*args, **kwargs)
+
+    @contextmanager
+    def _transaction(self):
+        started = perf_counter()
+        with self._writer_turns:
+            my_ticket = self._next_writer_ticket
+            self._next_writer_ticket += 1
+            while self._current_writer_ticket != my_ticket:
+                self._writer_turns.wait()
+        wait_ms = (perf_counter() - started) * 1000.0
+        current = getattr(self._measurements, "queue_capture", None)
+        if current is not None:
+            current.append(wait_ms)
+        try:
+            # Parent takes the ordinary SQLite BEGIN IMMEDIATE lock, and
+            # commits/rolls back and closes before we release this turn.
+            with super()._transaction() as db:
+                yield db
+        finally:
+            with self._writer_turns:
+                self._current_writer_ticket += 1
+                self._writer_turns.notify_all()
+
+    def begin_action_capture(self):
+        super().begin_action_capture()
+        self._measurements.queue_capture = []
+
+    def finish_queue_capture(self):
+        sample = self._measurements.queue_capture
+        self._measurements.queue_capture = None
+        return sample
 
 
 def _fictional_three_visits(
@@ -79,7 +127,12 @@ def _fictional_three_visits(
             assert result["accepted"] and not result["replayed"]
             acquired = store.finish_action_capture()
             held = store.finish_transaction_hold_capture()
-            if len(acquired) != 3 or len(held) != 3:
+            queued = (
+                store.finish_queue_capture()
+                if isinstance(store, _FIFOMeasuredSyntheticStore)
+                else [0.0, 0.0, 0.0]
+            )
+            if len(acquired) != 3 or len(held) != 3 or len(queued) != 3:
                 raise AssertionError(
                     "expected next/render/submit SQLite timing samples"
                 )
@@ -111,6 +164,10 @@ def _fictional_three_visits(
                 "sqlite_finalize_render_ms": held[1]["finalize_ms"],
                 "sqlite_finalize_submit_ms": held[2]["finalize_ms"],
                 "sqlite_finalize_total_ms": sum(x["finalize_ms"] for x in held),
+                "writer_queue_wait_next_ms": queued[0],
+                "writer_queue_wait_render_ms": queued[1],
+                "writer_queue_wait_submit_ms": queued[2],
+                "writer_queue_wait_total_ms": sum(queued),
             })
 
             if kind in RECOVERY_ACTIONS:
@@ -164,6 +221,7 @@ def _fictional_three_visits(
 
 def run_full_journey_rehearsal(
     *, participants: int = 3, workers: int = 3, simulations: int = 41,
+    writer_admission: str = "native",
 ) -> dict:
     """Return JSON-safe summary; never expose participant IDs or use network."""
     if type(participants) is not int or not 3 <= participants <= 90 \
@@ -173,10 +231,18 @@ def run_full_journey_rehearsal(
         raise ValueError("workers must be 1..16")
     if type(simulations) is not int or not 41 <= simulations <= 240:
         raise ValueError("POMCP simulations must be 41..240")
+    if type(writer_admission) is not str or writer_admission not in (
+        "native", "fifo",
+    ):
+        raise ValueError("writer admission must be native or fifo")
 
     content = Path(__file__).resolve().parents[2] / "docs/rct_candidate_v1"
     with tempfile.TemporaryDirectory(prefix="ijcai-fictional-3visits-") as tmp:
-        store = _MeasuredSyntheticStore(
+        store_class = (
+            _FIFOMeasuredSyntheticStore
+            if writer_admission == "fifo" else _MeasuredSyntheticStore
+        )
+        store = store_class(
             Path(tmp) / "synthetic_only.sqlite3",
             items_path=content / "items.csv",
             resources_path=content / "resources.csv",
@@ -223,6 +289,8 @@ def run_full_journey_rehearsal(
             "sqlite_body_submit_ms", "sqlite_body_total_ms",
             "sqlite_finalize_next_ms", "sqlite_finalize_render_ms",
             "sqlite_finalize_submit_ms", "sqlite_finalize_total_ms",
+            "writer_queue_wait_next_ms", "writer_queue_wait_render_ms",
+            "writer_queue_wait_submit_ms", "writer_queue_wait_total_ms",
         )
         def metrics(values):
             return {
@@ -334,6 +402,9 @@ def run_full_journey_rehearsal(
             ),
             "workers": workers,
             "planner_simulations": simulations,
+            "writer_admission": writer_admission,
+            "experimental_in_process_only": True,
+            "writer_queue_not_cross_process": True,
             "failures": failures,
             "not_scientific_validation": True,
         }
