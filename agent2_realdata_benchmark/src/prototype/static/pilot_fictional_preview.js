@@ -17,6 +17,9 @@ const submitButton = document.getElementById("submit-button");
 
 let action = null;
 let busy = false;
+// For an ambiguous network failure, retry the EXACT original synthetic
+// response and request ID. Never invent a new ID for the same pending action.
+let submissionAttempt = null;
 const stageNames = {
   pretest: "Baseline assessment",
   practice: "Practice session",
@@ -169,6 +172,9 @@ function renderResource(payload) {
 }
 
 async function present(payload) {
+  // A refresh reconciles with the server's durable state. Any newly fetched
+  // action is authoritative; a previous uncertain local attempt is discarded.
+  submissionAttempt = null;
   if (payload.action === "AWAITING_SUPERVISOR") {
     resetActivity("Waiting for the next fictional supervised visit", "SESSION BREAK");
     descriptionBox.append(
@@ -267,9 +273,22 @@ function formResponse() {
 form.addEventListener("submit", async event => {
   event.preventDefault();
   if (busy || !action) return;
-  let response;
+  let submission;
   try {
-    response = formResponse();
+    if (submissionAttempt &&
+        submissionAttempt.action_id === action.action_id &&
+        submissionAttempt.arm === currentArm()) {
+      submission = submissionAttempt;
+    } else {
+      const response = formResponse();
+      submissionAttempt = {
+        arm: currentArm(),
+        action_id: action.action_id,
+        request_id: window.crypto.randomUUID(),
+        response,
+      };
+      submission = submissionAttempt;
+    }
   } catch (error) {
     note(error.message, true);
     return;
@@ -279,19 +298,29 @@ form.addEventListener("submit", async event => {
   armControl.disabled = true;
   submitButton.disabled = true;
   try {
-    const result = await requestPreview("act", {
-      arm: currentArm(),
-      action_id: action.action_id,
-      request_id: window.crypto.randomUUID(),
-      response,
-    });
-    let message = "Fictional response saved.";
+    const result = await requestPreview("act", submission);
+    submissionAttempt = null;
+    let message = result.replayed
+      ? "Previously saved fictional response confirmed."
+      : "Fictional response saved.";
     if ("correct" in result) {
       message += result.correct ? " Practice response correct." : " Practice response incorrect.";
     }
     note(message, false);
   } catch (error) {
-    note(error.message, true);
+    // The HTTP reply can be lost AFTER SQLite commits the response. Prevent
+    // accidental editing and resubmit the exact original action/request ID.
+    // Refresh is available to reconcile and start a fresh action if desired.
+    for (const field of fields.querySelectorAll("input,select,textarea")) {
+      field.disabled = true;
+    }
+    submitButton.textContent = "Retry the same fictional response";
+    note(
+      "Save confirmation unavailable. Retry will send the identical response " +
+      "with the same request ID. Or select Refresh to check the server state. " +
+      error.message,
+      true,
+    );
     busy = false;
     submitButton.disabled = false;
     reloadButton.disabled = false;
