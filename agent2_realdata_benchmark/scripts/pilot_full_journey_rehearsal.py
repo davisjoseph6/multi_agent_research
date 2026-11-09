@@ -21,12 +21,16 @@ def main():
     parser.add_argument("--participants", type=int, default=3)
     parser.add_argument("--workers", type=int, default=3)
     parser.add_argument("--simulations", type=int, default=41)
+    parser.add_argument("--journal-mode", choices=("delete", "wal"),
+                        default="delete",
+                        help="EXPERIMENTAL synthetic disposable SQLite journaling only")
     args = parser.parse_args()
     try:
         report = run_full_journey_rehearsal(
             participants=args.participants,
             workers=args.workers,
             simulations=args.simulations,
+            journal_mode=args.journal_mode,
         )
     except ValueError as err:
         parser.exit(2, "INVALID SYNTHETIC TEST SCENARIO: " + str(err) + "\n")
