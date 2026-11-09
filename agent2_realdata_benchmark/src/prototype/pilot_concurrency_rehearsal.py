@@ -8,11 +8,13 @@ approval for research on people. All timestamps are artificial fixtures.
 from __future__ import annotations
 
 from collections import Counter
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import perf_counter
 import tempfile
+from threading import local
 import uuid
 
 from .pilot_three_arm_store_draft import SyntheticThreeArmPilotStore
@@ -21,6 +23,38 @@ from .study_v2 import RECOVERY_ACTIONS
 START = datetime(2026, 11, 20, 9, 0, tzinfo=timezone.utc)
 STAFF_FIXTURE = dict(offline_staff_authorized=True,
                      synthetic_release_authorized=True)
+
+
+class _MeasuredSyntheticStore(SyntheticThreeArmPilotStore):
+    """Measurement-only wrapper around the unchanged SQLite transaction code.
+
+    The timer covers connection setup, PRAGMAs and acquisition of BEGIN
+    IMMEDIATE, NOT the entire transaction and NOT just the busy wait.
+    Thread-local capture means individual concurrent fictional clients do
+    not mix their three per-action acquisition times.
+    """
+
+    def __init__(self, *args, **kwargs):
+        self._measurements = local()
+        super().__init__(*args, **kwargs)
+
+    @contextmanager
+    def _transaction(self):
+        start = perf_counter()
+        with super()._transaction() as db:
+            acquired_ms = (perf_counter() - start) * 1000.0
+            current = getattr(self._measurements, "capture", None)
+            if current is not None:
+                current.append(acquired_ms)
+            yield db
+
+    def begin_action_capture(self):
+        self._measurements.capture = []
+
+    def finish_action_capture(self):
+        samples = self._measurements.capture
+        self._measurements.capture = None
+        return samples
 
 
 def _percentile(values: list[float], percent: float) -> float:
@@ -42,6 +76,7 @@ def _visit_one(store: SyntheticThreeArmPilotStore, pid: str, arm: str) -> dict:
         if snapshot["stage"] == "awaiting_visit":
             break
         at = START + timedelta(seconds=idx + 1)
+        store.begin_action_capture()
         t0 = perf_counter()
         action = store.next_action(pid, at=at)
         after_next = perf_counter()
@@ -65,6 +100,9 @@ def _visit_one(store: SyntheticThreeArmPilotStore, pid: str, arm: str) -> dict:
         if not submission["accepted"] or submission["replayed"]:
             raise AssertionError("response was not accepted exactly once")
         elapsed_ms = (after_submit - t0) * 1000.0
+        acquired = store.finish_action_capture()
+        if len(acquired) != 3:
+            raise AssertionError("expected next/render/submit acquisition samples")
         calls.append(elapsed_ms)
         phase_samples.append({
             "arm": arm, "stage": action["stage"], "action": action["action"],
@@ -74,6 +112,10 @@ def _visit_one(store: SyntheticThreeArmPilotStore, pid: str, arm: str) -> dict:
             "next_ms": (after_next - t0) * 1000.0,
             "render_ms": (after_render - after_next) * 1000.0,
             "submit_ms": (after_submit - after_render) * 1000.0,
+            "sqlite_begin_next_ms": acquired[0],
+            "sqlite_begin_render_ms": acquired[1],
+            "sqlite_begin_submit_ms": acquired[2],
+            "sqlite_begin_total_ms": sum(acquired),
         })
     else:
         raise AssertionError("first fictional visit did not terminate")
@@ -108,7 +150,7 @@ def run_synthetic_parallel_rehearsal(*, participants: int = 9, workers: int = 3,
         raise ValueError("simulations must be between 41 and 240")
     root = Path(__file__).resolve().parents[2] / "docs/rct_candidate_v1"
     with tempfile.TemporaryDirectory(prefix="ijcai-fictional-parallel-") as directory:
-        store = SyntheticThreeArmPilotStore(
+        store = _MeasuredSyntheticStore(
             Path(directory) / "synthetic_only.sqlite3",
             items_path=root / "items.csv",
             resources_path=root / "resources.csv",
@@ -140,7 +182,11 @@ def run_synthetic_parallel_rehearsal(*, participants: int = 9, workers: int = 3,
         phase_samples = [
             sample for record in completed for sample in record["phase_samples"]
         ]
-        phase_names = ("next_ms", "render_ms", "submit_ms")
+        phase_names = (
+            "next_ms", "render_ms", "submit_ms",
+            "sqlite_begin_next_ms", "sqlite_begin_render_ms",
+            "sqlite_begin_submit_ms", "sqlite_begin_total_ms",
+        )
         phase_summary = {
             phase: {
                 "p50": round(_percentile([x[phase] for x in phase_samples], 50), 3),
@@ -205,8 +251,10 @@ def run_synthetic_parallel_rehearsal(*, participants: int = 9, workers: int = 3,
                 " scores, network, browser, authentication and infrastructure"
             ),
             "attribution_limits": (
-                "next_ms includes SQLite BEGIN IMMEDIATE wait plus selection/"
-                "planning; timing alone cannot prove which is causal"
+                "sqlite_begin_*_ms includes connection setup, PRAGMAs and"
+                " SQLite BEGIN IMMEDIATE wait (not only waiting); the rest"
+                " of next_ms includes SQL and planner. Benchmarks alone"
+                " do not prove any one root cause."
             ),
             "failures": errors,
             "thresholds_pi_approved": False,
