@@ -99,6 +99,9 @@ def test_incomplete_fictional_participants_fail_without_mutation(tmp_path):
     assert report["result"] == "FAIL_SYNTHETIC"
     assert all(report["arms"][arm]["result"] == "FAIL" for arm in "ABC")
     assert any("all three visits" in reason for reason in report["issues"])
+    assert all(report["arms"][arm]["fatigue_delta_by_visit"] == []
+               for arm in "ABC")
+    assert any("six valid M-VAS recordings" in reason for reason in report["issues"])
     assert store.path.read_bytes() == before
 
 
