@@ -219,6 +219,7 @@ async function refresh() {
   if (busy) return;
   busy = true;
   reloadButton.disabled = true;
+  armControl.disabled = true;
   form.hidden = true;
   try {
     const arm = currentArm();
@@ -237,6 +238,7 @@ async function refresh() {
   } finally {
     busy = false;
     reloadButton.disabled = false;
+    armControl.disabled = false;
   }
 }
 
@@ -274,6 +276,7 @@ form.addEventListener("submit", async event => {
   }
   busy = true;
   reloadButton.disabled = true;
+  armControl.disabled = true;
   submitButton.disabled = true;
   try {
     const result = await requestPreview("act", {
@@ -292,11 +295,13 @@ form.addEventListener("submit", async event => {
     busy = false;
     submitButton.disabled = false;
     reloadButton.disabled = false;
+    armControl.disabled = false;
     return;
   }
   busy = false;
   submitButton.disabled = false;
   reloadButton.disabled = false;
+  armControl.disabled = false;
   await refresh();
 });
 
