@@ -72,6 +72,26 @@ def test_parallel_first_visit_maintains_arm_isolation_and_reports_metrics():
     assert not report["thresholds_pi_approved"]
     assert report["total_completed_action_calls"] >= 6 * 38
     assert report["action_roundtrip_ms"]["p95"] >= 0
+    assert report["per_arm_latency_ms"]["A"]["action_count"] >= 2 * 38
+    assert report["per_arm_latency_ms"]["B"]["action_count"] == 2 * 38
+    assert report["per_arm_latency_ms"]["C"]["action_count"] == 2 * 38
+    for phase in (
+        "next_ms", "render_ms", "submit_ms",
+        "sqlite_begin_next_ms", "sqlite_begin_render_ms",
+        "sqlite_begin_submit_ms", "sqlite_begin_total_ms",
+    ):
+        stats = report["phase_latency_ms"][phase]
+        assert 0 <= stats["p50"] <= stats["p95"] <= stats["p99"] <= stats["max"]
+    observations = report["tail_observations"]
+    assert isinstance(observations["over_250ms_count"], int)
+    assert isinstance(observations["over_1000ms_count"], int)
+    assert len(observations["slowest_10_actions"]) == 10
+    assert all("pid" not in action and "participant_id" not in action
+               for action in observations["slowest_10_actions"])
+    assert all(item["sqlite_begin_total_ms"] <=
+               item["action_roundtrip_ms"] + 0.01
+               for item in observations["slowest_10_actions"])
+    assert "not only waiting" in report["attribution_limits"]
 
 
 def test_parallel_load_rejects_invalid_balancing_and_unbounded_workers():
@@ -82,3 +102,19 @@ def test_parallel_load_rejects_invalid_balancing_and_unbounded_workers():
     for invalid in (0, 17, False):
         with pytest.raises(ValueError):
             run_synthetic_parallel_rehearsal(workers=invalid)
+
+def test_phase_timing_diagnostics_are_local_and_non_authoritative():
+    report = run_synthetic_parallel_rehearsal(
+        participants=3, workers=2, simulations=41,
+    )
+    assert report["result"] == "PASS"
+    assert report["action_roundtrip_ms"]["max"] >= 0
+    assert report["tail_observations"]["over_1000ms_count"] <= (
+        report["tail_observations"]["over_250ms_count"]
+    )
+    assert not report["external_https_test"]
+    assert not report["thresholds_pi_approved"]
+    assert not report["human_enrollment_authorized"]
+    for arm in "ABC":
+        assert report["per_arm_latency_ms"][arm]["action_count"] >= 38
+        assert report["per_arm_latency_ms"][arm]["max_ms"] >= 0
