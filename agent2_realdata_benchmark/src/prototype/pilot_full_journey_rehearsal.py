@@ -18,7 +18,9 @@ from time import perf_counter
 import tempfile
 import uuid
 
-from .pilot_concurrency_rehearsal import START, STAFF_FIXTURE, _percentile
+from .pilot_concurrency_rehearsal import (
+    START, STAFF_FIXTURE, _MeasuredSyntheticStore, _percentile,
+)
 from .pilot_three_arm_store_draft import SyntheticThreeArmPilotStore
 from .study_v2 import RECOVERY_ACTIONS
 
@@ -27,6 +29,7 @@ def _fictional_three_visits(
     store: SyntheticThreeArmPilotStore, pid: str, arm: str,
 ) -> dict:
     times_ms: list[float] = []
+    phase_samples: list[dict] = []
     actions = Counter()
     stages = Counter()
     replay_checks = 0
@@ -45,14 +48,17 @@ def _fictional_three_visits(
                 break
 
             at = start + timedelta(minutes=step + 1)
+            store.begin_action_capture()
             t0 = perf_counter()
             offered = store.next_action(pid, at=at)
+            next_done = perf_counter()
             kind = offered["action"]
             actions[kind] += 1
             stages[offered["stage"]] += 1
             assert offered["synthetic_only"]
             assert offered["draft_content_not_approved"]
             assert store.mark_rendered(pid, offered["action_id"], at=at)["accepted"]
+            render_done = perf_counter()
 
             if kind in ("QUESTION", "DROP_2"):
                 answer = {"choice_id": offered["question"]["options"][0][0]}
@@ -69,8 +75,29 @@ def _fictional_three_visits(
             result = store.submit(
                 pid, offered["action_id"], request_id, answer, at=at,
             )
+            submit_done = perf_counter()
             assert result["accepted"] and not result["replayed"]
-            times_ms.append((perf_counter() - t0) * 1000.0)
+            acquired = store.finish_action_capture()
+            if len(acquired) != 3:
+                raise AssertionError(
+                    "expected next/render/submit SQLite transaction timing samples"
+                )
+            total_ms = (submit_done - t0) * 1000.0
+            times_ms.append(total_ms)
+            phase_samples.append({
+                "arm": arm,
+                "visit": visit,
+                "stage": offered["stage"],
+                "action": kind,
+                "action_roundtrip_ms": total_ms,
+                "next_ms": (next_done - t0) * 1000.0,
+                "render_ms": (render_done - next_done) * 1000.0,
+                "submit_ms": (submit_done - render_done) * 1000.0,
+                "sqlite_begin_next_ms": acquired[0],
+                "sqlite_begin_render_ms": acquired[1],
+                "sqlite_begin_submit_ms": acquired[2],
+                "sqlite_begin_total_ms": sum(acquired),
+            })
 
             if kind in RECOVERY_ACTIONS:
                 recoveries += 1
@@ -117,6 +144,7 @@ def _fictional_three_visits(
         "completed_action_calls": len(times_ms),
         "replayed_requests_checked": replay_checks,
         "action_latency_ms": times_ms,
+        "phase_samples": phase_samples,
     }
 
 
@@ -134,7 +162,7 @@ def run_full_journey_rehearsal(
 
     content = Path(__file__).resolve().parents[2] / "docs/rct_candidate_v1"
     with tempfile.TemporaryDirectory(prefix="ijcai-fictional-3visits-") as tmp:
-        store = SyntheticThreeArmPilotStore(
+        store = _MeasuredSyntheticStore(
             Path(tmp) / "synthetic_only.sqlite3",
             items_path=content / "items.csv",
             resources_path=content / "resources.csv",
@@ -170,6 +198,58 @@ def run_full_journey_rehearsal(
             value for record in outcomes
             for value in record["action_latency_ms"]
         ]
+        samples = [
+            value for record in outcomes for value in record["phase_samples"]
+        ]
+        phase_names = (
+            "next_ms", "render_ms", "submit_ms",
+            "sqlite_begin_next_ms", "sqlite_begin_render_ms",
+            "sqlite_begin_submit_ms", "sqlite_begin_total_ms",
+        )
+        def metrics(values):
+            return {
+                "p50": round(_percentile(values, 50), 3),
+                "p95": round(_percentile(values, 95), 3),
+                "p99": round(_percentile(values, 99), 3),
+                "max": round(max(values, default=0), 3),
+            }
+
+        phases = {
+            key: metrics([sample[key] for sample in samples])
+            for key in phase_names
+        }
+        arms = {
+            arm: {
+                "count": len(group),
+                "roundtrip_ms": metrics([
+                    sample["action_roundtrip_ms"] for sample in group
+                ]),
+                "over_250ms": sum(
+                    sample["action_roundtrip_ms"] > 250 for sample in group
+                ),
+                "over_1000ms": sum(
+                    sample["action_roundtrip_ms"] > 1000 for sample in group
+                ),
+            }
+            for arm in "ABC"
+            for group in ([sample for sample in samples
+                           if sample["arm"] == arm],)
+        }
+        visits = {
+            str(visit): {
+                "count": len(group),
+                "roundtrip_ms": metrics([
+                    sample["action_roundtrip_ms"] for sample in group
+                ]),
+            }
+            for visit in (1, 2, 3)
+            for group in ([sample for sample in samples
+                           if sample["visit"] == visit],)
+        }
+        slowest = sorted(
+            samples, key=lambda value: value["action_roundtrip_ms"],
+            reverse=True,
+        )[:10]
         passed = (
             not failures and len(outcomes) == participants
             and by_arm == {arm: participants // 3 for arm in "ABC"}
@@ -206,6 +286,28 @@ def run_full_journey_rehearsal(
                 "max": round(max(latencies) if latencies else 0, 3),
             },
             "wall_seconds": round(elapsed, 3),
+            "sqlite_phase_latency_ms": phases,
+            "per_arm_latency": arms,
+            "per_visit_latency": visits,
+            "actions_over_250ms": sum(
+                item["action_roundtrip_ms"] > 250 for item in samples
+            ),
+            "actions_over_1000ms": sum(
+                item["action_roundtrip_ms"] > 1000 for item in samples
+            ),
+            "slowest_10_actions": [
+                {key: round(value, 3) if type(value) is float else value
+                 for key, value in item.items()}
+                for item in slowest
+            ],
+            "latency_scope": (
+                "Only next/render/submit; excludes status, HTTP, TLS, "
+                "browser, authentication, OS resource monitoring and replay"
+            ),
+            "sqlite_entry_timing_limitations": (
+                "Includes connection, PRAGMAs and BEGIN IMMEDIATE acquisition;"
+                " does not separately measure lock wait or planner CPU"
+            ),
             "workers": workers,
             "planner_simulations": simulations,
             "failures": failures,
