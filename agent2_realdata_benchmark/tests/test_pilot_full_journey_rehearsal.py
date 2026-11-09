@@ -154,3 +154,43 @@ def test_native_is_unchanged_and_invalid_admission_fails_closed():
     for bad in ("FIFO", "unlocked", "wal", "", None, 1, False):
         with pytest.raises(ValueError):
             run_full_journey_rehearsal(writer_admission=bad)
+
+
+
+def test_fifo_writer_ticket_released_on_rollback_and_no_duplicate_action(tmp_path):
+    """Queue cleanup survives exceptions; pending-action semantics remain SQL."""
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import datetime, timedelta, timezone
+    from pathlib import Path
+
+    from src.prototype.pilot_full_journey_rehearsal import (
+        _FIFOMeasuredSyntheticStore,
+    )
+
+    content = Path(__file__).resolve().parents[1] / "docs/rct_candidate_v1"
+    store = _FIFOMeasuredSyntheticStore(
+        tmp_path / "fifo_rollback.sqlite3",
+        items_path=content / "items.csv",
+        resources_path=content / "resources.csv",
+        simulations=41,
+    )
+    with pytest.raises(RuntimeError):
+        with store._transaction():
+            raise RuntimeError("forced rollback in disposable test")
+
+    at = datetime(2026, 11, 20, 9, 0, tzinfo=timezone.utc)
+    pid = store.new_synthetic_participant(arm="B", at=at)
+    store.start_supervised_visit(
+        pid, visit=1, at=at,
+        offline_staff_authorized=True,
+        synthetic_release_authorized=True,
+    )
+    next_at = at + timedelta(seconds=1)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        actions = list(pool.map(
+            lambda _: store.next_action(pid, at=next_at), range(4),
+        ))
+    assert all(item == actions[0] for item in actions)
+    assert actions[0]["action"] == "QUESTION"
+    assert store.snapshot(pid)["completed_actions"] == 0
+    assert not store.snapshot(pid)["approved_for_humans"]
