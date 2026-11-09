@@ -144,6 +144,35 @@ class SyntheticPilotStore:
         finally:
             db.close()
 
+    @contextmanager
+    def _read_transaction(self):
+        """Use a consistent, query-only SQLite read snapshot.
+
+        Monitoring, scoring and synthetic audit reads must not acquire the
+        database-wide RESERVED writer lock (BEGIN IMMEDIATE). Read transactions
+        may still contend with final writer commits on rollback-journal SQLite.
+        This is a local synthetic performance experiment, not an alternative
+        to production database review or independent load testing.
+        """
+        if self.path.is_symlink():
+            raise PilotSequenceError("refuse symlink synthetic database")
+        db = sqlite3.connect(
+            self.path.resolve().as_uri() + "?mode=ro",
+            uri=True, isolation_level=None, timeout=30,
+        )
+        db.row_factory = sqlite3.Row
+        try:
+            db.execute("PRAGMA query_only=ON")
+            db.execute("PRAGMA busy_timeout=30000")
+            db.execute("BEGIN")
+            yield db
+            db.commit()
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
     @staticmethod
     def _event(db, pid: str, at: datetime, kind: str, **kwargs):
         db.execute(
@@ -359,7 +388,7 @@ class SyntheticPilotStore:
         """Return counts/scores for bank-backed synthetic assessments only."""
         if self.question_bank is None:
             raise PilotSequenceError("no item bank; no graded assessment")
-        with self._transaction() as db:
+        with self._read_transaction() as db:
             self._load(db, pid)
             rows = db.execute(
                 "SELECT public,response FROM pilot_actions WHERE pid=? "
@@ -391,7 +420,7 @@ class SyntheticPilotStore:
 
     def snapshot(self, pid: str) -> dict:
         """Read only synthetic state, without any raw answer or personal fields."""
-        with self._transaction() as db:
+        with self._read_transaction() as db:
             state = self._load(db, pid)
             n_actions = db.execute(
                 "SELECT COUNT(*) FROM pilot_actions WHERE pid=? AND completed_at IS NOT NULL",
