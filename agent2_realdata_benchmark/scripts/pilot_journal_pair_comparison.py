@@ -50,6 +50,8 @@ def compare_journal_modes(
                 "completed_visits": report["completed_visits"],
                 "failures": report["failures"],
                 "latency_ms": report["latency_ms"],
+                "per_arm_latency": report["per_arm_latency"],
+                "per_visit_latency": report["per_visit_latency"],
                 "sqlite_entry_latency_ms": report[
                     "sqlite_phase_latency_ms"
                 ]["sqlite_begin_total_ms"],
