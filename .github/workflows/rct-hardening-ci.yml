@@ -26,7 +26,30 @@ jobs:
       - name: Validate Python and exact candidate
         run: |
           python -m pytest -q tests/test_rct_candidate.py tests/test_rct_arm_a_demo.py tests/test_rct_resource_diagnostic.py tests/test_rct_operator_demo.py tests/test_rct_planner_probe.py tests/test_rct_recovery_gallery.py tests/test_rct_questionnaire_scales.py tests/test_rct_content_review_packet.py tests/test_rct_operational_load.py tests/test_rct_restore_drill.py
-      - name: Run full regression suite
-        run: python -m pytest -q
+      # Two legacy tests require local-only research artifacts absent on
+      # GitHub runners: ASSIST2009 processed/split data (5 tests) and the
+      # external NeuralCD reference model (1 test). Do not call this "full".
+      - name: Report unavailable legacy research fixtures
+        run: |
+          echo "::warning title=Legacy test coverage excluded::ASSIST2009 frozen splits (5) and external NeuralCD comparison (1) are not supplied on cloud runners; the local 1,354-test result is separately recorded. This CI job exercises the complete self-contained suite only."
+          test ! -f data/processed/assist2009/interactions.parquet || echo "ASSIST2009 locally present; full-suite validation still requires reference-model data"
+      - name: Run self-contained regression suite (six external-fixture tests excluded)
+        run: >
+          python -m pytest -q
+          --ignore=tests/test_assist2009_splits.py
+          -k "not test_reference_forward_equivalence"
+      - name: Assert the published pilot release index remains blocked
+        run: |
+          python - <<'PY'
+          from src.prototype.pilot_release_evidence_gate import inspect_evidence_index
+          from pathlib import Path
+          path = Path("../docs/pilot_release_evidence/MANIFEST_TEMPLATE.json")
+          report = inspect_evidence_index(path)
+          assert report["result"] == "BLOCKED_MISSING_EVIDENCE"
+          assert report["gates_complete"] == 0
+          assert report["gates_required"] == 14
+          assert not report["human_enrollment_authorized"]
+          print("The public pilot evidence template fails closed: 0/14 gates.")
+          PY
       - name: Fail closed if preview appears to collect participant data
         run: python -m scripts.rct_public_preview_check
