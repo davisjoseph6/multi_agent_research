@@ -378,9 +378,17 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
         return {**result, "replayed": False}
 
     def snapshot(self, pid: str) -> dict:
-        base = super().snapshot(pid)
+        """Atomic, query-only synthetic status across state and arm policy."""
         with self._read_transaction() as db:
+            state = self._load(db, pid)
             policy = self._policy(db, pid)
+            n_actions = db.execute(
+                "SELECT COUNT(*) FROM pilot_actions WHERE pid=? "
+                "AND completed_at IS NOT NULL", (pid,),
+            ).fetchone()[0]
+            n_events = db.execute(
+                "SELECT COUNT(*) FROM pilot_events WHERE pid=?", (pid,),
+            ).fetchone()[0]
             rows = db.execute(
                 "SELECT a.public,a.completed_at FROM pilot_actions a "
                 "WHERE a.pid=?", (pid,)
@@ -390,10 +398,19 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
             in RECOVERY_ACTIONS
         ]
         return dict(
-            base, arm=policy["arm"],
+            pid=pid, stage=state.stage, session=state.session,
+            index=state.index, completed_actions=n_actions,
+            event_count=n_events, ratings=state.ratings,
+            fatigue_deltas=fatigue_deltas(state),
+            visits_started=len(state.visit_started_at),
+            visits_finished=len(state.visit_finished_at),
+            fictional_only=True, approved_for_humans=False,
+            arm=policy["arm"],
             unique_practice_used=len(policy["used"]),
             recovery_offered=len(recovery),
-            recovery_completed=sum(r["completed_at"] is not None for r in recovery),
+            recovery_completed=sum(
+                row["completed_at"] is not None for row in recovery
+            ),
             pilot_policy_version=POLICY_VERSION,
         )
 
