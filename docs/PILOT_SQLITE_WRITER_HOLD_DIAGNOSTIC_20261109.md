@@ -67,3 +67,34 @@ Consider at least three independently repeated paired scenarios with alternating
 Before changing the live candidate, analyze: whether the true peak concurrency is 5 or less; the number of write transactions per question; grouping `next/render/submit` safely; whether a dedicated serialized writer queue would improve fairness; alternative DB design supporting participant-level row locks; and whether a new independently validated Postgres schema is appropriate. Never sacrifice audit evidence, arm-blinding, one-time scoring or immutable replay IDs for latency.
 
 Actual **human** pilot remains **NO-GO**: pending approved protocol/SAP/power design and minimum meaningful learning effect, institutional sponsor/ethics/DPO, final 95 questions and 32 resources, valid fatigue instrument/anchors, consent materials and languages, concealed 1:1:1 allocation, staff authentication, server-enforced 3–5-day schedules, independent security/WCAG, real HTTPS/device load and encrypted offsite recovery with signoff. No IONOS server changes.
+
+
+## Verified WSL acquisition-vs-writer-hold acceptance (2026-11-10, operator-reported)
+
+At commit `0013106`, the operator reports **6 targeted tests passed; 1,383 full-suite tests passed in 133.19 s; clean worktree**. Two distinct local disposable SQLite full-journey runs each passed with 30 fictional participants, 240 POMCP simulations and no failures:
+
+| Measurement | 1 worker | 5 workers |
+|---|---:|---:|
+| Action p50 | 11.669 ms | 11.741 ms |
+| Action p95 | 24.162 ms | 240.406 ms |
+| Action p99 | 33.438 ms | 1107.288 ms |
+| Action maximum | 57.649 ms | 5412.399 ms |
+| Transaction entry p99 | 0.682 ms | 1096.584 ms |
+| Writer-lock body p99 | 10.195 ms | 9.709 ms |
+| Commit/close p99 | 24.855 ms | 16.187 ms |
+| Actions >1 second | 0 | 33 |
+| Wall duration | 44.894 s | 39.506 s |
+
+**Interpretation:** Five threads reduce full-run wall time by ~12%, yet increase p99 action time ~33x. The large increase is concentrated in transaction entry; body and commit/close quantiles are similar or lower in the 5-worker run. This strongly points toward SQLite write-entry contention and/or lock acquisition/scheduling rather than slow per-transaction body execution. This instrumentation does **not** isolate `BEGIN IMMEDIATE` busy wait from connection/PRAGMA overhead and is only one run per condition, so this is a diagnostic, not proof of an exact bottleneck or a release decision.
+
+**Next verification:** Use the new `scripts.pilot_worker_count_sweep` harness for alternating-order, independently recreated 1/2/3/5 worker runs, ideally three repetitions. The synthetic workload and database remain disposable and DELETE-mode. Before capacity conclusions, also conduct controlled HTTP/TLS/browser tests and examine realistic concurrent interaction patterns: 30 learners do not necessarily mean 30 simultaneous database writes.
+
+```bash
+PY="$HOME/multi_agent_research/agent2_realdata_benchmark/.venv/bin/python"
+"$PY" -m pytest -q tests/test_pilot_worker_count_sweep.py
+"$PY" -m scripts.pilot_worker_count_sweep \
+  --participants 30 --workers 1,2,3,5 --simulations 240 --repetitions 3 \
+  > "$HOME/ijcai_sqlite_worker_sweep_30_240.json"
+```
+
+**The 1-versus-5 comparison does not itself justify imposing a one-worker cap on production.** It trades responsiveness for overall completion time, and this is not the VPS deployment. No changes to live hosting, study policy, server configuration or human enrollment follow from these measurements.
