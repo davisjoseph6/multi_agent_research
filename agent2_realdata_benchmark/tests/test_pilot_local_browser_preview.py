@@ -190,3 +190,45 @@ def test_restarted_fictional_app_preserves_pending_question(tmp_path):
     assert post(second_client, nonce2, "next", dict(arm="A")) == first
     # Old preview page nonce cannot submit after server restarts.
     assert post(second_client, nonce, "status", dict(arm="A"), 403)["error"]
+
+
+
+def test_browser_script_reuses_one_idempotency_key_on_uncertain_reply():
+    script = (Path(__file__).resolve().parents[1] /
+              "src/prototype/static/pilot_fictional_preview.js").read_text()
+    # Only the creation of a NEW action submission may issue a UUID.
+    assert script.count("window.crypto.randomUUID()") == 1
+    assert "let submissionAttempt = null;" in script
+    assert "const result = await requestPreview(\"act\", submission);" in script
+    assert "submissionAttempt.action_id === action.action_id" in script
+    assert "submissionAttempt.arm === currentArm()" in script
+    assert "field.disabled = true;" in script
+    assert "identical response" in script
+    assert "submissionAttempt = null;" in script
+
+
+def test_simulated_lost_response_replay_is_exactly_once(tmp_path):
+    store, client, nonce = setup(tmp_path)
+    pid = ensure_three_fictional_records(store)["C"]
+    offered = post(client, nonce, "next", {"arm": "C"})
+    assert offered["action"] == "QUESTION"
+    assert post(client, nonce, "rendered", {
+        "arm": "C", "action_id": offered["action_id"]
+    })["accepted"]
+
+    # First HTTP response is conceptually lost to the browser after server
+    # processes the action. It retries with the IDENTICAL id/payload.
+    submitted = {
+        "arm": "C",
+        "action_id": offered["action_id"],
+        "request_id": "AMBIGUOUS_BROWSER_REPLY_1",
+        "response": {"choice_id": offered["question"]["options"][0][0]},
+    }
+    first = post(client, nonce, "act", submitted)
+    replay = post(client, nonce, "act", submitted)
+    assert first["accepted"] and not first["replayed"]
+    assert replay["accepted"] and replay["replayed"]
+    assert store.snapshot(pid)["completed_actions"] == 1
+    assert store.scores(pid)["pretest"]["answered"] == 1
+    next_question = post(client, nonce, "next", {"arm": "C"})
+    assert next_question["action_id"] != offered["action_id"]
