@@ -1,0 +1,67 @@
+{
+  "schema_version": "IJCAI2027_PI_PROPOSED_FEASIBILITY_DIRECTION_V1",
+  "status": "SUPERVISOR_PROPOSAL_RECORDED_NOT_INSTITUTIONALLY_APPROVED",
+  "recorded_at": "2026-11-10",
+  "source": "Supervisor reply supplied by the researcher in conversation; original correspondence and identity not published",
+  "proposal_only": true,
+  "final_signed_scientific_protocol": false,
+  "independent_statistical_approval": false,
+  "research_institution_authorization": false,
+  "ethics_review_determined": false,
+  "dpo_review_determined": false,
+  "content_and_instrument_review_complete": false,
+  "human_enrollment_authorized": false,
+  "sponsor_proposed": "Aivancity",
+  "principal_investigator": "Supervisor states they will formally serve as PI; formal appointment/identity verification pending",
+  "study_type": "three_arm_individually_randomized_feasibility_pilot_PROPOSED",
+  "target_initial_enrollment": 90,
+  "target_final_completed": null,
+  "target_initial_enrollment_pending_power_and_feasibility_review": true,
+  "allocation_ratio": {
+    "A": 1,
+    "B": 1,
+    "C": 1
+  },
+  "arms": {
+    "A": "POMCP-based adaptive learning plus predefined auditable bounded self-healing recovery",
+    "B": "Greedy adaptive learning",
+    "C": "Fixed non-adaptive learning"
+  },
+  "shared_concepts_core_bank_and_assessment_structure": true,
+  "primary_feasibility_domains": [
+    "recruitment",
+    "retention",
+    "three_visit_protocol_adherence",
+    "intervention_fidelity",
+    "software_reliability",
+    "data_completeness"
+  ],
+  "exploratory_domains": [
+    "learning_outcomes",
+    "perceived_mental_fatigue"
+  ],
+  "fatigue_instrument": {
+    "choice_proposed": "Single-item mental-fatigue visual analogue measure",
+    "range_min": 0,
+    "range_max": 100,
+    "immediately_before_and_after_learning": true,
+    "visits": 3,
+    "ratings_per_visit": 2,
+    "ratings_per_student": 6,
+    "exact_item_wording_approved": false,
+    "digital_equivalence_approved": false,
+    "language_versions_approved": false,
+    "scoring_and_missingness_approved": false,
+    "psychometric_and_rights_approval": false
+  },
+  "unresolved_final_protocol_decisions": [
+    "PI/statistician sign exact feasibility progression criteria and denominators",
+    "Statistical review of 90 initial enrollments and plausible retained sample",
+    "Approve 95 item, 32 resource common content and per-session recovery count",
+    "Freeze exact instrument text, rights, timing, language, digital validity and missingness",
+    "Institution formally appoint PI and authorizes recruitment and data controller",
+    "Competent ethics review path, privacy DPO lawful basis and retention",
+    "Independently approve consent, eligibility, concealed allocation and session staffing",
+    "Approve separate human database/security and operational QA acceptance criteria"
+  ]
+}
