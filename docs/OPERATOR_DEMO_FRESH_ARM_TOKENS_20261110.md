@@ -90,9 +90,10 @@ Choose a *new filename* if the file already exists; the script
 intentionally refuses overwrites. The output lists the private filename
 and nonsecret enrollment counts, **not invitation strings**. The
 same live SQLite file receives nine brand-new, pre-enrolled fictional
-records. The new private JSON supplies exactly one selected token each
-for A, B and C, with six unused reserve invitations. Existing tokens
-remain untouched.
+records. The new private JSON supplies exactly one usable token each for A,
+B and C. Six extra randomized fictional records are immediately
+deactivated in the same transaction; no extra usable credentials are
+retained. Existing tokens remain untouched.
 
 The batch uses one SQLite transaction with a private fsynced pending
 output; if the transaction fails, the batch rolls back. If publishing
