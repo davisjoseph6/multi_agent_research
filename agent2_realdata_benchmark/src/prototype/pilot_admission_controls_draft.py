@@ -220,9 +220,12 @@ class SyntheticAdmissionStore:
             raise AdmissionDenied("exact synthetic eligibility decision required")
         now = self._now()
         with self._transaction() as conn:
-            row = conn.execute("SELECT status FROM admission_people WHERE pid=?", (pid,)).fetchone()
-            if row is None or row["status"] != "invited" or not pid.startswith("SYN_ADMISSION_"):
+            row = conn.execute("SELECT status,token_expiry FROM admission_people WHERE pid=?", (pid,)).fetchone()
+            if (row is None or row["status"] != "invited"
+                    or not pid.startswith("SYN_ADMISSION_")):
                 raise AdmissionDenied("synthetic invitation not pending screening")
+            if now > datetime.fromisoformat(row["token_expiry"]):
+                raise AdmissionDenied("expired synthetic screening invitation")
             state = "eligible" if eligible else "ineligible"
             conn.execute(
                 "UPDATE admission_people SET status=?,screened_at=? WHERE pid=?",
@@ -252,11 +255,11 @@ class SyntheticAdmissionStore:
                 "SELECT seq FROM admission_slots WHERE pid IS NULL "
                 "ORDER BY seq LIMIT 1"
             ).fetchone()
-        conn.execute(
+        updated = conn.execute(
             "UPDATE admission_slots SET pid=? WHERE seq=? AND pid IS NULL",
             (pid, slot["seq"]),
         )
-        if conn.total_changes == 0:
+        if updated.rowcount != 1:
             raise AdmissionDenied("atomic synthetic allocation failed")
 
     def consent(self, invitation: str, *, agreed: bool,
@@ -273,8 +276,10 @@ class SyntheticAdmissionStore:
                 raise AdmissionDenied("prior staff fixture screening required")
             self._allocate(conn, person["pid"])
             conn.execute(
-                "UPDATE admission_people SET status='active',consent_at=? WHERE pid=?",
-                (now.isoformat(), person["pid"]),
+                "UPDATE admission_people SET status='active',consent_at=?,token_expiry=? "
+                "WHERE pid=?",
+                (now.isoformat(), (now + timedelta(days=30)).isoformat(),
+                 person["pid"]),
             )
             self._event(conn, person["pid"], now, "fixture_consented_and_assigned",
                         {"consent_sha256": self._consent_sha256})
