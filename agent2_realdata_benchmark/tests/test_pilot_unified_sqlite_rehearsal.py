@@ -29,6 +29,23 @@ def test_nine_fictional_people_and_complete_three_visit_restart_rehearsal():
     assert not report["independent_security_review"]
 
 
+def test_full_thirty_fictional_three_visit_release_acceptance():
+    report = run_unified(participants=30, simulations=41)
+    assert report["result"] == "PASS_SYNTHETIC_ONLY"
+    assert report["fictional_completed_visits"] == 90
+    assert report["fictional_questions"] == 2610
+    assert report["fictional_mvas_records"] == 180
+    assert report["fictional_replay_checks"] >= 30
+    assert sum(report["allocation_by_arm"].values()) == 30
+    assert max(report["allocation_by_arm"].values()) - min(
+        report["allocation_by_arm"].values()
+    ) <= 3
+    assert report["single_sqlite_file"]
+    assert report["unified_audit"] == "PASS_SYNTHETIC_ONLY"
+    assert report["data_deleted_on_exit"]
+    assert not report["human_enrollment_authorized"]
+
+
 @pytest.mark.parametrize("participants", [0, 1, 8, 91, -9, True, 9.0, "9"])
 def test_reject_invalid_synthetic_participant_counts(participants):
     with pytest.raises(ValueError):
