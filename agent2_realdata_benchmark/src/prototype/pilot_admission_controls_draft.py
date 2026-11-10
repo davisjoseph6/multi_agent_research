@@ -12,7 +12,7 @@ file are accepted. Never point this at real students or a live study database.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from hmac import compare_digest
@@ -499,13 +499,15 @@ class SyntheticAdmissionStore:
                 or target.parent.is_symlink()
                 or not target.parent.is_dir()):
             raise AdmissionDenied("new, nonsymlink synthetic backup target required")
+        created = False
         try:
             fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            created = True
             os.close(fd)
-            with sqlite3.connect(
+            with closing(sqlite3.connect(
                 self.path.resolve().as_uri() + "?mode=ro", uri=True
-            ) as source:
-                with sqlite3.connect(target) as replica:
+            )) as source:
+                with closing(sqlite3.connect(target)) as replica:
                     source.backup(replica)
                     integrity = replica.execute(
                         "PRAGMA integrity_check"
@@ -519,9 +521,9 @@ class SyntheticAdmissionStore:
                         raise AdmissionDenied("synthetic backup configuration mismatch")
             os.chmod(target, 0o600)
         except BaseException:
-            # Remove only the file created by this invocation, not a
-            # pre-existing unrelated file (O_EXCL blocks overwrite).
-            if target.exists() and not target.is_symlink():
+            # O_EXCL may fail in a race. Never delete a file created by a
+            # different process: only unlink after our own successful create.
+            if created and target.exists() and not target.is_symlink():
                 target.unlink()
             raise
         return {
