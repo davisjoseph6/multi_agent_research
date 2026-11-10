@@ -287,6 +287,27 @@ class SyntheticAdmissionStore:
         return {"accepted": True, "created": True,
                 "synthetic_only": True, "human_enrollment_authorized": False}
 
+    def operator_assignment(self, operator_key: bytes, pid: str) -> str:
+        """Privileged OFFLINE fixture lookup; never expose through HTTP.
+
+        The consented participant status API deliberately never reveals arms.
+        Used by the disposable learning adapter to test that a server-derived
+        assignment, rather than a browser-supplied arm, controls treatment.
+        """
+        self._require(operator_key, "operator")
+        if type(pid) is not str or not pid.startswith("SYN_ADMISSION_"):
+            raise AdmissionDenied("synthetic record identity required")
+        with self._transaction() as conn:
+            row = conn.execute(
+                "SELECT p.status,s.arm FROM admission_people AS p "
+                "LEFT JOIN admission_slots AS s ON s.pid=p.pid "
+                "WHERE p.pid=?", (pid,),
+            ).fetchone()
+            if (row is None or row["status"] != "active"
+                    or row["arm"] not in ARMS):
+                raise AdmissionDenied("consented, assigned synthetic record required")
+            return row["arm"]
+
     def participant_status(self, invitation: str) -> dict:
         with self._transaction() as conn:
             row = self._person(conn, invitation, allow_withdrawn=True)

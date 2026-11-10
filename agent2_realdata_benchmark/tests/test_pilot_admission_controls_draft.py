@@ -115,6 +115,33 @@ def test_offline_operator_auditor_role_separation_and_consent(tmp_path):
     assert store.audit(auditor)["result"] == "PASS_SYNTHETIC_ONLY"
 
 
+def test_offline_operator_assignment_is_concealed_and_role_restricted(tmp_path):
+    store, _, operator, auditor, _ = setup(tmp_path)
+    invite = store.issue_invitation(operator)
+    pid = invite["synthetic_pid"]
+    with pytest.raises(AdmissionDenied):
+        store.operator_assignment(operator, pid)
+    store.screen(
+        operator, pid, eligible=True, screening_version=SCREENING,
+    )
+    with pytest.raises(AdmissionDenied):
+        store.operator_assignment(operator, pid)
+    store.consent(
+        invite["private_invitation"],
+        agreed=True, information_sha256=CONSENT_HASH,
+    )
+    with pytest.raises(AdmissionDenied):
+        store.operator_assignment(auditor, pid)
+    with pytest.raises(AdmissionDenied):
+        store.operator_assignment(operator, "SYN_ADMISSION_UNKNOWN")
+    private_arm = store.operator_assignment(operator, pid)
+    assert private_arm in ("A", "B", "C")
+    assert "arm" not in store.participant_status(invite["private_invitation"])
+    store.withdraw(invite["private_invitation"])
+    with pytest.raises(AdmissionDenied):
+        store.operator_assignment(operator, pid)
+
+
 def test_ineligible_participant_never_receives_allocation(tmp_path):
     store, _, operator, auditor, _ = setup(tmp_path)
     invite = store.issue_invitation(operator)
