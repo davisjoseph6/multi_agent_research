@@ -18,6 +18,7 @@ from hashlib import sha256
 from hmac import compare_digest
 import json
 from pathlib import Path
+import os
 import secrets
 import sqlite3
 from typing import Callable
@@ -483,4 +484,50 @@ class SyntheticAdmissionStore:
             "human_enrollment_authorized": False,
             "staff_identity_independently_verified": False,
             "scientific_or_ethics_approval": False,
+        }
+
+    def backup(self, auditor_key: bytes, destination: str | Path) -> dict:
+        """Create a verified *fictional-only* SQLite backup; never overwrite.
+
+        This is an isolated software rehearsal, not an offsite encrypted
+        retention or production disaster-recovery solution.
+        """
+        self._require(auditor_key, "auditor")
+        target = Path(destination)
+        if (target.name != "fictional_admission_backup.sqlite3"
+                or target.is_symlink() or target.exists()
+                or target.parent.is_symlink()
+                or not target.parent.is_dir()):
+            raise AdmissionDenied("new, nonsymlink synthetic backup target required")
+        try:
+            fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            os.close(fd)
+            with sqlite3.connect(
+                self.path.resolve().as_uri() + "?mode=ro", uri=True
+            ) as source:
+                with sqlite3.connect(target) as replica:
+                    source.backup(replica)
+                    integrity = replica.execute(
+                        "PRAGMA integrity_check"
+                    ).fetchone()[0]
+                    if integrity != "ok":
+                        raise AdmissionDenied("synthetic backup integrity check failed")
+                    row = replica.execute(
+                        "SELECT config FROM admission_config WHERE id=1"
+                    ).fetchone()
+                    if row is None or row[0] != self._config:
+                        raise AdmissionDenied("synthetic backup configuration mismatch")
+            os.chmod(target, 0o600)
+        except BaseException:
+            # Remove only the file created by this invocation, not a
+            # pre-existing unrelated file (O_EXCL blocks overwrite).
+            if target.exists() and not target.is_symlink():
+                target.unlink()
+            raise
+        return {
+            "result": "PASS_SYNTHETIC_BACKUP_ONLY",
+            "sqlite_integrity": "ok",
+            "synthetic_only": True,
+            "human_enrollment_authorized": False,
+            "offsite_restore_verified": False,
         }
