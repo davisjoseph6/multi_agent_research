@@ -226,6 +226,46 @@ def test_event_chain_detects_mutation_and_is_not_signature(tmp_path):
     assert not failed["scientific_or_ethics_approval"]
 
 
+def test_auditor_detects_forged_consent_without_valid_assignment(tmp_path):
+    store, _, operator, auditor, _ = setup(tmp_path)
+    person = store.issue_invitation(operator)
+    store.screen(
+        operator, person["synthetic_pid"], eligible=True,
+        screening_version=SCREENING,
+    )
+    assert store.audit(auditor)["result"] == "PASS_SYNTHETIC_ONLY"
+    # Direct DB mutation is deliberately not an authorized operation. The
+    # synthetic consistency audit must reject this incoherent transition.
+    with sqlite3.connect(store.path) as db:
+        db.execute(
+            "UPDATE admission_people SET status='active' WHERE pid=?",
+            (person["synthetic_pid"],),
+        )
+    result = store.audit(auditor)
+    assert result["result"] == "FAIL_SYNTHETIC"
+    assert "active record without screening, consent or assignment" in result["issues"]
+
+
+def test_auditor_detects_forged_early_followup_visit(tmp_path):
+    store, clock, operator, auditor, _ = setup(tmp_path)
+    person = activated(store, operator)
+    pid = person["synthetic_pid"]
+    store.start_visit(operator, pid, 1)
+    clock.advance(minutes=30)
+    store.finish_visit(operator, pid, 1)
+    # Bypass the offline business method in a tampering fixture to ensure
+    # the independent audit does not trust recorded visits uncritically.
+    with sqlite3.connect(store.path) as db:
+        db.execute(
+            "INSERT INTO admission_visits(pid,visit,started_at,finished_at)"
+            " VALUES(?,?,?,NULL)",
+            (pid, 2, clock.value.isoformat()),
+        )
+    result = store.audit(auditor)
+    assert result["result"] == "FAIL_SYNTHETIC"
+    assert "intervisit gap outside 72–120 hours" in result["issues"]
+
+
 def test_reopen_preserves_config_and_blocks_mismatch(tmp_path):
     store, clock, operator, auditor, params = setup(tmp_path)
     activated(store, operator)
