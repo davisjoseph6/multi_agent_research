@@ -1,0 +1,44 @@
+# SSH-only fictional pilot preview. Never deploy as human enrollment.
+# Install by root only after reviewing paths, ownership, and application SHA:
+#   sudo install -o root -g root -m 0644 \
+#     ops/rct/ijcai-pilot-private-preview.service.template \
+#     /etc/systemd/system/ijcai-pilot-private-preview.service
+# The unit purposely binds ONLY 127.0.0.1. DO NOT add a public proxy.
+[Unit]
+Description=IJCAI pilot FICTIONAL browser preview (SSH tunnel only; NO ENROLLMENT)
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=davis
+Group=davis
+WorkingDirectory=/home/davis/ijcai_preview_5c6bb17/agent2_realdata_benchmark
+ExecStart=/home/davis/ijcai_preview_5c6bb17/.venv/bin/python -m scripts.pilot_local_browser_preview --port 8766 --db /home/davis/ijcai_preview_5c6bb17/state/fictional_browser_preview.sqlite3
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+UMask=0077
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/davis/ijcai_preview_5c6bb17/state
+RestrictAddressFamilies=AF_INET AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+LimitNOFILE=4096
+TasksMax=64
+MemoryMax=512M
+CPUQuota=100%
+
+[Install]
+WantedBy=multi-user.target
