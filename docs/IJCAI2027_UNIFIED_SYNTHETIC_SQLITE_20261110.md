@@ -32,6 +32,10 @@ The integration test deliberately injects failures after partial writes and
 checks that the transaction rolls back completely. It reopens the database
 between visits, checks allocation secrecy, runs real draft quiz actions,
 tests duplicate-response idempotency, and audits linked stages/attendance.
+After the complete journey, it makes a restricted SQLite backup, restores it
+under a separate temporary path, and verifies that both schemas, concealed
+links, and the aggregate audit survive recovery. **This is local synthetic
+restore testing, not encrypted offsite disaster-recovery certification.**
 The admission hash chain detects accidental tampering, not an attacker
 with database write access.
 
