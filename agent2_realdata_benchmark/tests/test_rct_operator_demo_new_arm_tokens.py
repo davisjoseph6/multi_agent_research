@@ -57,6 +57,8 @@ def test_registers_fresh_a_b_c_in_same_existing_database(tmp_path):
     )
     assert result["result"] == "NEW_FICTIONAL_ARM_TOKENS_REGISTERED"
     assert result["created_fictional_records"] == 9
+    assert result["new_usable_tokens"] == 3
+    assert result["new_unused_records_deactivated"] == 6
     assert sorted(result["selected_demo_arms"]) == ["A", "B", "C"]
     assert sum(result["new_arm_counts"].values()) == 9
     assert count_people(database) == 18
@@ -71,12 +73,18 @@ def test_registers_fresh_a_b_c_in_same_existing_database(tmp_path):
     assert not private["human_enrollment_authorized"]
     selected = private["tokens_by_arm"]
     assert set(selected) == {"A", "B", "C"}
-    assert len(private["reserve_fictional_invitations"]) == 6
+    assert private["inactive_unused_fictional_records"] == 6
     new_tokens = [selected[arm]["invitation"] for arm in "ABC"]
-    new_tokens += [row["invitation"] for row in private["reserve_fictional_invitations"]]
-    assert len(set(new_tokens)) == 9
+    assert len(set(new_tokens)) == 3
     assert not set(new_tokens) & {row["invitation"] for row in old_tokens}
     assert all(token not in json.dumps(result) for token in new_tokens)
+
+    with sqlite3.connect(database) as conn:
+        status_counts = dict(conn.execute(
+            "SELECT status, COUNT(*) FROM rct_people GROUP BY status"
+        ).fetchall())
+    assert status_counts["active"] == 12
+    assert status_counts["withdrawn"] == 6
 
     all_private = engine.export_private()["outcomes"]
     arms = {record["pid"]: record["assigned_arm"] for record in all_private}
