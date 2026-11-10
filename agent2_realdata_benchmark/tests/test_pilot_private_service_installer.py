@@ -1,6 +1,7 @@
-"""Static, nonprivileged checks for private, fictional VPS service installer.
+"""Static, nonprivileged contract tests for synthetic-only VPS installer.
 
-Never run this installer from tests: it needs explicit server-side sudo approval.
+The installer is never executed in tests: actual systemd changes require the
+operator to run the reviewed script on the designated private VPS.
 """
 from __future__ import annotations
 
@@ -10,8 +11,10 @@ import subprocess
 
 import pytest
 
-SCRIPT = (Path(__file__).resolve().parents[1] /
-          "ops" / "rct" / "install_private_preview_service.sh")
+SCRIPT = (
+    Path(__file__).resolve().parents[1]
+    / "ops" / "rct" / "install_private_preview_service.sh"
+)
 
 
 def test_installer_is_syntactically_valid_bash():
@@ -25,7 +28,7 @@ def test_installer_must_remain_synthetic_only_and_fail_closed():
     content = SCRIPT.read_text(encoding="utf-8")
     for required in (
         'if [[ "$(id -un)" != "davis" ]]',
-        '^/home/davis/ijcai_preview_[a-zA-Z0-9_-]+,
+        "^/home/davis/ijcai_preview_[a-zA-Z0-9_-]+",
         "fictional_browser_preview.sqlite3",
         "ijcai-pilot-private-preview.service",
         "systemctl cat",
@@ -37,41 +40,12 @@ def test_installer_must_remain_synthetic_only_and_fail_closed():
         "IPAddressDeny=any",
         "IPAddressAllow=localhost",
         "ReadWritePaths=$STATE",
-        "python -m scripts.pilot_local_browser_preview",
+        " -m scripts.pilot_local_browser_preview ",
         "pilot_private_vps_smoke",
     ):
-        if required == "python -m scripts.pilot_local_browser_preview":
-            # ExecStart uses the selected Python interpreter in a variable.
-            assert ' -m scripts.pilot_local_browser_preview ' in content
-        else:
-            assert required in content
+        assert required in content
     assert "0.0.0.0" not in content
     assert "caddy" not in content.lower().replace(
-        "existing Caddy operator demo".lower(), ""
-    ).replace("rewrite caddy", "")
-    assert "human_enrollment_authorized=true" not in content.lower()
-,
-        "fictional_browser_preview.sqlite3",
-        "ijcai-pilot-private-preview.service",
-        "systemctl cat",
-        "Port 8766 already in use",
-        "User=davis",
-        "NoNewPrivileges=true",
-        "ProtectSystem=strict",
-        "ProtectHome=read-only",
-        "IPAddressDeny=any",
-        "IPAddressAllow=localhost",
-        "ReadWritePaths=$STATE",
-        "python -m scripts.pilot_local_browser_preview",
-        "pilot_private_vps_smoke",
-    ):
-        if required == "python -m scripts.pilot_local_browser_preview":
-            # ExecStart uses the selected Python interpreter in a variable.
-            assert ' -m scripts.pilot_local_browser_preview ' in content
-        else:
-            assert required in content
-    assert "0.0.0.0" not in content
-    assert "caddy" not in content.lower().replace(
-        "existing Caddy operator demo".lower(), ""
-    ).replace("rewrite caddy", "")
+        "existing caddy operator demo", ""
+    )
     assert "human_enrollment_authorized=true" not in content.lower()
