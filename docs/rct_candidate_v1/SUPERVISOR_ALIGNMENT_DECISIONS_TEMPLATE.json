@@ -1,0 +1,110 @@
+{
+  "schema_version": "IJCAI2027_SUPERVISOR_ALIGNMENT_DECISIONS_TEMPLATE_V1",
+  "document_status": "UNAPPROVED_PUBLIC_TEMPLATE",
+  "source": "operator-supplied supervisor brief PDF, 11 pages, not republished",
+  "candidate_protocol": "PILOT_PROTOCOL_DRAFT_20261108.md",
+  "pi_approved": false,
+  "institutionally_authorized": false,
+  "human_enrollment_authorized": false,
+  "note": "NOT AN AUTHORIZATION. Copy privately for PI/statistician adjudication; never publish signatures, participant records, or identity.",
+  "decisions": {
+    "SUP-01": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-02": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-03": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-04": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-05": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-06": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-07": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-08": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-09": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-10": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-11": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-12": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-13": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    },
+    "SUP-14": {
+      "status": "unresolved",
+      "pi_decision": null,
+      "rationale": null,
+      "approved_protocol_version": null,
+      "review_evidence_sha256": null
+    }
+  }
+}
