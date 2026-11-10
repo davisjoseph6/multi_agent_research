@@ -132,3 +132,29 @@ def test_refuses_symlinked_database(tmp_path):
             expected_host=HOST,
         )
     assert count_people(db) == 9
+
+def test_failed_allocation_rolls_back_entire_batch_and_private_file(tmp_path, monkeypatch):
+    settings, db, initial = setup(tmp_path)
+    from src.prototype.rct_candidate import RCTCandidateEngine
+
+    original = RCTCandidateEngine._allocate
+    calls = {"n": 0}
+
+    def interrupted(conn, pid):
+        calls["n"] += 1
+        if calls["n"] == 4:
+            raise RuntimeError("synthetic interrupted allocation")
+        return original(conn, pid)
+
+    monkeypatch.setattr(RCTCandidateEngine, "_allocate", staticmethod(interrupted))
+    output = tmp_path / "failed_new_tokens_PRIVATE.json"
+    with pytest.raises(RuntimeError, match="interrupted"):
+        issue_fresh_demo_arm_tokens(
+            settings=settings, database=db, output=output,
+            expected_host=HOST,
+        )
+    assert count_people(db) == 9
+    assert not output.exists()
+    assert not list(tmp_path.glob(".pending_demo_arm_tokens_*"))
+
+
