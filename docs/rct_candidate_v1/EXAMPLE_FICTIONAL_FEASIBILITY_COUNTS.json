@@ -1,0 +1,57 @@
+{
+  "schema_version": "IJCAI2027_SYNTHETIC_FEASIBILITY_COUNTS_V1",
+  "fictional_only": true,
+  "screening": {
+    "approached": 110,
+    "screened": 105,
+    "eligible": 95,
+    "consented": 90
+  },
+  "arms": {
+    "A": {
+      "randomized": 30,
+      "visit1_attended": 29,
+      "visit2_attended": 28,
+      "visit3_attended": 26,
+      "protocol_completed": 25,
+      "posttest_observed": 25,
+      "mvas_observed": 164,
+      "mvas_expected": 166,
+      "adjacent_visit_pairs_on_time": 53,
+      "application_requests": 1000,
+      "application_failures": 1,
+      "intervention_fidelity_deviations": 0,
+      "critical_incidents_reported": 0
+    },
+    "B": {
+      "randomized": 30,
+      "visit1_attended": 29,
+      "visit2_attended": 28,
+      "visit3_attended": 26,
+      "protocol_completed": 25,
+      "posttest_observed": 25,
+      "mvas_observed": 164,
+      "mvas_expected": 166,
+      "adjacent_visit_pairs_on_time": 53,
+      "application_requests": 1000,
+      "application_failures": 1,
+      "intervention_fidelity_deviations": 0,
+      "critical_incidents_reported": 0
+    },
+    "C": {
+      "randomized": 30,
+      "visit1_attended": 29,
+      "visit2_attended": 28,
+      "visit3_attended": 26,
+      "protocol_completed": 25,
+      "posttest_observed": 25,
+      "mvas_observed": 164,
+      "mvas_expected": 166,
+      "adjacent_visit_pairs_on_time": 53,
+      "application_requests": 1000,
+      "application_failures": 1,
+      "intervention_fidelity_deviations": 0,
+      "critical_incidents_reported": 0
+    }
+  }
+}
