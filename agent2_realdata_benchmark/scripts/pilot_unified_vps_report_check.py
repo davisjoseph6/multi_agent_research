@@ -20,6 +20,8 @@ CONTRACT = {
     "single_sqlite_file": True,
     "atomic_provisioning_and_visit_boundaries": True,
     "crash_restart_reopen_checks": 3,
+    "unified_backup_restore": "PASS_SYNTHETIC_ONLY",
+    "offsite_encrypted_recovery_verified": False,
     "data_deleted_on_exit": True,
     "no_network_requests": True,
     "human_enrollment_authorized": False,
