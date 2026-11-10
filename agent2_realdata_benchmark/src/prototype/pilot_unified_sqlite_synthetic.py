@@ -269,6 +269,10 @@ class UnifiedSyntheticStudyStore:
             state = self.learning._load(db, link["learning_pid"])
             if (row is None or row["finished_at"] is not None
                     or now < datetime.fromisoformat(row["started_at"])
+                    or (state.last_event_at is not None
+                        and now < state.last_event_at)
+                    or (len(state.visit_finished_at) >= visit
+                        and now < state.visit_finished_at[visit - 1])
                     or len(state.visit_finished_at) != visit
                     or state.stage != ("complete" if visit == 3 else "awaiting_visit")):
                 raise UnifiedSyntheticError(

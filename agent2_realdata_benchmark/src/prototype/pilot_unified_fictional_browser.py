@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from hmac import compare_digest
+import json
 from pathlib import Path
 import secrets
 
@@ -131,9 +132,17 @@ def _offline_finish_if_needed(
     if row is None:
         raise UnifiedSyntheticError("fictional visit attendance is missing")
     if row["finished_at"] is None:
-        clock.value = (
-            SYNTHETIC_EPOCH + timedelta(days=4 * (visit - 1), minutes=70)
+        learner, _hidden_arm = study.operator_lookup(operator_key, pid)
+        with study.learning._read_transaction() as db:
+            learning_state = study.learning._load(db, learner)
+        scheduled = SYNTHETIC_EPOCH + timedelta(
+            days=4 * (visit - 1), minutes=70,
         )
+        if learning_state.last_event_at is not None:
+            scheduled = max(
+                scheduled, learning_state.last_event_at + timedelta(seconds=1),
+            )
+        clock.value = scheduled
         study.finish_visit(operator_key, pid, visit)
 
 
@@ -246,10 +255,24 @@ def create_unified_fictional_browser_app(
         state = study.learning.snapshot(learner)
         if state["session"] not in (1, 2, 3):
             raise PilotSequenceError("fictional visit has not started")
+        # completed_actions is a *whole-study* count. Reusing it for the
+        # current session makes Visit 3's last learning timestamps later
+        # than the fixed 70-minute attendance finish. Count only actions
+        # completed in this visit so every synthetic session has its own
+        # virtual clock. This is NOT a real attendance clock.
+        with study.learning._read_transaction() as db:
+            completed = db.execute(
+                "SELECT public FROM pilot_actions "
+                "WHERE pid=? AND completed_at IS NOT NULL", (learner,),
+            ).fetchall()
+        in_visit = sum(
+            json.loads(action["public"])["session"] == state["session"]
+            for action in completed
+        )
         return (
             SYNTHETIC_EPOCH
             + timedelta(days=4 * (state["session"] - 1))
-            + timedelta(minutes=state["completed_actions"] + 1)
+            + timedelta(minutes=in_visit + 1)
         )
 
     @app.get("/")

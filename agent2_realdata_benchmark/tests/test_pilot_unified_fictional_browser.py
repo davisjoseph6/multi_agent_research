@@ -4,6 +4,7 @@ These do not authorize a human study or test an external production browser.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from hashlib import sha256
 import re
 import secrets
@@ -201,6 +202,15 @@ def test_offline_visit_advance_and_one_complete_three_visit_journey(tmp_path):
     assert counts["MVAS"] == 6
     assert store.learning.scores(learner)["practice"]["answered"] == 55
     assert store.operator_lookup(operator, pid) == (learner, private_arm)
+    with store.admission._transaction() as db:
+        learning = store.learning._load(db, learner)
+        attendance = db.execute(
+            "SELECT finished_at FROM admission_visits WHERE pid=? "
+            "ORDER BY visit", (pid,),
+        ).fetchall()
+    assert len(attendance) == len(learning.visit_finished_at) == 3
+    for recorded, completed in zip(attendance, learning.visit_finished_at):
+        assert datetime.fromisoformat(recorded["finished_at"]) >= completed
     assert store.audit(auditor)["result"] == "PASS_SYNTHETIC_ONLY"
     assert post(client, nonce, "next", {"fixture": fixture})["action"] == "COMPLETE"
 
