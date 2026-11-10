@@ -79,18 +79,19 @@ by the GitHub connector. Do not paste private SSH key contents into a command,
 do not open TCP/8766 on the public firewall, and keep the old operator demo
 untouched.
 
-On WSL (in the new engineering worktree, not the original repository):
+On WSL (in the new engineering worktree, not the original repository), set `VPS` to the private server hostname or address supplied by the operator:
 
 ```bash
+VPS="<VPS_HOST_OR_IP>"
 cd ~/ijcai_http_acceptance_20261110
 git fetch origin
 git switch --detach origin/research/ijcai2027-private-vps-http-fulljourney-20261110
 test -z "$(git status --porcelain)" || { echo "Dirty worktree"; exit 1; }
 test -f agent2_realdata_benchmark/ops/rct/install_private_preview_service.sh
-ssh -i ~/.ssh/ijcai_preview_ed25519 davis@31.70.172.140 \
+ssh -i ~/.ssh/ijcai_preview_ed25519 davis@$VPS \
   'mkdir -p ~/ijcai_preview_http_20261110'
 git archive --format=tar HEAD agent2_realdata_benchmark docs | \
-  ssh -i ~/.ssh/ijcai_preview_ed25519 davis@31.70.172.140 \
+  ssh -i ~/.ssh/ijcai_preview_ed25519 davis@$VPS \
     'tar -xf - -C ~/ijcai_preview_http_20261110'
 ```
 
