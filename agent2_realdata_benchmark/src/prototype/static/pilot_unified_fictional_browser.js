@@ -141,7 +141,7 @@ function renderResource(payload) {
     throw new Error("Expected a draft recovery resource");
   }
   descriptionBox.append(
-    element("p", "Optional Fixture A recovery activity · " + payload.action, "small-print"),
+    element("p", "Optional fictional recovery activity · " + payload.action, "small-print"),
     element("p", resource.text, "resource-text"),
   );
   if (resource.source) {
