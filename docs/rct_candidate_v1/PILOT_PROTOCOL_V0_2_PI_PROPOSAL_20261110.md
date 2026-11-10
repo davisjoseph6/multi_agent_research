@@ -41,7 +41,7 @@ Three supervised visits, provisionally **3–5 calendar days apart**, with serve
 | 2 | One pre-learning fatigue rating; 20 core practice questions plus possible bounded A recovery; one post-learning fatigue rating |
 | 3 | One pre-learning fatigue rating; 15 practice questions plus possible bounded A recovery; one post-learning fatigue rating; independent 16-item final posttest and debrief |
 
-The supervisor now proposes **one single-item 0–100 mental-fatigue VAS immediately before and after learning in each visit**, six total ratings per student. Learning gains and fatigue are **exploratory**, to inform a future adequately powered confirmatory trial. No fatigue noninferiority or educational efficacy conclusion from this feasibility sample.
+The supervisor now proposes **one single-item 0–100 mental-fatigue M-VAS immediately before and after learning in each visit**, six total ratings per student. Learning gains and fatigue are **exploratory**, to inform a future adequately powered confirmatory trial. No fatigue noninferiority or educational efficacy conclusion from this feasibility sample.
 
 **Important:** The original supervisor brief's **six NASA-TLX-like items administered after each session** and the proposed single-item pre/post VAS are scientifically distinct. The *new supervisor reply favors the VAS as the pilot proposal*. Exact wording, anchors, attribution/rights, accessibility, French/English language versions, digital implementation, validity, missingness and scoring **remain under independent review**; the current deployed fictional six-item questionnaire is **not approved** and must not be relabeled.
 
