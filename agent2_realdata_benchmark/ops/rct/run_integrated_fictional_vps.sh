@@ -18,6 +18,7 @@ fi
 
 for required in \
   "$BENCHMARK/scripts/pilot_integrated_synthetic_journey.py" \
+  "$BENCHMARK/scripts/pilot_integrated_vps_report_check.py" \
   "$BENCHMARK/src/prototype/pilot_admission_controls_draft.py" \
   "$BENCHMARK/src/prototype/pilot_three_arm_store_draft.py" \
   "$BENCHMARK/docs/rct_candidate_v1/items.csv" \
@@ -61,44 +62,7 @@ if ! timeout --signal=TERM --kill-after=15s 1800s \
   exit 2
 fi
 
-"$PY" - "$OUTPUT" <<'PY'
-import json
-from pathlib import Path
-import sys
-
-data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-expected = {
-    "kind": "DISPOSABLE_SYNTHETIC_ADMISSION_LEARNING_CROSSCHECK",
-    "result": "PASS_SYNTHETIC_ONLY",
-    "fictional_participants": 30,
-    "fictional_completed_visits": 90,
-    "fictional_questions": 2610,
-    "fictional_mvas_records": 180,
-    "admission_audit": "PASS_SYNTHETIC_ONLY",
-    "learning_audit": "PASS_SYNTHETIC_ONLY",
-    "no_client_supplied_arm": True,
-    "no_network_requests": True,
-    "temporary_stores_deleted": True,
-    "human_enrollment_authorized": False,
-    "staff_authentication_real": False,
-    "consent_or_measurement_validated": False,
-    "cross_database_atomicity": False,
-    "independent_security_or_ethics_approval": False,
-}
-for key, value in expected.items():
-    if data.get(key) != value:
-        raise SystemExit("VPS synthetic acceptance invariant failed: " + key)
-arms = data.get("allocated_by_arm", {})
-if (set(arms) != {"A", "B", "C"}
-        or any(type(n) is not int or n < 1 for n in arms.values())
-        or sum(arms.values()) != 30
-        or max(arms.values()) - min(arms.values()) > 3):
-    # 30 may end partway through a randomly sized block of 6 or 9.
-    # The resulting counts need not be exactly 10/10/10.
-    raise SystemExit("VPS synthetic allocation exceeded block-balance bound")
-if not isinstance(data.get("fictional_replay_checks"), int) or data["fictional_replay_checks"] < 30:
-    raise SystemExit("VPS synthetic replay coverage is incomplete")
-PY
+"$PY" -m scripts.pilot_integrated_vps_report_check --path "$OUTPUT"
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 # Never overwrite a prior acceptance report.
