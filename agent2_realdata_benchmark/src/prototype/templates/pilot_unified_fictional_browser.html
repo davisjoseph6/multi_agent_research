@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="preview-nonce" content="{{ preview_nonce }}">
+  <meta name="robots" content="noindex,nofollow">
+  <title>IJCAI 2027 · Unified fictional study preview</title>
+  <link rel="stylesheet" href="/unified.css">
+  <script src="/unified.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell">
+      <p class="eyebrow">IJCAI 2027 · Research software engineering</p>
+      <h1>Unified fictional study preview</h1>
+      <p class="lead">Three displayed fictional participants, selected from a nine-record synthetic randomized cohort, with concealed server-side A/B/C assignment and one SQLite database for admission and learning events.</p>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="notice" role="note">
+      <strong>SYNTHETIC-ONLY, UNAPPROVED</strong>
+      <p>Not for real people, enrollment, consent, student data or a human RCT. This is an SSH-tunnel-only software test. The staff controls, time and consent are fictional. Draft questions, recovery content and fatigue ratings are not validated.</p>
+    </section>
+    <section class="panel" aria-labelledby="selection-title">
+      <h2 id="selection-title">Choose a fictional participant</h2>
+      <label for="fixture-select">Private demo fixture</label>
+      <select id="fixture-select" name="fixture">
+        <option value="F1">F1 · Fictional participant 1</option>
+        <option value="F2">F2 · Fictional participant 2</option>
+        <option value="F3">F3 · Fictional participant 3</option>
+      </select>
+      <p class="small-print">The browser cannot choose or inspect the A/B/C assignment. The server created all three assignments.</p>
+      <button type="button" id="reload-button" class="secondary">Refresh fictional participant</button>
+      <div id="participant-status" class="status" role="status" aria-live="polite">Loading fictional state…</div>
+    </section>
+    <section class="panel" id="activity-panel" aria-labelledby="activity-title">
+      <p class="eyebrow" id="activity-stage">FICTIONAL SESSION</p>
+      <h2 id="activity-title" tabindex="-1">Activity</h2>
+      <div id="activity-description"></div>
+      <form id="answer-form" hidden>
+        <div id="answer-fields"></div>
+        <button type="submit" id="submit-button">Submit fictional response</button>
+      </form>
+    </section>
+    <section class="instructions" aria-label="Virtual supervised visit instructions">
+      <h2>Separate simulated operator commands</h2>
+      <p>The web browser cannot enroll, approve, open, finish or withdraw a visit. After Visit 1 or 2, the operator advances that specific fictional fixture in a separate local or VPS shell using the same private database.</p>
+      <pre><code>python -m scripts.pilot_unified_fictional_browser --advance-fixture F1</code></pre>
+      <p>Replace F1 with F2 or F3. After completing Visit 3, use <code>--finish-fixture F1</code> to record the synthetic final attendance. Refresh the browser after each offline command.</p>
+    </section>
+  </main>
+  <footer class="shell footer">
+    <p>Fictional three-arm algorithm demo · no human enrollment · no external APIs or analytics</p>
+  </footer>
+</body>
+</html>
