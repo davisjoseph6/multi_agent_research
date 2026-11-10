@@ -44,6 +44,7 @@ if [[ ! -x "$PY" ]]; then
   echo "No usable virtualenv Python: set IJCAI_PREVIEW_PY explicitly." >&2
   exit 2
 fi
+cd "$BENCHMARK"
 "$PY" -c 'import flask, werkzeug; from src.prototype.pilot_local_browser_preview import create_fictional_preview_app' \
   || { echo "Preview dependencies/source import failed." >&2; exit 2; }
 
