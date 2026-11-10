@@ -208,7 +208,7 @@ def create_unified_fictional_browser_app(
         })
         return response
 
-    @app.errorhandler((AdmissionDenied, UnifiedSyntheticError))
+    @app.errorhandler(AdmissionDenied)
     def admission_conflict(error):
         return jsonify(error=str(error), synthetic_only=True), 409
 
