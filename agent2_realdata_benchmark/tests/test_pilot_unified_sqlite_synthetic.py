@@ -178,7 +178,8 @@ def test_complete_nine_fictional_people_three_atomic_visit_boundaries(tmp_path):
     result = store.audit(auditor)
     assert result["fictional_active_records"] == 9
     assert result["fictional_learning_links"] == 9
-    assert result["cross_database_atomicity"]
+    assert result["single_database_combined_writes_atomic"]
+    assert not result["cross_database_atomicity"]
     assert result["single_sqlite_file"]
     assert not result["human_enrollment_authorized"]
 
