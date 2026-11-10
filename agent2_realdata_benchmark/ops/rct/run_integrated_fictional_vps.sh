@@ -89,8 +89,13 @@ for key, value in expected.items():
     if data.get(key) != value:
         raise SystemExit("VPS synthetic acceptance invariant failed: " + key)
 arms = data.get("allocated_by_arm", {})
-if set(arms) != {"A", "B", "C"} or sorted(arms.values()) != [10, 10, 10]:
-    raise SystemExit("VPS synthetic allocation did not balance 30 fixtures")
+if (set(arms) != {"A", "B", "C"}
+        or any(type(n) is not int or n < 1 for n in arms.values())
+        or sum(arms.values()) != 30
+        or max(arms.values()) - min(arms.values()) > 3):
+    # 30 may end partway through a randomly sized block of 6 or 9.
+    # The resulting counts need not be exactly 10/10/10.
+    raise SystemExit("VPS synthetic allocation exceeded block-balance bound")
 if not isinstance(data.get("fictional_replay_checks"), int) or data["fictional_replay_checks"] < 30:
     raise SystemExit("VPS synthetic replay coverage is incomplete")
 PY
