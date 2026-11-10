@@ -19,6 +19,7 @@ from src.prototype.pilot_unified_sqlite_synthetic import (
     UnifiedSyntheticError, UnifiedSyntheticStudyStore,
 )
 from src.prototype.pilot_admission_controls_draft import AdmissionDenied
+from src.prototype.pilot_session_flow_draft import PilotSequenceError
 
 
 CONTENT = Path(__file__).resolve().parents[1] / "docs" / "rct_candidate_v1"
@@ -180,6 +181,54 @@ def test_complete_nine_fictional_people_three_atomic_visit_boundaries(tmp_path):
     assert result["cross_database_atomicity"]
     assert result["single_sqlite_file"]
     assert not result["human_enrollment_authorized"]
+
+
+def test_atomic_withdrawal_revokes_existing_pending_action(tmp_path):
+    store, clock, operator, auditor, _ = setup(tmp_path)
+    invite = screened(store, operator)
+    store.consent_and_create(
+        invite["private_invitation"], agreed=True,
+        information_sha256=HASH,
+    )
+    pid = invite["synthetic_pid"]
+    learner, _ = store.operator_lookup(operator, pid)
+    store.start_visit(operator, pid, 1)
+    at = clock.value + timedelta(minutes=1)
+    pending = store.learning.next_action(learner, at=at)
+    store.learning.mark_rendered(learner, pending["action_id"], at=at)
+    clock.at(at + timedelta(seconds=1))
+    stopped = store.withdraw(invite["private_invitation"])
+    assert stopped["stopped"] and stopped["changed"]
+    assert not store.withdraw(invite["private_invitation"])["changed"]
+    assert store.audit(auditor)["result"] == "PASS_SYNTHETIC_ONLY"
+    with pytest.raises(UnifiedSyntheticError):
+        store.operator_lookup(operator, pid)
+    with pytest.raises(PilotSequenceError):
+        store.learning.next_action(learner, at=clock.value)
+    with pytest.raises(PilotSequenceError):
+        store.learning.submit(
+            learner, pending["action_id"], uuid.uuid4().hex,
+            _response(pending), at=clock.value,
+        )
+    with pytest.raises(UnifiedSyntheticError):
+        store.start_visit(operator, pid, 2)
+    assert store.audit(auditor)["result"] == "PASS_SYNTHETIC_ONLY"
+
+
+def test_atomic_withdrawal_prior_to_consent_leaves_no_learning_record(tmp_path):
+    store, _, operator, auditor, _ = setup(tmp_path)
+    invite = screened(store, operator)
+    result = store.withdraw(invite["private_invitation"])
+    assert result["stopped"] and result["changed"]
+    with pytest.raises(AdmissionDenied):
+        store.consent_and_create(
+            invite["private_invitation"], agreed=True,
+            information_sha256=HASH,
+        )
+    with sqlite3.connect(store.path) as db:
+        assert db.execute("SELECT COUNT(*) FROM pilot_people").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM unified_links").fetchone()[0] == 0
+    assert store.audit(auditor)["result"] == "PASS_SYNTHETIC_ONLY"
 
 
 def test_rejects_unreviewed_human_database_and_policy_mismatch(tmp_path):
