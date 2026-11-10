@@ -146,14 +146,13 @@ def test_audit_rejects_historical_early_final_attendance(tmp_path):
             "SELECT state FROM pilot_people WHERE pid=?", (learning,),
         ).fetchone()[0])
         learning_finished = state["visit_finished_at"][2]
+        early = "2026-11-28T09:00:00+00:00"
+        assert learning_finished > early
         db.execute(
             "UPDATE admission_visits SET finished_at=? "
             "WHERE pid=? AND visit=3",
-            ("2026-11-28T10:10:00+00:00", pid),
+            (early, pid),
         )
-    assert learning_finished > "2026-11-28T10:10:00+00:00" or (
-        learning_finished != "2026-11-28T10:10:00+00:00"
-    )
     with pytest.raises(FictionalAuditError, match="predates learning"):
         audit_fictional_browser(store.path)
 
