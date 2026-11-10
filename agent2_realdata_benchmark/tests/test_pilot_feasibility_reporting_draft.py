@@ -108,7 +108,10 @@ def test_denies_invalid_visit_mvas_or_screening_counts():
         (("arms", "C", "randomized"), True),
     ]:
         example = _example()
-        example[path[0]][path[1]][path[2]] = invalid
+        if len(path) == 3:
+            example[path[0]][path[1]][path[2]] = invalid
+        else:
+            example[path[0]][path[1]] = invalid
         with pytest.raises(ValueError):
             summarize_synthetic_feasibility(example)
 
