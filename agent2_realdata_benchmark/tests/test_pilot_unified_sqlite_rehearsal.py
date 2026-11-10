@@ -21,6 +21,8 @@ def test_nine_fictional_people_and_complete_three_visit_restart_rehearsal():
     assert report["single_sqlite_file"]
     assert report["atomic_provisioning_and_visit_boundaries"]
     assert report["crash_restart_reopen_checks"] == 3
+    assert report["unified_backup_restore"] == "PASS_SYNTHETIC_ONLY"
+    assert not report["offsite_encrypted_recovery_verified"]
     assert report["data_deleted_on_exit"]
     assert report["no_network_requests"]
     assert not report["human_enrollment_authorized"]
@@ -42,6 +44,7 @@ def test_full_thirty_fictional_three_visit_release_acceptance():
     ) <= 3
     assert report["single_sqlite_file"]
     assert report["unified_audit"] == "PASS_SYNTHETIC_ONLY"
+    assert report["unified_backup_restore"] == "PASS_SYNTHETIC_ONLY"
     assert report["data_deleted_on_exit"]
     assert not report["human_enrollment_authorized"]
 
