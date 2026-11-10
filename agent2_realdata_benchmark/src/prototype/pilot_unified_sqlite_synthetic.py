@@ -333,6 +333,11 @@ class UnifiedSyntheticStudyStore:
         self.admission._require(auditor_key, "auditor")
         issues = []
         with self.admission._transaction() as db:
+            config = db.execute(
+                "SELECT value FROM unified_config WHERE id=1"
+            ).fetchone()
+            if config is None or config["value"] != self._version:
+                issues.append("synthetic unified configuration mismatch")
             active = db.execute(
                 "SELECT COUNT(*) FROM admission_people WHERE status='active'"
             ).fetchone()[0]
@@ -356,11 +361,16 @@ class UnifiedSyntheticStudyStore:
                 if person is None or person["status"] not in ("active", "withdrawn"):
                     issues.append("unified link to nonconsenting or unknown record")
                 policy = db.execute(
-                    "SELECT arm FROM pilot_three_arm_people WHERE pid=?",
+                    "SELECT arm,policy FROM pilot_three_arm_people WHERE pid=?",
                     (link["learning_pid"],),
                 ).fetchone()
+                try:
+                    internal_arm = json.loads(policy["policy"]).get("arm") if policy else None
+                except (ValueError, TypeError):
+                    internal_arm = None
                 if (link["arm"] != link["assigned"] or policy is None
-                        or policy["arm"] != link["arm"]):
+                        or policy["arm"] != link["arm"]
+                        or internal_arm != link["arm"]):
                     issues.append("inconsistent concealed arm or learning link")
                 attendance = db.execute(
                     "SELECT visit,finished_at FROM admission_visits "
