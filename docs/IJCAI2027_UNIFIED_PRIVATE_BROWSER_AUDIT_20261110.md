@@ -90,6 +90,28 @@ incomplete, or **2** on audit failure. A valid but partially finished
 fictional study may still return `PASS_SYNTHETIC_ONLY` with
 `all_three_complete=false` when `--require-complete` is omitted.
 
+## Complete all three fictional journeys over real loopback HTTP
+
+A separate disposable test exercises the actual 127.0.0.1-only Flask
+server and complete F1/F2/F3 HTTP actions across all three virtual
+visits, without connecting to the existing 8767 service. It validates
+idempotent response replay, the hidden treatments, an independent
+read-only completion audit and nine finished visits.
+
+From the current audited source snapshot (WSL or VPS):
+
+```bash
+PY="<path-to-the-verified-python-environment>"
+"$PY" -m pytest -q tests/test_pilot_unified_http_fulljourney.py
+"$PY" -m scripts.pilot_unified_http_fulljourney
+```
+
+The expected counts are 9 fictional visits, 261 ordinary questions,
+18 proposed M-VAS responses, and 18 private HTTP smoke checks.
+This creates an ephemeral local TCP port and a temporary SQLite database
+that is deleted on exit. It does not test a graphical browser, TLS, real
+humans, authenticated sessions or production concurrency.
+
 ## Validate corrected browser in an independent temporary VPS snapshot
 
 Never point the corrected browser at the existing 8767 database or replace
