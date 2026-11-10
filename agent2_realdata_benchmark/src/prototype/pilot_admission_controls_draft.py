@@ -308,10 +308,12 @@ class SyntheticAdmissionStore:
         now = self._now()
         with self._transaction() as conn:
             row = conn.execute(
-                "SELECT status FROM admission_people WHERE pid=?", (pid,)
+                "SELECT status,consent_at FROM admission_people WHERE pid=?", (pid,)
             ).fetchone()
             if row is None or row["status"] != "active" or not pid.startswith("SYN_ADMISSION_"):
                 raise AdmissionDenied("synthetic active and consented state required")
+            if row["consent_at"] is None or now < datetime.fromisoformat(row["consent_at"]):
+                raise AdmissionDenied("synthetic visit must follow agreement")
             visits = conn.execute(
                 "SELECT visit,started_at,finished_at FROM admission_visits "
                 "WHERE pid=? ORDER BY visit", (pid,),
@@ -413,12 +415,62 @@ class SyntheticAdmissionStore:
                     failures.append("synthetic event hash chain invalid")
                     break
                 previous = item["event_hash"]
-            visit_issues = conn.execute(
-                "SELECT COUNT(*) FROM admission_visits WHERE "
-                "finished_at IS NOT NULL AND finished_at < started_at"
-            ).fetchone()[0]
-            if visit_issues:
-                failures.append("invalid visit ordering")
+            assigned_pids = [row["pid"] for row in allocated if row["pid"] is not None]
+            assigned_set = set(assigned_pids)
+            if len(assigned_pids) != len(assigned_set):
+                failures.append("duplicate synthetic allocation")
+            people_detail = conn.execute(
+                "SELECT pid,status,screened_at,consent_at "
+                "FROM admission_people ORDER BY pid"
+            ).fetchall()
+            for person in people_detail:
+                pid = person["pid"]
+                if not pid.startswith("SYN_ADMISSION_"):
+                    failures.append("nonfictional participant ID")
+                status = person["status"]
+                screened = person["screened_at"] is not None
+                consented = person["consent_at"] is not None
+                if status not in STATUS:
+                    failures.append("unknown synthetic participation state")
+                if status == "active" and (
+                    not screened or not consented or pid not in assigned_set
+                ):
+                    failures.append("active record without screening, consent or assignment")
+                if status in ("invited", "eligible", "ineligible") and (
+                    consented or pid in assigned_set
+                ):
+                    failures.append("premature synthetic assignment or consent")
+                if status in ("eligible", "ineligible") and not screened:
+                    failures.append("missing synthetic screening timestamp")
+                if status == "withdrawn" and consented and pid not in assigned_set:
+                    failures.append("withdrawn consenting record without allocation")
+                visits = conn.execute(
+                    "SELECT visit,started_at,finished_at FROM admission_visits "
+                    "WHERE pid=? ORDER BY visit", (pid,),
+                ).fetchall()
+                if visits and not consented:
+                    failures.append("synthetic visit before agreement")
+                for expected_visit, visit in enumerate(visits, start=1):
+                    if visit["visit"] != expected_visit:
+                        failures.append("out-of-order synthetic visit")
+                    try:
+                        started = datetime.fromisoformat(visit["started_at"])
+                        if consented and started < datetime.fromisoformat(person["consent_at"]):
+                            failures.append("synthetic visit before consent")
+                        if visit["finished_at"] is not None:
+                            finished = datetime.fromisoformat(visit["finished_at"])
+                            if finished < started:
+                                failures.append("invalid visit ordering")
+                        if expected_visit > 1:
+                            previous_visit = visits[expected_visit - 2]
+                            if previous_visit["finished_at"] is None:
+                                failures.append("visit before prior completion")
+                            else:
+                                gap = started - datetime.fromisoformat(previous_visit["finished_at"])
+                                if not timedelta(hours=72) <= gap <= timedelta(hours=120):
+                                    failures.append("intervisit gap outside 72–120 hours")
+                    except (TypeError, ValueError):
+                        failures.append("invalid synthetic visit timestamp")
         return {
             "result": "PASS_SYNTHETIC_ONLY" if not failures else "FAIL_SYNTHETIC",
             "issues": failures,
