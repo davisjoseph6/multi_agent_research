@@ -71,6 +71,66 @@ The test uses actual loopback HTTP but **not** an external browser,
 HTTPS reverse proxy, randomized human subjects, independent audits,
 concurrent genuine network clients or a production WSGI service.
 
+
+## Deploy a persistent private VPS preview from an immutable source snapshot
+
+These commands are deliberate *operator actions* and have **not** been executed
+by the GitHub connector. Do not paste private SSH key contents into a command,
+do not open TCP/8766 on the public firewall, and keep the old operator demo
+untouched.
+
+On WSL (in the new engineering worktree, not the original repository):
+
+```bash
+cd ~/ijcai_http_acceptance_20261110
+git fetch origin
+git switch --detach origin/research/ijcai2027-private-vps-http-fulljourney-20261110
+test -z "$(git status --porcelain)" || { echo "Dirty worktree"; exit 1; }
+test -f agent2_realdata_benchmark/ops/rct/install_private_preview_service.sh
+ssh -i ~/.ssh/ijcai_preview_ed25519 davis@31.70.172.140 \
+  'mkdir -p ~/ijcai_preview_http_20261110'
+git archive --format=tar HEAD agent2_realdata_benchmark docs | \
+  ssh -i ~/.ssh/ijcai_preview_ed25519 davis@31.70.172.140 \
+    'tar -xf - -C ~/ijcai_preview_http_20261110'
+```
+
+On the VPS SSH terminal (the user `davis`):
+
+```bash
+cd ~/ijcai_preview_http_20261110/agent2_realdata_benchmark
+PY="$HOME/ijcai_preview_5c6bb17/.venv/bin/python"
+test -x "$PY" || { echo "Previous venv not available"; exit 1; }
+"$PY" -m pytest -q \
+  tests/test_pilot_private_vps_smoke.py \
+  tests/test_pilot_disposable_http_fulljourney.py
+bash -n ops/rct/install_private_preview_service.sh
+bash ops/rct/install_private_preview_service.sh
+```
+
+The installer derives the checked-out snapshot path, refuses an existing
+`ijcai-pilot-private-preview.service`, refuses a busy port, uses a virtualenv
+rather than system Python, creates a private synthetic state directory, installs
+a root-owned restricted systemd unit, enables restart-on-failure, and checks
+local HTTP response guards with a read-only smoke test. It does **not**
+rewrite Caddy or publish the service.
+
+If a service with the same name already exists, halt and inspect it manually;
+do not overwrite it silently. If the installer cannot find its dependencies,
+set `IJCAI_PREVIEW_PY` to the existing verified interpreter path before
+rerunning. Only use this installer for synthetic fixtures in the isolated
+`ijcai_preview_*` directory namespace.
+
+To check without exposing the service:
+
+```bash
+sudo systemctl is-active ijcai-pilot-private-preview
+sudo ss -lntp '( sport = :8766 )'
+"$PY" -m scripts.pilot_private_vps_smoke --base http://127.0.0.1:8766
+```
+
+A successful result is local-only HTTP and a listener at
+`127.0.0.1:8766`; it is never a human-study launch decision.
+
 ## Release controls still closed
 
 This addition only validates the existing fictional preview's HTTP behavior
