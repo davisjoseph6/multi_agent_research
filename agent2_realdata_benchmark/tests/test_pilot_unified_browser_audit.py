@@ -182,14 +182,15 @@ def test_audit_refuses_tampered_concealed_arm_and_chain(tmp_path):
     store, roster, operator, auditor, clock = setup_cohort(tmp_path)
     pid = roster["F1"]
     with sqlite3.connect(store.path) as db:
-        db.execute("UPDATE unified_links SET arm='Z' WHERE admission_pid=?",
-                   (pid,))
-    with pytest.raises(FictionalAuditError):
-        audit_fictional_browser(store.path)
-    with sqlite3.connect(store.path) as db:
         true_arm = db.execute(
             "SELECT arm FROM admission_slots WHERE pid=?", (pid,),
         ).fetchone()[0]
+        wrong_arm = next(a for a in "ABC" if a != true_arm)
+        db.execute("UPDATE unified_links SET arm=? WHERE admission_pid=?",
+                   (wrong_arm, pid))
+    with pytest.raises(FictionalAuditError):
+        audit_fictional_browser(store.path)
+    with sqlite3.connect(store.path) as db:
         db.execute("UPDATE unified_links SET arm=? WHERE admission_pid=?",
                    (true_arm, pid))
         db.execute("UPDATE admission_events SET kind='fabricated' WHERE seq=1")
