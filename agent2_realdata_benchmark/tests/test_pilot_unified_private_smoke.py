@@ -43,7 +43,6 @@ def test_real_loopback_http_synthetic_status_and_guard_acceptance(tmp_path):
         assert not result["human_enrollment_authorized"]
         assert not result["external_https_test"]
         assert not result["production_security_certification"]
-        assert study.audit(bytes([0]) * 32) if False else True
     finally:
         server.shutdown()
         worker.join(timeout=5)
