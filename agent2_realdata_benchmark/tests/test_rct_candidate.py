@@ -58,6 +58,26 @@ def test_draft_cannot_start_live(tmp_path, bundle):
     assert not (tmp_path / "live.db").exists()
 
 
+def test_fabricated_complete_evidence_never_opens_legacy_live_mode(
+    tmp_path, bundle, monkeypatch,
+):
+    """A mechanical evidence index is not independent institutional signing."""
+    import src.prototype.rct_candidate as candidate_module
+
+    def unverified_inventory(*args, **kwargs):
+        return {
+            "candidate_sha256": "f" * 64,
+            "blockers": [],
+            "mechanical_gate_passed": True,
+        }
+
+    monkeypatch.setattr(candidate_module, "release_report", unverified_inventory)
+    target = tmp_path / "forged_live.db"
+    with pytest.raises(ProtocolError, match="Live enrollment blocked"):
+        candidate_module.RCTCandidateEngine(target, bundle, mode="live")
+    assert not target.exists()
+
+
 def test_missing_evidence_never_becomes_approval(bundle):
     report = release_report(bundle, policy_record())
     assert not report["mechanical_gate_passed"]
