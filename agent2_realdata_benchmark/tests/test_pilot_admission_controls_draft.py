@@ -5,7 +5,9 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import secrets
+import shutil
 import sqlite3
+import stat
 
 import pytest
 
@@ -291,6 +293,35 @@ def test_invitation_expiry_blocks_late_consent(tmp_path):
         store.consent(person["private_invitation"],
                       agreed=True, information_sha256=CONSENT_HASH)
     assert store.audit(auditor)["allocated"] == 0
+
+
+def test_restricted_synthetic_backup_and_restore(tmp_path):
+    store, _, operator, auditor, params = setup(tmp_path)
+    activated(store, operator)
+    destination = tmp_path / "fictional_admission_backup.sqlite3"
+    with pytest.raises(AdmissionDenied):
+        store.backup(operator, destination)
+    assert not destination.exists()
+    report = store.backup(auditor, destination)
+    assert report["result"] == "PASS_SYNTHETIC_BACKUP_ONLY"
+    assert report["sqlite_integrity"] == "ok"
+    assert not report["human_enrollment_authorized"]
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o600
+    with sqlite3.connect(destination) as db:
+        assert db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert db.execute("SELECT COUNT(*) FROM admission_people").fetchone()[0] == 1
+
+    # Never overwrite a pre-existing backup, even when called repeatedly.
+    with pytest.raises(AdmissionDenied):
+        store.backup(auditor, destination)
+
+    isolated = tmp_path / "restored"
+    isolated.mkdir()
+    recovered = isolated / "fictional_admission.sqlite3"
+    shutil.copyfile(destination, recovered)
+    restored = SyntheticAdmissionStore(recovered, **params)
+    assert restored.audit(auditor)["allocated"] == 1
+    assert restored.audit(auditor)["result"] == "PASS_SYNTHETIC_ONLY"
 
 
 def test_not_mounted_in_any_public_http_app():
