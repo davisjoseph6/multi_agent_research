@@ -43,6 +43,11 @@ implements a small, persistent security-contract rehearsal:
   full database write permission.**
 - The audit gives only aggregates and integrity findings, not identity,
   bearer tokens, item answers, or individual treatment assignments.
+- A restricted synthetic-only SQLite backup method requires the auditor
+  fixture capability, refuses an existing output, creates an owner-only
+  backup file, verifies SQLite integrity and the pinned configuration,
+  and permits a separate restored fixture to be re-audited. This is NOT
+  an offsite encrypted backup, real retention solution or DR certification.
 
 The entire module is **not imported by either Flask application**.
 All methods and output schemas explicitly identify their synthetic scope.
@@ -62,7 +67,8 @@ python -m pytest -q \
 The tests cover concurrent synthetic allocations, partial/complete blocks,
 unknown/expired invitations, missing or mismatched consent, ineligible
 records, role separation, visit timing/ordering, withdrawal, immutable
-configuration, database restart, and event-chain tampering. A separate
+configuration, database restart, backup/restore, forged state
+transitions, and event-chain tampering. A separate
 regression test mocks a completely positive local evidence inventory and
 requires the **legacy** `mode="live"` constructor to refuse startup anyway.
 
