@@ -16,10 +16,11 @@ Example, from the benchmark directory on a verified operator-demo VPS:
     --expected-host demo.selfhealing-edu.fr \
     --out /var/lib/ijcai-rct-demo/demo_arm_tokens_PRIVATE_001.json
 
-Nine fictional participants are enrolled atomically so random-block
-assignment naturally provides all arms. Three invitations (one per arm)
-are selected for the demonstration; the other six are preserved only in
-the private output as unused reserve credentials. The file is owner-only.
+Nine fictional records are allocated atomically so random-block
+assignment naturally provides all arms. Exactly three invitations (one
+per arm) are kept active for the demonstration; the other six are
+immediately marked withdrawn in the same transaction, with no unused
+bearer tokens retained. The file is owner-only.
 No credentials are displayed in logs, terminals, URLs, GitHub or chat.
 """
 from __future__ import annotations
@@ -156,10 +157,24 @@ def issue_fresh_demo_arm_tokens(
                     record for record in records if record["arm"] == arm
                 ) for arm in "ABC"}
                 chosen_ids = {record["participant_id"] for record in chosen.values()}
+                # Only three new credentials should remain usable. Keep
+                # the full randomized allocation ledger, but immediately
+                # deactivate the six fictional non-selected records within
+                # the SAME transaction. No additional bearer tokens escape.
                 reserve = [
                     record for record in records
                     if record["participant_id"] not in chosen_ids
                 ]
+                for discarded in reserve:
+                    conn.execute(
+                        "UPDATE rct_people SET status='withdrawn' "
+                        "WHERE pid=? AND status='active'",
+                        (discarded["participant_id"],),
+                    )
+                    engine._event(
+                        conn, discarded["participant_id"],
+                        "participation_stopped",
+                    )
                 json.dump({
                     "purpose": "PRIVATE_FICTIONAL_OPERATOR_DEMO_NEW_ARM_TOKENS",
                     "host": expected_host,
@@ -169,7 +184,7 @@ def issue_fresh_demo_arm_tokens(
                     "lifetime_hours": lifetime_hours,
                     "candidate_sha256": engine.release["candidate_sha256"],
                     "tokens_by_arm": chosen,
-                    "reserve_fictional_invitations": reserve,
+                    "inactive_unused_fictional_records": len(reserve),
                 }, private, indent=2)
                 private.write("\n")
                 private.flush()
@@ -190,6 +205,8 @@ def issue_fresh_demo_arm_tokens(
         "result": "NEW_FICTIONAL_ARM_TOKENS_REGISTERED",
         "host": expected_host,
         "created_fictional_records": 9,
+        "new_usable_tokens": 3,
+        "new_unused_records_deactivated": 6,
         "new_arm_counts": {arm: counts[arm] for arm in "ABC"},
         "selected_demo_arms": ["A", "B", "C"],
         "private_file": str(output),
