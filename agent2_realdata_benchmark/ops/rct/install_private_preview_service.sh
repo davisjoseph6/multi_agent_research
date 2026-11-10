@@ -15,13 +15,10 @@ fi
 
 BENCHMARK="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 SNAPSHOT="$(cd -- "$BENCHMARK/.." && pwd -P)"
-case "$SNAPSHOT" in
-  /home/davis/ijcai_preview_*) ;;
-  *)
-    echo "Refusing unexpected preview snapshot location: $SNAPSHOT" >&2
-    exit 2
-    ;;
-esac
+if [[ ! "$SNAPSHOT" =~ ^/home/davis/ijcai_preview_[a-zA-Z0-9_-]+$ ]]; then
+  echo "Refusing unexpected preview snapshot location: $SNAPSHOT" >&2
+  exit 2
+fi
 for required in \
   "$BENCHMARK/scripts/pilot_local_browser_preview.py" \
   "$BENCHMARK/scripts/pilot_private_vps_smoke.py" \
@@ -40,8 +37,8 @@ if [[ ! -x "$PY" && -z "${IJCAI_PREVIEW_PY:-}" &&
       -x /home/davis/ijcai_preview_5c6bb17/.venv/bin/python ]]; then
   PY=/home/davis/ijcai_preview_5c6bb17/.venv/bin/python
 fi
-if [[ ! -x "$PY" ]]; then
-  echo "No usable virtualenv Python: set IJCAI_PREVIEW_PY explicitly." >&2
+if [[ ! "$PY" =~ ^/[a-zA-Z0-9_./-]+$ || ! -x "$PY" ]]; then
+  echo "No safe executable virtualenv Python: set IJCAI_PREVIEW_PY explicitly." >&2
   exit 2
 fi
 cd "$BENCHMARK"
@@ -116,6 +113,13 @@ if ! sudo systemctl is-active --quiet "$UNIT"; then
   echo "Service did not start; inspect journalctl before retrying." >&2
   exit 2
 fi
+# A running systemd unit may need a moment to acquire the private listener.
+for attempt in 1 2 3 4 5; do
+  if ss -ltn '( sport = :8766 )' | awk 'NR > 1 { found=1 } END {exit !found}'; then
+    break
+  fi
+  sleep 1
+done
 
 # Same isolated, fail-closed loopback-only HTTP acceptance as CI.
 cd "$BENCHMARK"
