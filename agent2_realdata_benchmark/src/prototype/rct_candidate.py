@@ -74,8 +74,18 @@ one transaction. A completed submission cannot be applied to a later action.
             if not hosts or any(host in ("localhost", "127.0.0.1", "::1") or
                                 host.endswith(".invalid") for host in hosts):
                 raise ValueError("operator demo requires actual non-local approved hostname")
-        if mode == "live" and not self.release["mechanical_gate_passed"]:
-            raise ProtocolError("Live enrollment blocked: " + "; ".join(self.release["blockers"]))
+        if mode == "live":
+            # Evidence-file hashes are only a document inventory. A reviewer
+            # name inside editable JSON is not an authenticated institutional
+            # signature. The older candidate also lacks the approved human
+            # screening, staff/session authorization and governance controls.
+            # Always fail closed here, even if someone fabricates a complete
+            # locally indexed evidence file. A separate independently
+            # authorized human-study implementation is required.
+            raise ProtocolError(
+                "Live enrollment blocked: this legacy candidate cannot "
+                "authenticate institutional signoff or supervise human visits"
+            )
         self.mode = mode
         self.path = Path(database)
         self.bank = {q.item_id: q for q in bundle.items}
