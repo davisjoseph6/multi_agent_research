@@ -30,6 +30,8 @@ def test_accepts_valid_single_sqlite_fictional_report():
     {"staff_authentication_real": True},
     {"independent_security_review": True},
     {"data_deleted_on_exit": False},
+    {"unified_backup_restore": "FAIL"},
+    {"offsite_encrypted_recovery_verified": True},
     {"no_network_requests": False},
     {"fictional_completed_visits": 89},
     {"fictional_questions": 2609},
