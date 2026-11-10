@@ -42,7 +42,7 @@ def ensure_unified_fictional_roster(
     study: UnifiedSyntheticStudyStore, operator_key: bytes,
     *, screening_version: str, information_sha256: str,
 ) -> dict[str, str]:
-    """Seed exactly three randomly allocated fixture records, once only.
+    """Seed nine randomly allocated fictional records and display three, once only.
 
     An interrupted partial seed is rejected rather than silently rebuilt;
     use a separate new fictional database to restart a failed setup.
@@ -65,7 +65,11 @@ def ensure_unified_fictional_roster(
             "SELECT COUNT(*) FROM pilot_people"
         ).fetchone()[0]
     if not rows and not admissions and not learners:
-        for fixture in FIXTURE_IDS:
+        # Generate one complete nine-record fictional cohort so the selected
+        # demo trio contains one assignment for each treatment. Alias order
+        # is randomized; the browser never sees this private mapping.
+        selected_by_arm: dict[str, str] = {}
+        for _ in range(9):
             invitation = study.issue_invitation(operator_key)
             pid = invitation["synthetic_pid"]
             study.screen(
@@ -78,6 +82,13 @@ def ensure_unified_fictional_roster(
             )
             if not result["created"]:
                 raise UnifiedSyntheticError("fictional consent did not create learner")
+            _learner, arm = study.operator_lookup(operator_key, pid)
+            selected_by_arm.setdefault(arm, pid)
+        if set(selected_by_arm) != {"A", "B", "C"}:
+            raise UnifiedSyntheticError("fictional randomized cohort lacks a policy arm")
+        display_pids = list(selected_by_arm.values())
+        secrets.SystemRandom().shuffle(display_pids)
+        for fixture, pid in zip(FIXTURE_IDS, display_pids):
             with study.admission._transaction() as db:
                 db.execute(
                     "INSERT INTO unified_demo_roster(fixture,admission_pid)"
@@ -95,12 +106,12 @@ def ensure_unified_fictional_roster(
             learners = db.execute(
                 "SELECT COUNT(*) FROM pilot_people"
             ).fetchone()[0]
-    if (len(rows) != 3 or admissions != 3 or learners != 3
+    if (len(rows) != 3 or admissions != 9 or learners != 9
             or tuple(row["fixture"] for row in rows) != FIXTURE_IDS
             or any(not row["admission_pid"].startswith("SYN_ADMISSION_")
                    for row in rows)):
         raise UnifiedSyntheticError(
-            "expected exactly three already-consented fictional records; "
+            "expected a nine-record cohort and three displayed fictional records; "
             "refusing partial/external data"
         )
     for row in rows:
