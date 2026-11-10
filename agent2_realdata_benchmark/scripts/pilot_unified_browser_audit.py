@@ -56,11 +56,17 @@ def _read_config(db) -> None:
         uc = json.loads(unified["value"])
     except (TypeError, ValueError) as exc:
         raise FictionalAuditError("invalid fictional configuration JSON") from exc
+    bank_prefix = "SYNTHETIC_ONLY_PILOT_FLOW_V1_NOT_APPROVED_95_ITEM_BANK_"
+    bank_version = pilot["version"]
     if (ac.get("schema") != "IJCAI2027_SYNTHETIC_ADMISSION_V1"
             or ac.get("synthetic_only") is not True
             or uc.get("version") != "SYNTHETIC_UNIFIED_SQLITE_V1_NOT_APPROVED"
-            or pilot["version"] != "SYNTHETIC_ONLY_PILOT_FLOW_V1_NOT_APPROVED"):
-        raise FictionalAuditError("not an approved synthetic schema for this read-only audit")
+            or type(bank_version) is not str
+            or not bank_version.startswith(bank_prefix)
+            or len(bank_version[len(bank_prefix):]) != 64
+            or any(c not in "0123456789abcdef"
+                   for c in bank_version[len(bank_prefix):])):
+        raise FictionalAuditError("not a recognized synthetic bank-bound schema")
 
 
 def _event_integrity(db) -> int:
