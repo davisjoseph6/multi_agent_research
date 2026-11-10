@@ -16,6 +16,7 @@ from datetime import timedelta
 import json
 from pathlib import Path
 import secrets
+import shutil
 from tempfile import TemporaryDirectory
 import uuid
 
@@ -126,6 +127,23 @@ def run_unified(*, participants: int = 9, simulations: int = 41) -> dict:
         report = study.audit(auditor)
         if report["result"] != "PASS_SYNTHETIC_ONLY":
             raise AssertionError("single-file synthetic final audit failed")
+
+        # A complete SQLite backup must preserve both admission + learner
+        # schemas and links. Restore in a *different* temporary directory.
+        # This tests local integrity, NOT encrypted/offsite DR arrangements.
+        backup_path = Path(directory) / "fictional_admission_backup.sqlite3"
+        backup = study.admission.backup(auditor, backup_path)
+        restored_root = Path(directory) / "restored"
+        restored_root.mkdir()
+        restored_path = restored_root / "fictional_admission.sqlite3"
+        shutil.copyfile(backup_path, restored_path)
+        recovered = UnifiedSyntheticStudyStore(restored_path, **config)
+        restored_report = recovered.audit(auditor)
+        if (backup["result"] != "PASS_SYNTHETIC_BACKUP_ONLY"
+                or restored_report["result"] != "PASS_SYNTHETIC_ONLY"
+                or restored_report["fictional_learning_links"] != participants
+                or restored_report["sqlite_integrity"] != "ok"):
+            raise AssertionError("unified fictional backup/restore reconciliation failed")
         return {
             "kind": "DISPOSABLE_SINGLE_SQLITE_SYNTHETIC_RCT",
             "result": "PASS_SYNTHETIC_ONLY",
@@ -140,6 +158,8 @@ def run_unified(*, participants: int = 9, simulations: int = 41) -> dict:
             "single_sqlite_file": True,
             "atomic_provisioning_and_visit_boundaries": True,
             "crash_restart_reopen_checks": 3,
+            "unified_backup_restore": "PASS_SYNTHETIC_ONLY",
+            "offsite_encrypted_recovery_verified": False,
             "data_deleted_on_exit": True,
             "no_network_requests": True,
             "human_enrollment_authorized": False,
