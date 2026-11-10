@@ -125,10 +125,16 @@ def test_three_blinded_server_allocations_and_browser_assets(tmp_path):
     assert "default-src 'none'" in page.headers["Content-Security-Policy"]
     assert client.get("/unified.js", base_url=BASE).status_code == 200
     assert client.get("/unified.css", base_url=BASE).status_code == 200
+    displayed_arms = set()
     for pid in roster.values():
         learner, arm = store.operator_lookup(operator, pid)
         assert learner.startswith("SYN_PILOT_")
         assert arm in "ABC"
+        displayed_arms.add(arm)
+    assert displayed_arms == {"A", "B", "C"}
+    with store.admission._transaction() as db:
+        assert db.execute("SELECT COUNT(*) FROM admission_people").fetchone()[0] == 9
+        assert db.execute("SELECT COUNT(*) FROM unified_demo_roster").fetchone()[0] == 3
 
 
 def test_unguarded_and_public_enrollment_routes_fail_closed(tmp_path):
