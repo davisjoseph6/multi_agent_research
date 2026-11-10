@@ -232,6 +232,41 @@ def test_atomic_withdrawal_prior_to_consent_leaves_no_learning_record(tmp_path):
     assert store.audit(auditor)["result"] == "PASS_SYNTHETIC_ONLY"
 
 
+def test_unified_audit_fails_on_tampered_internal_arm(tmp_path):
+    store, _, operator, auditor, _ = setup(tmp_path)
+    invite = screened(store, operator)
+    store.consent_and_create(
+        invite["private_invitation"], agreed=True,
+        information_sha256=HASH,
+    )
+    learner, arm = store.operator_lookup(operator, invite["synthetic_pid"])
+    assert store.audit(auditor)["result"] == "PASS_SYNTHETIC_ONLY"
+    with sqlite3.connect(store.path) as db:
+        policy = db.execute(
+            "SELECT policy FROM pilot_three_arm_people WHERE pid=?",
+            (learner,),
+        ).fetchone()[0]
+        import json
+        decoded = json.loads(policy)
+        decoded["arm"] = next(a for a in "ABC" if a != arm)
+        db.execute(
+            "UPDATE pilot_three_arm_people SET policy=? WHERE pid=?",
+            (json.dumps(decoded, sort_keys=True), learner),
+        )
+    broken = store.audit(auditor)
+    assert broken["result"] == "FAIL_SYNTHETIC"
+    assert "inconsistent concealed arm or learning link" in broken["issues"]
+
+
+def test_unified_audit_rejects_mutated_configuration(tmp_path):
+    store, _, operator, auditor, _ = setup(tmp_path)
+    with sqlite3.connect(store.path) as db:
+        db.execute("UPDATE unified_config SET value='fabricated' WHERE id=1")
+    broken = store.audit(auditor)
+    assert broken["result"] == "FAIL_SYNTHETIC"
+    assert "synthetic unified configuration mismatch" in broken["issues"]
+
+
 def test_rejects_unreviewed_human_database_and_policy_mismatch(tmp_path):
     store, _, operator, auditor, params = setup(tmp_path)
     with pytest.raises(AdmissionDenied):
