@@ -170,6 +170,16 @@ def _audit_snapshot(db) -> dict:
                 raise FictionalAuditError("fictional attendance start mismatch")
             if visit["finished_at"] is not None:
                 _check_time(visit["finished_at"])
+                if (index >= len(finished)
+                        or datetime.fromisoformat(visit["finished_at"])
+                           < datetime.fromisoformat(finished[index])):
+                    # Older fictional browser code incorrectly reused the
+                    # cumulative action count as a per-visit time offset.
+                    # Never silently certify such a chronological violation
+                    # or rewrite its historical event chain.
+                    raise FictionalAuditError(
+                        "fictional attendance predates learning completion"
+                    )
                 attendance_done += 1
         if (attendance_done > len(finished)
                 or (len(finished) == session and attendance_done < session - 1)):
