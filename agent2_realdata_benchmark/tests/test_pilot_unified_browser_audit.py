@@ -133,6 +133,31 @@ def test_audit_tracks_one_completed_and_then_all_completed(tmp_path):
     assert store.audit(auditor)["result"] == "PASS_SYNTHETIC_ONLY"
 
 
+def test_audit_rejects_historical_early_final_attendance(tmp_path):
+    store, roster, operator, auditor, clock = setup_cohort(tmp_path)
+    finish_one(store, roster, operator, clock, "F1")
+    pid = roster["F1"]
+    with sqlite3.connect(store.path) as db:
+        learning = db.execute(
+            "SELECT learning_pid FROM unified_links WHERE admission_pid=?",
+            (pid,),
+        ).fetchone()[0]
+        state = json.loads(db.execute(
+            "SELECT state FROM pilot_people WHERE pid=?", (learning,),
+        ).fetchone()[0])
+        learning_finished = state["visit_finished_at"][2]
+        db.execute(
+            "UPDATE admission_visits SET finished_at=? "
+            "WHERE pid=? AND visit=3",
+            ("2026-11-28T10:10:00+00:00", pid),
+        )
+    assert learning_finished > "2026-11-28T10:10:00+00:00" or (
+        learning_finished != "2026-11-28T10:10:00+00:00"
+    )
+    with pytest.raises(FictionalAuditError, match="predates learning"):
+        audit_fictional_browser(store.path)
+
+
 def test_audit_rejects_foreign_and_missing_database(tmp_path):
     with pytest.raises(FictionalAuditError):
         audit_fictional_browser(tmp_path / "human_study.sqlite3")
