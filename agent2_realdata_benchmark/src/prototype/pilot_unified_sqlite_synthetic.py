@@ -12,7 +12,7 @@ not a production study implementation or institutionally authorized release.
 """
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
@@ -287,6 +287,47 @@ class UnifiedSyntheticStudyStore:
         return {"accepted": True, "visit": visit,
                 "synthetic_only": True, "human_enrollment_authorized": False}
 
+    def withdraw(self, invitation: str) -> dict:
+        """Atomically stop fictional admission and invalidate learning stage.
+
+        This is a synthetic-only tombstone, NOT a real GDPR deletion or
+        institutional withdrawal workflow. Pending actions are retained for
+        a fictional audit, but can no longer be submitted as live actions.
+        """
+        now = self.admission._now()
+        with self.admission._transaction() as db:
+            person = self.admission._person(
+                db, invitation, allow_withdrawn=True,
+            )
+            if person["status"] == "withdrawn":
+                return {"stopped": True, "changed": False,
+                        "synthetic_only": True, "human_enrollment_authorized": False}
+            link = db.execute(
+                "SELECT learning_pid FROM unified_links WHERE admission_pid=?",
+                (person["pid"],),
+            ).fetchone()
+            if person["status"] == "active" and link is None:
+                raise UnifiedSyntheticError("active fictional participant lacks learner")
+            if link:
+                state = self.learning._load(db, link["learning_pid"])
+                if state.last_event_at is not None and now < state.last_event_at:
+                    raise UnifiedSyntheticError("fictional withdrawal clock precedes learning")
+                updated = replace(state, stage="withdrawn", last_event_at=now)
+                self.learning._save(db, link["learning_pid"], updated)
+                self.learning._event(
+                    db, link["learning_pid"], now,
+                    "synthetic_learning_withdrawn",
+                )
+            db.execute(
+                "UPDATE admission_people SET status='withdrawn' WHERE pid=?",
+                (person["pid"],),
+            )
+            self.admission._event(
+                db, person["pid"], now, "fixture_withdrawn", {},
+            )
+        return {"stopped": True, "changed": True,
+                "synthetic_only": True, "human_enrollment_authorized": False}
+
     def audit(self, auditor_key: bytes) -> dict:
         """Aggregate cross-subsystem audit; retains independent chain checks."""
         self.admission._require(auditor_key, "auditor")
@@ -294,6 +335,11 @@ class UnifiedSyntheticStudyStore:
         with self.admission._transaction() as db:
             active = db.execute(
                 "SELECT COUNT(*) FROM admission_people WHERE status='active'"
+            ).fetchone()[0]
+            withdrawn_linked = db.execute(
+                "SELECT COUNT(*) FROM admission_people AS p "
+                "JOIN unified_links AS l ON l.admission_pid=p.pid "
+                "WHERE p.status='withdrawn'"
             ).fetchone()[0]
             links = db.execute(
                 "SELECT l.admission_pid,l.learning_pid,l.arm,s.arm AS assigned "
@@ -303,6 +349,12 @@ class UnifiedSyntheticStudyStore:
             all_links = db.execute("SELECT COUNT(*) FROM unified_links").fetchone()[0]
             learners = db.execute("SELECT COUNT(*) FROM pilot_people").fetchone()[0]
             for link in links:
+                person = db.execute(
+                    "SELECT status FROM admission_people WHERE pid=?",
+                    (link["admission_pid"],),
+                ).fetchone()
+                if person is None or person["status"] not in ("active", "withdrawn"):
+                    issues.append("unified link to nonconsenting or unknown record")
                 policy = db.execute(
                     "SELECT arm FROM pilot_three_arm_people WHERE pid=?",
                     (link["learning_pid"],),
@@ -316,12 +368,19 @@ class UnifiedSyntheticStudyStore:
                     (link["admission_pid"],),
                 ).fetchall()
                 state = self.learning._load(db, link["learning_pid"])
+                if (person is not None and person["status"] == "withdrawn"
+                        and state.stage != "withdrawn"):
+                    issues.append("withdrawn fictional learner still active")
+                if (person is not None and person["status"] == "active"
+                        and state.stage == "withdrawn"):
+                    issues.append("active admission paired to withdrawn learner")
                 if len(attendance) != len(state.visit_started_at):
                     issues.append("admission-learning visit start mismatch")
                 if sum(x["finished_at"] is not None for x in attendance) != len(state.visit_finished_at):
                     issues.append("admission-learning visit completion mismatch")
-            if all_links != len(links) or all_links != learners or active != all_links:
-                issues.append("orphan, missing or inactive unified learning link")
+            if (all_links != len(links) or all_links != learners
+                    or active + withdrawn_linked != all_links):
+                issues.append("orphan, missing or inconsistent unified learning link")
         admission_audit = self.admission.audit(auditor_key)
         if admission_audit["result"] != "PASS_SYNTHETIC_ONLY":
             issues.append("independent admission audit failed")
