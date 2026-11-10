@@ -64,6 +64,20 @@ python -m pytest -q \
   tests/test_rct_candidate.py
 ```
 
+An additional disposable, no-network rehearsal exercises this complete
+offline fixture-control path and independent backup/restore for 30 fictional
+records (or another explicitly selected count, 3–90):
+
+```bash
+python -m scripts.pilot_admission_offline_rehearsal --participants 30
+```
+
+This is deliberately distinct from the quiz HTTP full-journey test:
+it does not deliver any question, fatigue instrument or intervention, and
+its three "visits" are staff fixture events only. The report contains
+aggregate counts, not participants, invitations, or assigned arms. The
+runner does not take an external host or database path.
+
 The tests cover concurrent synthetic allocations, partial/complete blocks,
 unknown/expired invitations, missing or mismatched consent, ineligible
 records, role separation, visit timing/ordering, withdrawal, immutable
