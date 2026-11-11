@@ -85,6 +85,10 @@ on a new, **empty**, fictional SQLite database:
 - Text-only completion/acknowledgment does **not** establish restored
   mastery. For the two-answer retry, scored correctness is observable,
   but eliminating the known incorrect option inflates apparent success.
+  Therefore the experimental V2 **does not update BKT from DROP_2**
+  and excludes those instructional retries from the live BKT plot.
+  It waits for a later independent practice question to provide
+  mastery evidence. This differs from the legacy observation model.
 
 The actual user study must settle a prespecified target, treatment
 dose, fatigue and time-equivalence conditions, and a justified
