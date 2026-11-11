@@ -23,6 +23,7 @@ from .research_v2_proposal import EMAIL_TEMPLATES, ProposedStudyError, utc
 FIRST_AFTER = timedelta(days=3)
 FOLLOWUP_AFTER_SEND = timedelta(days=3)
 PAUSE_DEADLINE = timedelta(days=14)
+CLAIM_LEASE = timedelta(minutes=30)
 
 
 def _stamp(when: datetime) -> str:
@@ -65,10 +66,20 @@ class SyntheticReminderOutbox:
                     episode INTEGER NOT NULL,
                     reminder INTEGER NOT NULL CHECK(reminder IN (1,2)),
                     reserved_at TEXT NOT NULL,
+                    last_claimed_at TEXT NOT NULL,
+                    attempts INTEGER NOT NULL DEFAULT 1 CHECK(attempts >= 1),
                     delivered_at TEXT,
                     UNIQUE(ref,episode,reminder)
                 );
             """)
+            columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(outbox)")
+            }
+            if not {"last_claimed_at", "attempts"}.issubset(columns):
+                raise ProposedStudyError(
+                    "old fictional contact schema cannot be upgraded in place; "
+                    "create an isolated fresh test database"
+                )
         os.chmod(self.path, 0o600)
 
     @contextmanager
@@ -174,7 +185,10 @@ class SyntheticReminderOutbox:
     def reserve_due(self, at: datetime) -> tuple[int, ...]:
         """Reserve at most one message per episode per invocation, atomically.
 
-        Returns opaque queue IDs, never contact details. Re-running is safe.
+        Returns opaque queue IDs, never contact details. Crashed claims
+        become available for a re-attempt after a 30-minute lease. The same
+        queue ID must be used as an idempotency key at an actual provider.
+        A generic SMTP connection cannot guarantee exactly-once delivery.
         """
         now = utc(at)
         reserved = []
@@ -193,14 +207,30 @@ class SyntheticReminderOutbox:
                 if number is None:
                     continue
                 exists = db.execute(
-                    "SELECT 1 FROM outbox WHERE ref=? AND episode=? AND reminder=?",
+                    "SELECT id,delivered_at,last_claimed_at FROM outbox "
+                    "WHERE ref=? AND episode=? AND reminder=?",
                     (row["ref"], row["pause_episode"], number),
                 ).fetchone()
                 if exists:
+                    if exists["delivered_at"] is not None:
+                        continue
+                    claimed_at = _time(exists["last_claimed_at"])
+                    if now < claimed_at:
+                        raise ProposedStudyError("claim clock moved backward")
+                    if now - claimed_at < CLAIM_LEASE:
+                        continue
+                    db.execute(
+                        "UPDATE outbox SET last_claimed_at=?,attempts=attempts+1 "
+                        "WHERE id=?",
+                        (_stamp(now), exists["id"]),
+                    )
+                    reserved.append(exists["id"])
                     continue
                 cur = db.execute(
-                    "INSERT INTO outbox(ref,episode,reminder,reserved_at) VALUES(?,?,?,?)",
-                    (row["ref"], row["pause_episode"], number, _stamp(now)),
+                    "INSERT INTO outbox(ref,episode,reminder,reserved_at,"
+                    "last_claimed_at) VALUES(?,?,?,?,?)",
+                    (row["ref"], row["pause_episode"], number,
+                     _stamp(now), _stamp(now)),
                 )
                 reserved.append(cur.lastrowid)
         return tuple(reserved)
