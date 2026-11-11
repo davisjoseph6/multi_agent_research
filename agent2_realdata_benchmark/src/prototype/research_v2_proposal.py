@@ -202,6 +202,9 @@ class CrossoverProgress:
     finished_periods: set[str] = field(default_factory=set)
     exposed_assessment_practice_ids: set[str] = field(default_factory=set)
     seen_in_current_period: set[str] = field(default_factory=set)
+    form_counts_current_period: dict[str, int] = field(default_factory=lambda: {
+        form: 0 for form in QUESTIONS_PER_ARM
+    })
     active_token_hash: str | None = None
     token_expires_at: datetime | None = None
 
@@ -235,6 +238,7 @@ class CrossoverProgress:
         )
 
     def record_question(self, item_id: str, *, kind: str = "QUESTION",
+                        form: str = "practice",
                         immediately_previous_wrong_id: str | None = None) -> None:
         if self.active_token_hash is None:
             raise ProposedStudyError("period not opened")
@@ -245,21 +249,32 @@ class CrossoverProgress:
                     or item_id not in self.seen_in_current_period):
                 raise ProposedStudyError("DROP_2 retry must target current arm's last wrong item")
             return
-        if kind != "QUESTION" or not item_id or item_id in self.exposed_assessment_practice_ids:
+        if (kind != "QUESTION" or not item_id
+                or item_id in self.exposed_assessment_practice_ids):
             raise ProposedStudyError("normal question cannot repeat in any period")
+        if form not in QUESTIONS_PER_ARM:
+            raise ProposedStudyError("question has unknown independent form")
+        if self.form_counts_current_period[form] >= QUESTIONS_PER_ARM[form]:
+            raise ProposedStudyError("period form budget exhausted")
         self.exposed_assessment_practice_ids.add(item_id)
         self.seen_in_current_period.add(item_id)
+        self.form_counts_current_period[form] += 1
 
     def complete_period(self, *, observed_unique_forms: Mapping[str, int]) -> None:
         if self.active_token_hash is None or self.current_arm is None:
             raise ProposedStudyError("period not open")
-        if dict(observed_unique_forms) != QUESTIONS_PER_ARM:
+        if (dict(observed_unique_forms) != QUESTIONS_PER_ARM
+                or self.form_counts_current_period != QUESTIONS_PER_ARM
+                or len(self.seen_in_current_period) != 87):
             raise ProposedStudyError("all independent pretest/practice/posttest items required")
         self.finished_periods.add(self.current_arm)
         self.current_period += 1
         self.active_token_hash = None
         self.token_expires_at = None
         self.seen_in_current_period.clear()
+        self.form_counts_current_period = {
+            form: 0 for form in QUESTIONS_PER_ARM
+        }
 
 
 @dataclass
