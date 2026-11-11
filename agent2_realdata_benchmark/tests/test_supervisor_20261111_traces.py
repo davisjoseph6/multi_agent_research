@@ -198,3 +198,49 @@ def test_no_additional_recovery_outside_arm_a():
             engine.submit("wrong")
         assert engine.pending == []
         assert engine.attempts_session == 0
+
+
+
+def test_json_snapshot_resume_preserves_pending_recovery_and_session_peak():
+    import json
+    initial = dict(zip(CONCEPT_IDS, INITIAL_MASTERY[2]))
+    engine = SupervisorTraceEngine("A", initial)
+    # Case 2's first period has an L1 promotion and a later decline.
+    for i, response in enumerate(("correct", "correct", "correct", "correct",
+                                   "correct", "correct", "correct", "correct",
+                                   "correct", "correct")):
+        engine.submit(response)
+    snap = json.loads(json.dumps(engine.snapshot()))
+    resumed = SupervisorTraceEngine.restore(snap)
+    assert resumed.snapshot() == engine.snapshot()
+    assert resumed.next_action() == engine.next_action()
+    # Complete case 2's actual 59-step oracle, checkpointing after every step.
+    oracle = [x for x in rows() if x["case"] == "2"]
+    engine = SupervisorTraceEngine("A", dict(zip(CONCEPT_IDS, INITIAL_MASTERY[2])))
+    for row in oracle:
+        if int(row["session"]) != engine.session:
+            engine.new_session(int(row["session"]))
+        expected = engine.next_action()
+        assert expected["qid"] == row["qid"]
+        engine.submit(row["answer"])
+        engine = SupervisorTraceEngine.restore(
+            json.loads(json.dumps(engine.snapshot())))
+    assert engine.session == 3 and engine.question_in_session == 15
+
+
+def test_recovery_resumes_at_exact_four_step_position_after_restart():
+    import json
+    p = SupervisorTraceEngine("A", dict(zip(CONCEPT_IDS, INITIAL_MASTERY[3])))
+    for answer in ("wrong","wrong","wrong"):
+        p.submit(answer)
+    assert p.next_action()["action"] == "CONCEPT_SUMMARY"
+    p.submit("")
+    saved = json.loads(json.dumps(p.snapshot()))
+    restored = SupervisorTraceEngine.restore(saved)
+    assert restored.next_action()["action"] == "DROP_2"
+    assert restored.next_action()["qid"] == "QZ_C1_L1_04"
+    restored.submit("wrong")
+    assert restored.next_action()["action"] == "WORKED_EXAMPLE"
+    restored.submit("")
+    restored.submit("wrong")
+    assert restored.next_action()["qid"] == "QZ_C1_L1_05"
