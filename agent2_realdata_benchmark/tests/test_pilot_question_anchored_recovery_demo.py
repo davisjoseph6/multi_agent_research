@@ -140,6 +140,45 @@ def test_recovery_cannot_be_offered_without_a_recorded_wrong_answer(tmp_path, mo
         store.next_action(pid, at=at)
 
 
+def test_latest_wrong_question_replaces_earlier_error_anchor(tmp_path, monkeypatch):
+    store = _build(tmp_path)
+    pid, at, first, wrong1 = _arrive_at_one_incorrect_practice(store)
+    second = next(
+        q for q in store.policy_bank.by_id.values()
+        if q.form == "practice" and q.concept != first.concept
+    )
+    wrong2 = next(x for x, _ in second.options if x != second.answer_id)
+
+    def followup(state):
+        if state["index"] == 1:
+            return {
+                "action": "QUESTION", "concept": second.concept,
+                "item_id": second.item_id,
+            }
+        assert state["index"] == 2
+        assert state["last_incorrect_concept"] == second.concept
+        return {
+            "action": "SOCRATIC_HINT", "concept": second.concept,
+            "item_id": None,
+        }
+
+    monkeypatch.setattr(store.selector, "_candidate", followup)
+    second_question = store.next_action(pid, at=at)
+    assert second_question["question"]["item_id"] == second.item_id
+    assert _submit(
+        store, pid, second_question, {"choice_id": wrong2}, at,
+    )["correct"] is False
+    at += timedelta(seconds=1)
+    targeted = store.next_action(pid, at=at)
+    assert targeted["action"] == "SOCRATIC_HINT"
+    anchor = targeted["resource"]["question_anchor"]
+    assert anchor["target_item_id"] == second.item_id
+    assert anchor["target_item_id"] != first.item_id
+    assert anchor["prior_selected_option"]["id"] == wrong2
+    assert anchor["target_question"] == second.prompt
+    assert store.snapshot(pid)["unique_practice_used"] == 2
+
+
 def test_two_choice_retry_rejects_a_hidden_third_option(tmp_path, monkeypatch):
     store = _build(tmp_path)
     pid, at, item, wrong = _arrive_at_one_incorrect_practice(store)
