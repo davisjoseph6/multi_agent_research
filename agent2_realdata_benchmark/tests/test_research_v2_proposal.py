@@ -155,6 +155,12 @@ def test_three_day_then_six_day_inactivity_reminders_and_fourteen_day_pause():
     assert subsequent.due(T0 + timedelta(days=7)) == (1,)
     with pytest.raises(ProposedStudyError, match="duplicate"):
         pause.claim(1, T0 + timedelta(days=7))
+    late = PauseEpisode(T0, T0, email_opt_in=True)
+    assert late.due(T0 + timedelta(days=8)) == (1,)
+    late.claim(1, T0 + timedelta(days=8))
+    assert late.due(T0 + timedelta(days=8)) == ()
+    assert late.due(T0 + timedelta(days=10)) == ()
+    assert late.due(T0 + timedelta(days=11)) == (2,)
 
 
 def test_two_wrong_enforces_resource_before_fatigue_and_only_arm_a():
