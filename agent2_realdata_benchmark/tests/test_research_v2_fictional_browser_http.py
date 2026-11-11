@@ -393,3 +393,44 @@ def test_fictional_restart_rejects_partial_or_foreign_contact_roster(tmp_path):
         new_fictional_runtime(
             isolated, clock=lambda: NOW, resume_existing=True,
         )
+
+
+
+def test_concurrent_duplicate_submit_and_competing_forged_answers(harness):
+    from concurrent.futures import ThreadPoolExecutor
+
+    runtime, _client, nonce = harness
+    app = _client.application
+    q = fictional_item(0, "pretest", 0, "en")
+    original = {
+        "fixture": "F1", "item_id": q["item_id"],
+        "selected_index": q["correct_index"],
+        "request_id": "concurrent_replay_same_request",
+    }
+    def submit(payload):
+        # Each concurrent thread has a separate Flask test client, but the
+        # server shares the same SQLite-backed fictional learner and lock.
+        with app.test_client() as c:
+            resp = c.post("/research-v2/api/answer", json=payload,
+                headers={
+                    "Origin": f"http://127.0.0.1:{PORT}",
+                    "X-Preview-Nonce": nonce,
+                },
+                base_url=f"http://127.0.0.1:{PORT}")
+            return resp.status_code, resp.json
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(submit, [original] * 8))
+    assert all(code == 200 for code, _ in results)
+    assert sum(not result["replayed"] for _, result in results) == 1
+    assert ok(harness, "status")["counts"]["pretest"] == 1
+    next_q = fictional_item(0, "pretest", 1, "en")
+    competing = [
+        {"fixture":"F1", "item_id":next_q["item_id"],
+         "selected_index":i, "request_id":f"conflict_{i:03d}"}
+        for i in range(4)
+    ]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        conflicts = list(pool.map(submit, competing))
+    assert sum(code == 200 for code, _ in conflicts) == 1
+    assert sum(code == 409 for code, _ in conflicts) == 3
+    assert ok(harness, "status")["counts"]["pretest"] == 2
