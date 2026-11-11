@@ -14,6 +14,7 @@ from tempfile import TemporaryDirectory
 
 from src.prototype.research_v2_crossover_fixture import FictionalCrossoverStore
 from src.prototype.research_v2_reminder_outbox import SyntheticReminderOutbox
+from src.prototype.study_v2 import CONCEPTS
 from src.prototype.research_v2_proposal import (
     QUESTIONS_PER_ARM, TwoWrongRecovery, all_sequences,
 )
@@ -53,6 +54,7 @@ def run_smoke(root: Path, sequence: tuple[str, str, str] = ("A", "C", "B")) -> d
                 result = crossover.record(
                     learner, token, request_id=f"req_{period}_{form}_{number}",
                     item_id=item_id, form=form, correct=not wrong, at=now,
+                    concept=CONCEPTS[number % len(CONCEPTS)],
                 )
                 assert result["accepted"] and result["counted"]
                 if form == "practice":
@@ -84,6 +86,12 @@ def run_smoke(root: Path, sequence: tuple[str, str, str] = ("A", "C", "B")) -> d
                             learner, token, decision="continue", at=now,
                         )
                         recovery.acknowledge_recovery(action)
+        trace = crossover.mastery_trace(learner, token, now)
+        assert trace["method"] == "BKT_PROVISIONAL_PARAMETERS"
+        assert len(trace["points"]) == sum(QUESTIONS_PER_ARM.values()) + 1
+        assert trace["independent_scores"]["pretest"] == 16
+        assert trace["independent_scores"]["posttest"] == 16
+        assert not trace["human_enrollment_authorized"]
         finished = crossover.finish_period(learner, token, now)
         assert finished == period + 1
     progress = crossover.redacted_progress(learner)
