@@ -148,7 +148,8 @@ class EightConceptPOMCP:
     def choose(self, belief: Mapping[str, float], *,
                practice_concepts: Sequence[str],
                resource_actions: Sequence[str] = RECOVERY_ACTIONS,
-               resources_left: int = 2, seed: int = 71) -> PlanResult:
+               resources_left: int = 2, seed: int = 71,
+               resource_concepts: Sequence[str] | None = None) -> PlanResult:
         self._validate_belief(belief)
         if type(resources_left) is not int or not 0 <= resources_left <= 10:
             raise ValueError("invalid resource budget")
@@ -162,8 +163,19 @@ class EightConceptPOMCP:
             raise ValueError("invalid recovery action list")
         ordered = tuple(c for c in CONCEPTS if c in practice_concepts)
         allowed_resources = tuple(a for a in RECOVERY_ACTIONS if a in resource_actions)
+        # Optional, explicitly versioned instructional targeting. The
+        # default preserves the original planner action space exactly.
+        if resource_concepts is None:
+            resource_order = ordered
+        else:
+            if (any(c not in CONCEPTS for c in resource_concepts)
+                    or len(set(resource_concepts)) != len(resource_concepts)):
+                raise ValueError("invalid or duplicated targeted resource concept")
+            resource_order = tuple(c for c in CONCEPTS if c in resource_concepts)
+        if allowed_resources and not resource_order and resources_left:
+            raise ValueError("active resources require a target concept")
         practice_actions = tuple((PRACTICE, c) for c in ordered)
-        resource_choices = tuple((a,c) for c in ordered for a in allowed_resources)
+        resource_choices = tuple((a,c) for c in resource_order for a in allowed_resources)
         rng = random.Random(seed)
         visits: Counter[tuple] = Counter()
         edge_visits: Counter[tuple] = Counter()

@@ -87,15 +87,34 @@ class SyntheticPOMCPProtocolEngine(SyntheticProtocolEngine):
         spent = s["recovery"].get("pomcp_resource_spent", 0)
         remaining = max(0, self.max_resources_per_session - spent)
         concepts = [c for c in belief.mastery if any(q.concept == c for q in candidates)]
-        stable_seed = int.from_bytes(sha256(json.dumps({
+        seed_state = {
             "mastery": s["mastery"], "used": s["used"],
             "session": s["session"], "index": s["index"],
             "spent": spent, "model": self.planner.assumptions.fingerprint,
-        },sort_keys=True).encode()).digest()[:8], "big")
+        }
+        targeted = s.get("question_anchored_recovery") is True
+        target_concept = s.get("last_incorrect_concept") if targeted else None
+        if targeted:
+            if target_concept is not None and target_concept not in CONCEPTS:
+                raise ValueError("invalid recorded incorrect-question concept")
+            # Recovery must be triggered by an actual incorrect PRACTICE answer,
+            # rather than low initial mastery or an arbitrary concept choice.
+            seed_state["last_incorrect_concept"] = target_concept
+        stable_seed = int.from_bytes(sha256(json.dumps(
+            seed_state, sort_keys=True,
+        ).encode()).digest()[:8], "big")
+        resource_actions = (
+            RECOVERY_ACTIONS if remaining and (not targeted or target_concept)
+            else ()
+        )
+        planner_args = (
+            {"resource_concepts": (target_concept,) if target_concept else ()}
+            if targeted else {}
+        )
         result = self.planner.choose(
             belief.mastery, practice_concepts=concepts,
-            resource_actions=RECOVERY_ACTIONS if remaining else (),
-            resources_left=remaining, seed=stable_seed)
+            resource_actions=resource_actions,
+            resources_left=remaining, seed=stable_seed, **planner_args)
         if result.action == PRACTICE:
             selected = min((q for q in candidates if q.concept == result.concept),
                            key=lambda q: (q.difficulty, q.item_id))

@@ -35,7 +35,8 @@ SCREENING_VERSION = "UNIFIED_BROWSER_SYNTHETIC_SCREENING_V1"
 CONSENT_HASH = sha256(b"UNAPPROVED_SYNTHETIC_BROWSER_INFORMATION").hexdigest()
 
 
-def open_synthetic_study(path: Path):
+def open_synthetic_study(path: Path, *,
+                         question_anchored_recovery: bool = False):
     """Create isolated test-only capabilities for the current process."""
     clock = FixtureClock()
     operator = secrets.token_bytes(32)
@@ -47,6 +48,7 @@ def open_synthetic_study(path: Path):
         items_path=CONTENT / "items.csv",
         resources_path=CONTENT / "resources.csv",
         simulations=41,
+        question_anchored_recovery=question_anchored_recovery,
     )
     roster = ensure_unified_fictional_roster(
         store, operator, screening_version=SCREENING_VERSION,
@@ -65,6 +67,10 @@ def main() -> None:
         "--db", type=Path, default=DEFAULT_DB,
         help="an isolated fictional_admission.sqlite3, never real study data",
     )
+    parser.add_argument(
+        "--question-anchored-recovery", action="store_true",
+        help="unapproved last-incorrect-question targeting; requires a fresh fictional DB",
+    )
     offline = parser.add_mutually_exclusive_group()
     offline.add_argument("--advance-fixture", choices=("F1", "F2", "F3"))
     offline.add_argument("--finish-fixture", choices=("F1", "F2", "F3"))
@@ -76,7 +82,9 @@ def main() -> None:
     if args.advance_fixture or args.finish_fixture:
         if not args.db.is_file():
             parser.error("an existing fictional database is required for offline visit actions")
-    study, roster, operator, clock = open_synthetic_study(args.db)
+    study, roster, operator, clock = open_synthetic_study(
+        args.db, question_anchored_recovery=args.question_anchored_recovery,
+    )
     if args.advance_fixture or args.finish_fixture:
         fixture = args.advance_fixture or args.finish_fixture
         report = advance_unified_fictional_visit(
