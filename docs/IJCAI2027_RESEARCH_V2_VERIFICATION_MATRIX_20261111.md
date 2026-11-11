@@ -86,3 +86,26 @@ The synthetic contact vault supports reserved `.test` recipients only.
 The SQLite queue models recoverable claims; an external transport must
 support its own idempotency controls to avoid duplicate emails after a crash
 between external delivery and local acknowledgment.
+
+## Additional 11 November verification
+
+The new crash-recovery and two-error persistence revision passed a full
+self-contained GitHub run with **1,618 passing tests and 1 deliberately
+deselected external-reference test**. The targeted fast gates subsequently
+passed **37 tests** on the BKT-trace commit.
+
+- The fictional email outbox can reacquire an unacknowledged reservation
+  after its 30-minute lease; the same queue ID acts as a future provider
+  idempotency key. This is NOT an exactly-once email delivery guarantee.
+- The fictional crossover record now persists the consecutive-wrong streak,
+  requires the indicated intervention before continuing, and preserves
+  recovery state across process restart.
+- The persisted per-period BKT trace requires trusted concept metadata,
+  excludes immediate DROP_2 instructional retries, and does not expose
+  partial pretest/posttest scores before all 16 items are complete.
+- A valid 261-item bank and institution-controlled human authentication
+  remain prerequisites before a real browser can use these models.
+
+The live web UI for the new crossover workflow and a verified email
+provider are **not** supplied by the standalone synthetic stores. Never
+interpret an offline green test as evidence of human-study readiness.
