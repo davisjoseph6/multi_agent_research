@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Supervisor parallel study — private fictional preview</title>
+  <link rel="stylesheet" href="/supervisor-fake.css">
+  <script defer src="/supervisor-fake.js"></script>
+</head>
+<body>
+<main id="app" data-preview-nonce="{{ preview_nonce }}">
+  <h1>Supervisor’s adaptive quiz — technical preview</h1>
+  <p class="warning" role="status">
+    FICTIONAL ONLY. These files are for engineering validation. No real
+    student registration, email transmission, consent collection, or
+    scientifically approved experiment is enabled here.
+  </p>
+  <div class="toolbar">
+    <label for="fixture">Fictional learner</label>
+    <select id="fixture" aria-label="Fictional learner">
+      <option value="F1">F1</option>
+      <option value="F2">F2</option>
+      <option value="F3">F3</option>
+    </select>
+    <button type="button" id="load">Load status</button>
+  </div>
+  <p id="progress" aria-live="polite">No fictional learner selected.</p>
+  <section id="registration" aria-labelledby="register-title" hidden>
+    <h2 id="register-title">Registration and screening (fictional)</h2>
+    <label><input type="checkbox" id="consent">
+      I agree to run this FICTIONAL developer-only consent rehearsal.</label>
+    <label><input type="checkbox" id="econ">
+      I have previously taken an economics or behavioral science course.</label>
+    <p>One screening item per concept. No correct answers are shown.</p>
+    <div id="screening"></div>
+    <button id="register" type="button">Submit fictional registration</button>
+  </section>
+  <section aria-labelledby="phase-title">
+    <h2 id="phase-title">Current step</h2>
+    <p id="question"></p>
+    <fieldset id="options"><legend>Choose one answer</legend></fieldset>
+    <div class="actions">
+      <button type="button" id="answer" hidden>Submit</button>
+      <button type="button" id="continue" hidden>Continue recovery</button>
+      <button type="button" id="survey" hidden>Submit fatigue survey</button>
+      <button type="button" id="advance" hidden>Advance 4 fictional days</button>
+    </div>
+  </section>
+  <p id="feedback" role="alert" aria-live="assertive"></p>
+</main>
+</body>
+</html>
