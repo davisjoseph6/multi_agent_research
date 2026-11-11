@@ -274,7 +274,7 @@ class FictionalCrossoverStore:
             row = self._state(db, ref)
             if row["paused_at"] is None:
                 raise ProposedStudyError("no active fictional pause")
-            if not (0 <= utc(at) - _parse(row["paused_at"]) <= PAUSE_MAX):
+            if not (timedelta(0) <= utc(at) - _parse(row["paused_at"]) <= PAUSE_MAX):
                 raise ProposedStudyError("14-day pause interval exceeded")
             # Token must independently be valid even during a pause.
             if (not isinstance(token, str) or not row["token_hash"]
