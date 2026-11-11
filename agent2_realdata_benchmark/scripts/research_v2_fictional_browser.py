@@ -43,6 +43,25 @@ def new_fictional_runtime(directory: Path, *, clock=None,
             "explicit resume_existing must match existing fictional state")
     study = FictionalCrossoverStore(study_path)
     contacts = SyntheticReminderOutbox(contact_path)
+    if resume_existing:
+        # Do not attach a fictional preview to foreign or mixed-identity DBs.
+        expected = {
+            f"SYN_CROSSOVER_{label}": "".join(order)
+            for label, order in zip(FIXTURES, all_sequences())
+        }
+        with study._transaction() as db:
+            actual = {
+                row["ref"]: row["sequence"]
+                for row in db.execute("SELECT ref,sequence FROM fictional_learners")
+            }
+        with contacts._tx() as db:
+            contact_rows = db.execute("SELECT ref,email FROM contacts").fetchall()
+        if actual != expected or len(contact_rows) != len(FIXTURES) or any(
+            row["ref"] not in {f"SYN_CONTACT_{label}" for label in FIXTURES}
+            or not row["email"].lower().endswith(".test")
+            for row in contact_rows
+        ):
+            raise ValueError("foreign or incomplete fictional roster rejected")
     now = (clock or (lambda: datetime.now(timezone.utc)))()
     fixtures = {}
     for label, order in zip(FIXTURES, all_sequences()):
