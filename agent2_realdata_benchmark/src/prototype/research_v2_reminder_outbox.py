@@ -235,6 +235,56 @@ class SyntheticReminderOutbox:
                 reserved.append(cur.lastrowid)
         return tuple(reserved)
 
+    def preview_payload(self, queue_id: int, at: datetime) -> dict:
+        """For the private fictional local worker only. Never expose via HTTP.
+
+        Returns only a reserved .test address, localized subject/body and
+        stable fictional provider idempotency key, never arm assignment.
+        A real provider integration needs additional reviewed release gates.
+        """
+        if type(queue_id) is not int or queue_id <= 0:
+            raise ProposedStudyError("invalid fictional outbox id")
+        now = utc(at)
+        with self._tx() as db:
+            row = db.execute(
+                "SELECT o.*,c.email,c.locale,c.opted_in,c.withdrawn,c.completed,"
+                "c.paused_at,c.pause_episode,c.first_delivered_at,c.second_delivered_at "
+                "FROM outbox o JOIN contacts c ON o.ref=c.ref WHERE o.id=?",
+                (queue_id,),
+            ).fetchone()
+            if (row is None or row["delivered_at"] is not None
+                    or row["episode"] != row["pause_episode"]
+                    or not self._eligible(row, now)):
+                raise ProposedStudyError("inactive fictional outbox reservation")
+            claimed = _time(row["last_claimed_at"])
+            if not claimed <= now < claimed + CLAIM_LEASE:
+                raise ProposedStudyError("fictional outbox claim lease expired")
+            if row["reminder"] == 1:
+                valid = (row["first_delivered_at"] is None
+                         and now - _time(row["paused_at"]) >= FIRST_AFTER)
+            else:
+                valid = (row["first_delivered_at"] is not None
+                         and row["second_delivered_at"] is None
+                         and now - _time(row["first_delivered_at"])
+                         >= FOLLOWUP_AFTER_SEND)
+            if not valid:
+                raise ProposedStudyError("fictional message not yet due")
+            if not row["email"].lower().endswith(".test"):
+                raise ProposedStudyError("refusing nonfictional contact")
+            template = EMAIL_TEMPLATES[row["locale"]][
+                f"reminder_{row['reminder']}"
+            ]
+            subject = (
+                "Fictional study reminder"
+                if row["locale"] == "en" else "Rappel d'étude fictive"
+            )
+            return {
+                "recipient": row["email"], "subject": subject,
+                "body": template, "locale": row["locale"],
+                "preview_idempotency_key": f"SYN_V2_REMINDER_{queue_id}",
+                "synthetic_only": True,
+            }
+
     def deliver_preview(self, queue_id: int, at: datetime) -> dict:
         """Commit fictional delivery only, without network or real email.
 
