@@ -328,6 +328,12 @@ def create_unified_fictional_browser_app(
             public = json.loads(row["public"])
             if public["action"] not in ("QUESTION", "DROP_2"):
                 continue
+            if (study.learning.mandatory_two_wrong_recovery
+                    and public["action"] == "DROP_2"):
+                # The instructed retry is trivially solved by elimination
+                # after the prior wrong choice is identified. Exclude from
+                # model-estimated mastery, while recording completion elsewhere.
+                continue
             recorded = json.loads(row["response"])
             # A final two-error recovery is still practice evidence, even
             # if the learning session has advanced to mvas_post.
