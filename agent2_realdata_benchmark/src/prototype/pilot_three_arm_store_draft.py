@@ -346,7 +346,10 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                         and item.item_id in policy["used"]:
                     raise PilotSequenceError("practice item already used")
                 public["question"] = (
-                    two_choice_retry(item, selected["target_wrong_choice_id"])
+                    two_choice_retry(
+                        item, selected["target_wrong_choice_id"],
+                        include_prior_wrong=self.mandatory_two_wrong_recovery,
+                    )
                     if kind == "DROP_2" and self.question_anchored_recovery
                     else item.public()
                 )
