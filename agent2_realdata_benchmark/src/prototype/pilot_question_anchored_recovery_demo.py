@@ -35,17 +35,27 @@ def verify_error_anchor(
 
 
 def two_choice_retry(item: Item, choice: str) -> dict:
-    """Re-present the SAME practice stem with original wrong+correct options.
+    """Re-present the SAME practice stem with correct+NEW wrong distractor.
 
-    Do not expose correct_option_id. The two option IDs retain their original
-    display order; no answer is marked in the browser response.
+    The learner has already been told the previous choice was incorrect.
+    Keeping that known-wrong choice next to the correct answer would make
+    the retry solvable by elimination alone. Select a *different* distractor
+    from the frozen authored item instead, in original option order.
+    Do not identify the correct option in the public payload.
     """
     if choice == item.answer_id or choice not in dict(item.options):
         raise PilotSequenceError("cannot construct a two-option retry")
+    different_distractors = [
+        option_id for option_id, _ in item.options
+        if option_id not in (item.answer_id, choice)
+    ]
+    if not different_distractors:
+        raise PilotSequenceError("two-choice retry requires a different distractor")
+    distractor = different_distractors[0]
     question = item.public()
     question["options"] = [
         (option_id, label) for option_id, label in item.options
-        if option_id in (item.answer_id, choice)
+        if option_id in (item.answer_id, distractor)
     ]
     if len(question["options"]) != 2:
         raise PilotSequenceError("recovery must present exactly two distinct options")
@@ -86,9 +96,10 @@ def contextual_resource(
             "and what differs. Then attempt the original reasoning independently."
         ),
         "DROP_2": (
-            "Retry the same question with two options: your previously selected "
-            "incorrect option and the correct option, in original option order. "
-            "No answer is highlighted."
+            "Retry the same question with only two choices: the correct "
+            "answer and a different, still plausible distractor from the "
+            "original authored options. Your already-known incorrect choice "
+            "is omitted, so elimination alone does not reveal the answer."
         ),
     }
     return {
