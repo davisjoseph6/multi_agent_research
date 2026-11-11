@@ -106,7 +106,7 @@ def test_each_recovery_is_based_on_last_wrong_question(tmp_path, monkeypatch, ac
         assert mistaken.answer_id in visible
         assert wrong not in visible
         assert len(visible) == 2
-        _submit(store, pid, response, {"choice_id": wrong}, at)
+        _submit(store, pid, response, {"choice_id": mistaken.answer_id}, at)
     else:
         assert "question" not in response
         _submit(store, pid, response, {"status": "completed"}, at)
