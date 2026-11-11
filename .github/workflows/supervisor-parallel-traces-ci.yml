@@ -7,6 +7,7 @@ on:
       - 'agent2_realdata_benchmark/data/supervisor_20261111/**'
       - 'agent2_realdata_benchmark/src/prototype/supervisor_*.py'
       - 'agent2_realdata_benchmark/scripts/supervisor_fictional_browser.py'
+      - 'agent2_realdata_benchmark/scripts/supervisor_neural_rehearsal.py'
       - 'agent2_realdata_benchmark/src/prototype/templates/supervisor_fictional_web.html'
       - 'agent2_realdata_benchmark/src/prototype/static/supervisor_fictional_web.*'
       - 'agent2_realdata_benchmark/tests/test_supervisor_*.py'
@@ -16,6 +17,7 @@ on:
       - 'agent2_realdata_benchmark/data/supervisor_20261111/**'
       - 'agent2_realdata_benchmark/src/prototype/supervisor_*.py'
       - 'agent2_realdata_benchmark/scripts/supervisor_fictional_browser.py'
+      - 'agent2_realdata_benchmark/scripts/supervisor_neural_rehearsal.py'
       - 'agent2_realdata_benchmark/src/prototype/templates/supervisor_fictional_web.html'
       - 'agent2_realdata_benchmark/src/prototype/static/supervisor_fictional_web.*'
       - 'agent2_realdata_benchmark/tests/test_supervisor_*.py'
@@ -40,6 +42,8 @@ jobs:
         run: python -m pip install pytest==9.1.1 Flask==3.1.3
       - name: Exactly compare all supervisor scenarios and bank constraints
         run: python -m pytest -q tests/test_supervisor_20261111_traces.py tests/test_supervisor_20261111_store.py tests/test_supervisor_20261111_end_to_end_store.py tests/test_supervisor_20261111_reminders.py tests/test_supervisor_20261111_fictional_http.py tests/test_supervisor_20261111_neural.py tests/test_supervisor_20261111_model_comparison.py tests/test_supervisor_20261111_backup.py
+      - name: Print unresolved neural feature contract (no torch needed)
+        run: python -m scripts.supervisor_neural_rehearsal --feature-contract
       - name: Verify all canonical CSV files are present
         run: |
           python - <<'PY'
