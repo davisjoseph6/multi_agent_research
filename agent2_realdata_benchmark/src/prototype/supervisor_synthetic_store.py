@@ -487,7 +487,7 @@ class SupervisorSyntheticStore:
             before, D_before = engine.mastery[concept], engine.degradation
             action = step["action"]
             if action in ("QUESTION", "DROP_2", "SOCRATIC_HINT"):
-                if choice not in "ABCD" if isinstance(choice, str) else True:
+                if type(choice) is not str or choice not in "ABCD":
                     raise SyntheticStudyError("A/B/C/D answer required")
                 correct = self.bank.grade(item_id, choice, form="practice")
                 if action == "DROP_2":
@@ -510,7 +510,7 @@ class SupervisorSyntheticStore:
                 scripted = ""
                 options_shown = ""
             number = engine.question_in_session + (action == "QUESTION")
-            engine.submit(scripted)
+            completed_step = engine.submit(scripted)
             state["engine"] = engine.snapshot()
             state["index"] = engine.question_in_session
             state["pending_recovery"] = (
@@ -530,7 +530,10 @@ class SupervisorSyntheticStore:
                 choice=choice, correct=correct, before=before,
                 after=engine.mastery[concept], D_before=D_before,
                 D_after=engine.degradation,
-                trigger=engine.last_recovery_trigger or "",
+                rule_tags=completed_step.get("rule_tags", ""),
+                trigger=completed_step.get("trigger", ""),
+                recovery_attempt=completed_step.get("recovery_attempt", ""),
+                recovery_outcome=completed_step.get("recovery_outcome", ""),
                 content_id=(
                     "UNREVIEWED_RESOURCE_" + action
                     if action in ("CONCEPT_SUMMARY", "WORKED_EXAMPLE")
