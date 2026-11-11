@@ -67,6 +67,7 @@ class FictionalCrossoverStore:
                     period INTEGER NOT NULL,
                     form TEXT NOT NULL,
                     concept TEXT,
+                    selected_index INTEGER CHECK(selected_index BETWEEN 0 AND 3),
                     correct INTEGER NOT NULL,
                     PRIMARY KEY(ref,item_id),
                     FOREIGN KEY(ref) REFERENCES fictional_learners(ref)
@@ -85,7 +86,7 @@ class FictionalCrossoverStore:
             }
             if (not {"wrong_streak", "recovery_pending", "recovery_completed",
                      "awaiting_continue"}.issubset(schema)
-                    or "concept" not in exposures_schema):
+                    or not {"concept", "selected_index"}.issubset(exposures_schema)):
                 raise ProposedStudyError(
                     "old fictional crossover schema unsupported; use a new isolated test DB"
                 )
@@ -184,7 +185,8 @@ class FictionalCrossoverStore:
     def record(self, ref: str, token: str, *, request_id: str,
                item_id: str, form: str, correct: bool, at: datetime,
                kind: str = "QUESTION",
-               concept: str | None = None) -> dict:
+               concept: str | None = None,
+               selected_index: int | None = None) -> dict:
         """The trusted fictional grader supplies scored observations.
 
         Request-ID replay is safe only when the entire payload matches.
@@ -203,8 +205,14 @@ class FictionalCrossoverStore:
             raise ProposedStudyError("unknown form")
         if concept is not None and concept not in CONCEPTS:
             raise ProposedStudyError("unexpected concept metadata")
+        if selected_index is not None and (
+                type(selected_index) is not int or not 0 <= selected_index <= 3):
+            raise ProposedStudyError("invalid answer-choice index")
+        if kind == "DROP_2" and not correct:
+            raise ProposedStudyError("DROP_2 only completes after correct retry")
         payload = json.dumps(
-            [item_id, form, correct, kind, concept], separators=(",", ":"),
+            [item_id, form, correct, kind, concept, selected_index],
+            separators=(",", ":"),
         )
         fingerprint = hashlib.sha256(payload.encode()).hexdigest()
         with self._transaction() as db:
@@ -250,9 +258,10 @@ class FictionalCrossoverStore:
                     raise ProposedStudyError("complete 55 practice items before posttest")
                 try:
                     db.execute(
-                        "INSERT INTO exposures(ref,item_id,period,form,concept,correct)"
-                        " VALUES(?,?,?,?,?,?)",
-                        (ref, item_id, row["period"], form, concept, int(correct)),
+                        "INSERT INTO exposures(ref,item_id,period,form,concept,selected_index,correct)"
+                        " VALUES(?,?,?,?,?,?,?)",
+                        (ref, item_id, row["period"], form, concept,
+                         selected_index, int(correct)),
                     )
                 except sqlite3.IntegrityError as exc:
                     raise ProposedStudyError("question repeated across periods") from exc
@@ -327,9 +336,16 @@ class FictionalCrossoverStore:
         self._ref(ref)
         with self._transaction() as db:
             row = self._state(db, ref)
+            wrong = None
+            if row["recovery_pending"] and row["last_wrong"]:
+                wrong = db.execute(
+                    "SELECT selected_index FROM exposures WHERE ref=? AND item_id=?",
+                    (ref, row["last_wrong"]),
+                ).fetchone()
             return {
                 "action": row["recovery_pending"],
                 "target_item_id": row["last_wrong"] if row["recovery_pending"] else None,
+                "wrong_selected_index": wrong["selected_index"] if wrong else None,
                 "awaiting_continue": bool(row["awaiting_continue"]),
                 "synthetic_only": True,
             }
