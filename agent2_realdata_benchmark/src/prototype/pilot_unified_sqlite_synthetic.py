@@ -44,7 +44,8 @@ class UnifiedSyntheticStudyStore:
                  operator_key: bytes, auditor_key: bytes,
                  items_path: str | Path, resources_path: str | Path,
                  clock=None, simulations: int = 41,
-                 question_anchored_recovery: bool = False):
+                 question_anchored_recovery: bool = False,
+                 mandatory_two_wrong_recovery: bool = False):
         self.admission = SyntheticAdmissionStore(
             path, consent_sha256=consent_sha256,
             screening_version=screening_version,
@@ -56,6 +57,7 @@ class UnifiedSyntheticStudyStore:
             path, items_path=items_path, resources_path=resources_path,
             simulations=simulations,
             question_anchored_recovery=question_anchored_recovery,
+            mandatory_two_wrong_recovery=mandatory_two_wrong_recovery,
         )
         if self.admission.path.resolve() != self.learning.path.resolve():
             raise UnifiedSyntheticError("both fixtures must use the same SQLite file")
