@@ -19,7 +19,7 @@ def test_due_first_at_three_days_and_second_three_days_after_actual_delivery(tmp
     q.pause("SYN_CONTACT_F1", T0)
     assert q.reserve_due(T0 + timedelta(days=2)) == ()
     first, = q.reserve_due(T0 + timedelta(days=3))
-    assert q.reserve_due(T0 + timedelta(days=6)) == ()
+    assert q.reserve_due(T0 + timedelta(days=3, minutes=29)) == ()
     with pytest.raises(ProposedStudyError, match="premature"):
         q.deliver_preview(first, T0 + timedelta(days=2))
     assert q.deliver_preview(first, T0 + timedelta(days=3))["reminder"] == 1
