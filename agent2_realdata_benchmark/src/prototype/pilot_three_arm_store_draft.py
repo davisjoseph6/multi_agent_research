@@ -453,11 +453,17 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                         and selected.get("forced_trigger")
                             == "TWO_CONSECUTIVE_WRONG_PRACTICE")
                 ):
-                    # Only scored responses update BKT. A completed text
-                    # summary/hint/example does not imply learning.
-                    belief = Belief(policy["mastery"].copy())
-                    belief.observe(item.concept, correct)
-                    policy["mastery"] = belief.mastery
+                    # In the proposed V2, the learner has already been
+                    # informed that the earlier choice was wrong; DROP_2 then
+                    # shows that known-wrong option and the correct one.
+                    # A successful retry can be solved by elimination, so it
+                    # is NOT an independent BKT mastery observation.
+                    # Wait for the next independent practice question to
+                    # update the belief. Legacy policies are unchanged.
+                    if not (self.mandatory_two_wrong_recovery and kind == "DROP_2"):
+                        belief = Belief(policy["mastery"].copy())
+                        belief.observe(item.concept, correct)
+                        policy["mastery"] = belief.mastery
                     extra["correct"] = correct
                 if kind == "QUESTION":
                     if state.stage == "practice":
