@@ -43,7 +43,8 @@ class UnifiedSyntheticStudyStore:
                  consent_sha256: str, screening_version: str,
                  operator_key: bytes, auditor_key: bytes,
                  items_path: str | Path, resources_path: str | Path,
-                 clock=None, simulations: int = 41):
+                 clock=None, simulations: int = 41,
+                 question_anchored_recovery: bool = False):
         self.admission = SyntheticAdmissionStore(
             path, consent_sha256=consent_sha256,
             screening_version=screening_version,
@@ -54,6 +55,7 @@ class UnifiedSyntheticStudyStore:
         self.learning = SyntheticThreeArmPilotStore(
             path, items_path=items_path, resources_path=resources_path,
             simulations=simulations,
+            question_anchored_recovery=question_anchored_recovery,
         )
         if self.admission.path.resolve() != self.learning.path.resolve():
             raise UnifiedSyntheticError("both fixtures must use the same SQLite file")
@@ -227,6 +229,8 @@ class UnifiedSyntheticStudyStore:
             )
             policy = self.learning._policy(db, link["learning_pid"])
             policy["recovery"] = asdict(RecoveryStatus())
+            if self.learning.question_anchored_recovery:
+                policy["last_incorrect_practice"] = None
             db.execute(
                 "INSERT INTO admission_visits(pid,visit,started_at) VALUES(?,?,?)",
                 (pid, visit, now.isoformat()),
