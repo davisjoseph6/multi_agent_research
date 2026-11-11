@@ -138,3 +138,40 @@ def test_expired_reminder_episode_never_retry_after_lease(tmp_path):
     assert q.reserve_due(T0 + timedelta(days=15)) == ()
     with pytest.raises(ProposedStudyError, match="withheld"):
         q.deliver_preview(first, T0 + timedelta(days=15))
+
+
+
+def test_second_reminder_after_resuming_and_abandoning_again_is_not_first(tmp_path):
+    q = make(tmp_path)
+    ref = "SYN_CONTACT_F1"
+    q.register(ref, "again@example.test", locale="fr", opted_in=True)
+    q.pause(ref, T0)
+    first, = q.reserve_due(T0 + timedelta(days=3))
+    assert q.deliver_preview(first, T0 + timedelta(days=3))["reminder"] == 1
+    q.resume(ref, T0 + timedelta(days=4))
+    q.pause(ref, T0 + timedelta(days=5))
+    assert q.reserve_due(T0 + timedelta(days=7)) == ()
+    second, = q.reserve_due(T0 + timedelta(days=8))
+    assert second != first
+    payload = q.preview_payload(second, T0 + timedelta(days=8))
+    assert "reminder" in payload["preview_idempotency_key"].lower()
+    assert q.deliver_preview(second, T0 + timedelta(days=8))["reminder"] == 2
+    q.resume(ref, T0 + timedelta(days=9))
+    q.pause(ref, T0 + timedelta(days=10))
+    assert q.reserve_due(T0 + timedelta(days=13)) == ()
+    with q._tx() as db:
+        numbers = [row["reminder"] for row in db.execute(
+            "SELECT reminder FROM outbox WHERE ref=? ORDER BY id", (ref,)
+        )]
+    assert numbers == [1, 2]
+
+
+def test_early_resume_does_not_send_second_notice_while_active(tmp_path):
+    q = make(tmp_path)
+    ref = "SYN_CONTACT_F1"
+    q.register(ref, "early@example.test", locale="en", opted_in=True)
+    q.pause(ref, T0)
+    first, = q.reserve_due(T0 + timedelta(days=3))
+    q.deliver_preview(first, T0 + timedelta(days=3))
+    q.resume(ref, T0 + timedelta(days=4))
+    assert q.reserve_due(T0 + timedelta(days=6)) == ()
