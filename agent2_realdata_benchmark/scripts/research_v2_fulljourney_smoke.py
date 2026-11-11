@@ -61,6 +61,7 @@ def run_smoke(root: Path, sequence: tuple[str, str, str] = ("A", "C", "B")) -> d
                     )
                     if triggered:
                         action = recovery.choose_recovery()
+                        assert crossover.pending_recovery(learner)["action"] == action
                         interventions += 1
                         if action == "DROP_2":
                             retry = crossover.record(
@@ -71,6 +72,17 @@ def run_smoke(root: Path, sequence: tuple[str, str, str] = ("A", "C", "B")) -> d
                             )
                             assert not retry["counted"]
                             retries += 1
+                        else:
+                            completed = crossover.acknowledge_recovery(
+                                learner, token,
+                                request_id=f"ack_{period}_{number:03d}",
+                                kind=action, at=now,
+                            )
+                            assert completed["accepted"] and not completed["counted"]
+                        assert crossover.pending_recovery(learner)["awaiting_continue"]
+                        crossover.decide_after_recovery(
+                            learner, token, decision="continue", at=now,
+                        )
                         recovery.acknowledge_recovery(action)
         finished = crossover.finish_period(learner, token, now)
         assert finished == period + 1
