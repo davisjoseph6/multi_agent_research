@@ -207,14 +207,14 @@ def test_planner_resource_actions_can_only_target_missed_concept():
         resource_concepts=(target,), resources_left=2, seed=71,
     )
     for name in result.root_visits:
-        if not name.startswith("PRACTICE::"):
+        if not name.startswith("QUESTION::"):
             assert name.endswith("::" + target)
     no_resource = planner.choose(
         initial, practice_concepts=CONCEPTS,
         resource_concepts=(), resource_actions=(),
         resources_left=2, seed=71,
     )
-    assert all(name.startswith("PRACTICE::") for name in no_resource.root_visits)
+    assert all(name.startswith("QUESTION::") for name in no_resource.root_visits)
     with pytest.raises(ValueError):
         planner.choose(
             initial, practice_concepts=CONCEPTS,
