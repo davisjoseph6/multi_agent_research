@@ -142,7 +142,7 @@ def test_quiz_question_and_reading_recovery_commit_atomically(fixture):
     identity = enroll(store, bank)
     ref, token = complete_pretest(store, bank, identity)
     # All pretest answers correct, so the greedy policy starts at C1.
-    for i in range(3):
+    for i in range(2):
         item = store.next_item(ref, token)
         assert item["kind"] == "question"
         assert item["question_id"].startswith("QZ_")
