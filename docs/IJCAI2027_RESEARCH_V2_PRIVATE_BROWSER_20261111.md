@@ -27,7 +27,12 @@ during independent assessment and incomplete pre/post scores are hidden.
 A separate fictional contact SQLite database supports opt-in, pause,
 resume and opt-out. It accepts reserved .test email domains only.
 The bilingual notice worker captures due reminders in memory, never
-sending email via SMTP/API/network. Exactly-once real sending is NOT
+sending email via SMTP/API/network. There are at most two delivered
+fictional notices across repeated pause/resume episodes: a first notice
+after three days of inactivity and a second at least three days after
+both the first actual notice and a new pause, if still incomplete.
+Resuming suppresses dispatch; abandoning again does not reset a
+previously delivered notice count. Exactly-once real sending is NOT
 provided by the local fictional SQLite idempotency key.
 
 ## Run in WSL from the pre-existing worktree
