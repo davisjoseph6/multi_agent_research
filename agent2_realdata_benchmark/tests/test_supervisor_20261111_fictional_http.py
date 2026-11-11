@@ -269,3 +269,27 @@ def test_legacy_supervisor_api_aliases_remain_fictional_and_no_arm_override(h):
     assert genuine.status_code==200
     assert "correct" not in genuine.json
     assert "token" not in str(genuine.json)
+
+
+
+def test_fictional_browser_records_actual_elapsed_answer_time(h):
+    import time
+    assert register(h)["eligible"]
+    bank=h[0].store.bank
+    preview=ok(h,"item")
+    assert preview["phase"]=="PRETEST"
+    time.sleep(.025)
+    q=bank.get(preview["question_id"],form="pretest")
+    ok(h,"answer",{
+        "question_id":preview["question_id"],
+        "choice":q.correct_answer,
+        "request_id":"timing_measurement_01",
+    })
+    with h[0].store._tx() as db:
+        logged=db.execute(
+            "SELECT response_time_ms FROM events WHERE request_id=?",
+            ("timing_measurement_01",),
+        ).fetchone()
+        assert logged is not None
+        assert logged["response_time_ms"] >= 15
+        assert logged["response_time_ms"] < 60_000
