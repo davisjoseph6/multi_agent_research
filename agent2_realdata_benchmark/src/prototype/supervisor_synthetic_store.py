@@ -309,6 +309,9 @@ class SupervisorSyntheticStore:
                  consent_version: str, consent_given: bool,
                  age: int | None, program: str, at: datetime) -> dict:
         """Eligible fictional candidates alone consume the A/B/C rotation."""
+        if (consent_given is not True or not isinstance(consent_version, str)
+                or not consent_version.strip()):
+            raise SyntheticStudyError("explicit versioned consent required")
         eligible, score = self.bank.eligible(
             econ_course=econ_course,
             screening_answers=screening_answers,
@@ -316,9 +319,6 @@ class SupervisorSyntheticStore:
         if not eligible:
             return {"eligible": False, "screening_score": score,
                     "group_assigned": False, "synthetic_only": True}
-        if (consent_given is not True or not isinstance(consent_version, str)
-                or not consent_version.strip()):
-            raise SyntheticStudyError("explicit versioned consent required")
         if (not isinstance(contact_email, str)
                 or not re.fullmatch(
                     r"[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.test",
