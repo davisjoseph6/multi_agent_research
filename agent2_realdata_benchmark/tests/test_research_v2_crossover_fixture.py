@@ -46,19 +46,81 @@ def test_order_no_repeats_and_three_periods_persist_across_processes(tmp_path):
         s.issue_token(REF, T0)
 
 
-def test_immediate_drop2_only_once_after_incorrect_arm_a_practice(tmp_path):
+def test_two_wrong_mandatory_recovery_and_drop2_only_on_second_trigger(tmp_path):
     s, token, _ = setup(tmp_path)
     for i in range(16):
         answer(s, token, f"pre{i}", "pretest", f"pre_{i}")
-    with pytest.raises(ProposedStudyError, match="latest wrong"):
+    with pytest.raises(ProposedStudyError, match="second consecutive"):
         answer(s, token, "bad", "practice", "drop_0", kind="DROP_2")
     answer(s, token, "wrong0", "practice", "normal_0", correct=False)
-    result = answer(s, token, "wrong0", "practice", "drop_1", kind="DROP_2")
+    with pytest.raises(ProposedStudyError, match="second consecutive"):
+        answer(s, token, "wrong0", "practice", "drop_1", kind="DROP_2")
+    second = answer(s, token, "wrong1", "practice", "normal_1", correct=False)
+    assert second["recovery_required"] == "CONCEPT_SUMMARY"
+    assert s.pending_recovery(REF)["target_item_id"] == "wrong1"
+    with pytest.raises(ProposedStudyError, match="recovery must complete"):
+        answer(s, token, "next", "practice", "normal_2")
+    ack = s.acknowledge_recovery(REF, token, kind="CONCEPT_SUMMARY",
+                                 request_id="resource_001", at=T0)
+    assert ack["accepted"] and not ack["counted"]
+    assert s.acknowledge_recovery(REF, token, kind="CONCEPT_SUMMARY",
+                                  request_id="resource_001", at=T0)["replayed"]
+    with pytest.raises(ProposedStudyError, match="continue or pause"):
+        answer(s, token, "next", "practice", "normal_2")
+    s.decide_after_recovery(REF, token, decision="continue", at=T0)
+    answer(s, token, "wrong2", "practice", "normal_2", correct=False)
+    assert answer(s, token, "wrong3", "practice", "normal_3",
+                  correct=False)["recovery_required"] == "DROP_2"
+    result = answer(s, token, "wrong3", "practice", "drop_2", kind="DROP_2")
     assert not result["counted"]
-    with pytest.raises(ProposedStudyError, match="latest wrong"):
-        answer(s, token, "wrong0", "practice", "drop_2", kind="DROP_2")
+    s.decide_after_recovery(REF, token, decision="continue", at=T0)
+    with pytest.raises(ProposedStudyError, match="second consecutive"):
+        answer(s, token, "wrong3", "practice", "drop_3", kind="DROP_2")
     with pytest.raises(ProposedStudyError, match="repeated"):
-        answer(s, token, "wrong0", "practice", "normal_1", correct=False)
+        answer(s, token, "wrong3", "practice", "normal_4", correct=False)
+
+
+def test_final_practice_error_requires_recovery_before_posttest(tmp_path):
+    s, token, path = setup(tmp_path)
+    for i in range(16):
+        answer(s, token, f"pre{i}", "pretest", f"pre_{i}")
+    for i in range(53):
+        answer(s, token, f"p{i}", "practice", f"p_{i}")
+    answer(s, token, "p53", "practice", "p_53", correct=False)
+    assert answer(s, token, "p54", "practice", "p_54",
+                  correct=False)["recovery_required"] == "CONCEPT_SUMMARY"
+    restarted = FictionalCrossoverStore(path)
+    assert restarted.pending_recovery(REF)["action"] == "CONCEPT_SUMMARY"
+    with pytest.raises(ProposedStudyError, match="recovery must complete"):
+        answer(restarted, token, "post0", "posttest", "post_0")
+    restarted.acknowledge_recovery(REF, token, kind="CONCEPT_SUMMARY",
+                                   request_id="ack_final", at=T0)
+    with pytest.raises(ProposedStudyError, match="continue or pause"):
+        answer(restarted, token, "post0", "posttest", "post_0")
+    restarted.decide_after_recovery(REF, token, decision="continue", at=T0)
+    for i in range(16):
+        answer(restarted, token, f"post{i}", "posttest", f"post_{i}")
+    assert restarted.finish_period(REF, token, T0) == 1
+
+
+def test_correct_answer_breaks_wrong_streak_even_after_restart(tmp_path):
+    s, token, path = setup(tmp_path)
+    for i in range(16):
+        answer(s, token, f"pre{i}", "pretest", f"pre_{i}")
+    answer(s, token, "q0", "practice", "q_0", correct=False)
+    answer(s, token, "q1", "practice", "q_1", correct=True)
+    answer(s, token, "q2", "practice", "q_2", correct=False)
+    assert s.pending_recovery(REF)["action"] is None
+    s = FictionalCrossoverStore(path)
+    answer(s, token, "q3", "practice", "q_3", correct=False)
+    assert s.pending_recovery(REF)["action"] == "CONCEPT_SUMMARY"
+    s.pause(REF, token, T0)
+    with pytest.raises(ProposedStudyError, match="paused"):
+        s.acknowledge_recovery(REF, token, kind="CONCEPT_SUMMARY",
+                               request_id="ack_paused", at=T0)
+    s.resume(REF, token, T0 + timedelta(hours=1))
+    assert s.pending_recovery(REF)["action"] == "CONCEPT_SUMMARY"
+
 
 
 def test_retries_are_idempotent_but_changed_payload_is_rejected(tmp_path):
