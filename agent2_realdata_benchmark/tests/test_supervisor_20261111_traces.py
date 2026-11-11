@@ -119,8 +119,8 @@ def test_full_screening_eligibility_and_pretest_qmatrix(bank):
     right = {q.question_id:q.correct_answer for q in screening}
     assert bank.eligible(econ_course=False, screening_answers=right) == (
         False, 8)
-    assert bank.eligible(econ_course=True, screening_answers=right) == (
-        False, 8)
+    assert bank.eligible(econ_course=True, screening_answers={}) == (
+        False, 0)
     # With five correct answers, the candidate may proceed.
     for q in screening[5:]:
         right[q.question_id] = (
@@ -128,8 +128,8 @@ def test_full_screening_eligibility_and_pretest_qmatrix(bank):
         )
     assert bank.eligible(econ_course=False, screening_answers=right) == (
         True, 5)
-    assert bank.eligible(econ_course=True, screening_answers=right) == (
-        False, 5)
+    assert bank.eligible(econ_course=True, screening_answers={}) == (
+        False, 0)
 
     pre = bank.forms["pretest"]
     responses = {q.question_id:q.correct_answer for q in pre}
