@@ -28,8 +28,10 @@ This branch implements an **explicit opt-in variant**:
    This changes the planner's action space relative to V3 and hence
    **requires a scientific protocol decision** before a real RCT.
 4. `DROP_2` re-presents the **original incorrect practice stem** with
-   exactly two options: the previously chosen wrong answer and the
-   correct answer. Option order follows the original item. The
+   exactly two options: the correct answer and a DIFFERENT
+   incorrect distractor from the same authored item. The learner's
+   already-known incorrect choice is excluded so the retry cannot be
+   solved by eliminating that known wrong choice alone. Option order follows the original item. The
    answer key is not marked or returned; the backend validates
    submission against only the *visible* two IDs. This uses the
    authored 55-question practice bank rather than the separate
