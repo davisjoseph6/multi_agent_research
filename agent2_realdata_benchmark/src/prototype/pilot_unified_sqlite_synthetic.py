@@ -153,6 +153,13 @@ class UnifiedSyntheticStudyStore:
                 arm=arm, mastery={concept: .2 for concept in CONCEPTS},
                 used=[], recovery=asdict(RecoveryStatus()),
             )
+            if self.learning.mandatory_two_wrong_recovery:
+                policy.update(
+                    two_wrong_streak=0,
+                    forced_recovery_count=0,
+                    awaiting_continue_choice=None,
+                    paused_at=None,
+                )
             db.execute(
                 "INSERT INTO pilot_people(pid,state,created_at) VALUES(?,?,?)",
                 (learning_pid, _serialize(PilotSessionFlow()), now.isoformat()),
