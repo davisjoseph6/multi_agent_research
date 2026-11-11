@@ -94,7 +94,7 @@ class SyntheticReminderOutbox:
             raise ProposedStudyError("fictional contact reference required")
         if email is not None:
             if (not isinstance(email, str)
-                    or not re.fullmatch(r"[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9.-]+\\.test", email)
+                    or not re.fullmatch(r"[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9.-]+\.test", email)
                     or len(email) > 150):
                 raise ProposedStudyError("only synthetic .test recipient addresses allowed")
 
