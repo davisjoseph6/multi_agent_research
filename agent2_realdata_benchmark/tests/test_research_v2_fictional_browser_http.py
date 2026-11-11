@@ -91,7 +91,8 @@ def test_bilingual_placeholder_is_explicitly_fake_and_answer_key_is_private(harn
     assert "correct_index" not in item and "answer_key" not in item
     assert item["form"] == "pretest"
     mastery = ok(harness, "mastery")
-    assert mastery["independent_scores"] == {"pretest": None, "posttest": None}
+    assert mastery["available"] is False
+    assert mastery["reason"] == "pretest_in_progress"
     assert "email" not in str(mastery).lower()
 
 
@@ -115,12 +116,14 @@ def test_wrong_item_and_forged_scores_cannot_advance(harness):
                "request_id": "idempotent_00001"}
     first = ok(harness, "answer", payload)
     second = ok(harness, "answer", payload)
-    assert first["correct"] and second["replayed"]
+    assert "correct" not in first and "correct" not in second
+    assert first["accepted"] and second["replayed"]
     altered = post(harness, "answer", payload | {
         "selected_index": (q["correct_index"] + 1) % 4
     })
     assert altered.status_code == 409
     assert ok(harness, "status")["counts"]["pretest"] == 1
+    assert ok(harness, "mastery")["available"] is False
 
 
 def test_two_wrong_intervention_is_anchored_before_next_question(harness):
@@ -190,6 +193,7 @@ def test_all_three_periods_without_repeat_or_cross_participant_leak(harness):
         assert mastery["independent_scores"]["pretest"] == 16
         assert mastery["independent_scores"]["posttest"] == 16
         assert len(mastery["points"]) == 88
+        assert mastery["available"] is True
         assert ok(harness, "item", {"language":"en"})["kind"] == "period_complete"
         outcome = ok(harness, "finish")
         assert outcome["periods_finished"] == period + 1
