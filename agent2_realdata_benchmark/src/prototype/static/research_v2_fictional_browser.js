@@ -105,6 +105,7 @@
  $("continue").addEventListener("click",()=>act("decision",{decision:"continue"}));
  $("after-pause").addEventListener("click",()=>act("decision",{decision:"pause"}));
  $("pause").addEventListener("click",()=>act("pause",{}));
+ $("optout").addEventListener("click",()=>act("opt-out",{}));
  $("resume").addEventListener("click",()=>act("resume",{}));
  $("finish").addEventListener("click",()=>act("finish",{}));
  $("next").addEventListener("click",()=>act("start-next",{}));
