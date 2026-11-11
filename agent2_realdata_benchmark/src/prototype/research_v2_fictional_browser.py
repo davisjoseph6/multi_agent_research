@@ -289,7 +289,11 @@ def make_fictional_v2_app(runtime: FictionalV2Runtime, *, port: int = 8774) -> F
                 item_id=q["item_id"], form=form, correct=correct,
                 selected_index=choice, concept=q["concept"], at=runtime.at(),
             )
-            return jsonify(**result, correct=correct)
+            # Independent pre/post assessments return no per-item correctness.
+            # Practice feedback is permitted in this illustrative demo only.
+            if form == "practice":
+                result = dict(result, correct=correct)
+            return jsonify(result)
 
     @app.post("/research-v2/api/recovery/ack")
     def ack():
@@ -381,7 +385,23 @@ def make_fictional_v2_app(runtime: FictionalV2Runtime, *, port: int = 8774) -> F
         body = parameters({"fixture"})
         with runtime.lock:
             ref, token = runtime.require_token(body["fixture"])
+            progress = runtime.store.redacted_progress(ref)
+            counts = progress["counts"]
+            # Independent assessments must be performed without item-by-item
+            # BKT feedback. Suppress the entire view until pretest completion
+            # and during the incomplete posttest.
+            if counts["pretest"] < QUESTIONS_PER_ARM["pretest"]:
+                return jsonify(available=False, reason="pretest_in_progress",
+                               synthetic_only=True)
+            if 0 < counts["posttest"] < QUESTIONS_PER_ARM["posttest"]:
+                return jsonify(available=False, reason="posttest_in_progress",
+                               synthetic_only=True)
             result = runtime.store.mastery_trace(ref, token, runtime.at())
+            # Pretest and posttest observed scores are independent outcomes;
+            # do not expose them to the learning interface before full period end.
+            if counts["posttest"] < QUESTIONS_PER_ARM["posttest"]:
+                result["independent_scores"] = {"pretest": None, "posttest": None}
+            result["available"] = True
             # No real participant identity or arm assignment is returned.
             return jsonify(result)
 
