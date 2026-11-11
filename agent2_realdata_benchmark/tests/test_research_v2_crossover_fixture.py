@@ -74,20 +74,22 @@ def test_retries_are_idempotent_but_changed_payload_is_rejected(tmp_path):
 
 def test_pause_expiry_and_token_renewal_are_independent(tmp_path):
     s, token, _ = setup(tmp_path)
-    s.pause(REF, token, T0)
+    s.pause(REF, token, T0 + timedelta(days=1))
     with pytest.raises(ProposedStudyError, match="paused"):
-        answer(s, token, "pre0", "pretest", "while_pause")
+        answer(s, token, "pre0", "pretest", "while_pause",
+               when=T0 + timedelta(days=2))
+    after_original_expiry = T0 + timedelta(days=14, seconds=1)
     with pytest.raises(ProposedStudyError, match="renewal"):
-        s.resume(REF, token, T0 + timedelta(days=14))
+        s.resume(REF, token, after_original_expiry)
     renewed = s.rotate_token(REF, T0 + timedelta(days=13),
                              contact_identity_verified=True)
     with pytest.raises(ProposedStudyError, match="renewal"):
-        s.resume(REF, token, T0 + timedelta(days=14))
-    s.resume(REF, renewed, T0 + timedelta(days=14))
+        s.resume(REF, token, after_original_expiry)
+    s.resume(REF, renewed, after_original_expiry)
     assert not s.redacted_progress(REF)["paused"]
-    s.pause(REF, renewed, T0 + timedelta(days=14))
+    s.pause(REF, renewed, after_original_expiry)
     with pytest.raises(ProposedStudyError, match="interval"):
-        s.resume(REF, renewed, T0 + timedelta(days=29))
+        s.resume(REF, renewed, T0 + timedelta(days=29, seconds=2))
 
 
 def test_token_secrets_not_exposed_in_sanitized_progress(tmp_path):
