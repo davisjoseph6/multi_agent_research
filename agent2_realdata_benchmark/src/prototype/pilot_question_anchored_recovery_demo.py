@@ -34,7 +34,9 @@ def verify_error_anchor(
     return item, choice, option_map[choice]
 
 
-def two_choice_retry(item: Item, choice: str) -> dict:
+def two_choice_retry(
+    item: Item, choice: str, *, include_prior_wrong: bool = False,
+) -> dict:
     """Re-present the SAME practice stem with correct+NEW wrong distractor.
 
     The learner has already been told the previous choice was incorrect.
@@ -49,9 +51,13 @@ def two_choice_retry(item: Item, choice: str) -> dict:
         option_id for option_id, _ in item.options
         if option_id not in (item.answer_id, choice)
     ]
-    if not different_distractors:
+    if not different_distractors and not include_prior_wrong:
         raise PilotSequenceError("two-choice retry requires a different distractor")
-    distractor = different_distractors[0]
+    # Explicit new V2 request: original wrong choice + correct answer.
+    # The learner can infer the correct answer from knowing the original
+    # choice was incorrect, so such a retry is instructional, not
+    # an independent assessment or unbiased proof of mastery.
+    distractor = choice if include_prior_wrong else different_distractors[0]
     question = item.public()
     question["options"] = [
         (option_id, label) for option_id, label in item.options
