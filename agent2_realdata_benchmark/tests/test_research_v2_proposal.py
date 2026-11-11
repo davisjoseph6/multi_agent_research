@@ -90,6 +90,21 @@ def test_counterbalanced_period_sequence_and_single_current_arm():
     assert not state.authenticate(first, T0 + timedelta(days=14, seconds=1))
     with pytest.raises(ProposedStudyError, match="one active token"):
         state.issue_next_token(T0, prior_period_complete=True)
+    with pytest.raises(ProposedStudyError, match="verified fictional contact"):
+        state.renew_same_arm_token(
+            T0 + timedelta(days=13), contact_identity_verified=True,
+        )
+    state.contact_reference = "SYN_CONTACT_test"
+    with pytest.raises(ProposedStudyError):
+        state.renew_same_arm_token(
+            T0 + timedelta(days=13), contact_identity_verified=False,
+        )
+    second = state.renew_same_arm_token(
+        T0 + timedelta(days=13), contact_identity_verified=True,
+    )
+    assert not state.authenticate(first, T0 + timedelta(days=13))
+    assert state.authenticate(second, T0 + timedelta(days=27))
+
     state.record_question("ITEM001")
     with pytest.raises(ProposedStudyError, match="cannot repeat"):
         state.record_question("ITEM001")
