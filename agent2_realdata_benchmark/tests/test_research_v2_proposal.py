@@ -180,6 +180,9 @@ def test_sequential_unlock_disallows_next_arm_and_repeated_questions():
     assert state.authenticate(t2, T0 + timedelta(days=1))
     with pytest.raises(ProposedStudyError, match="cannot repeat"):
         state.record_question(last)
+    # Second period has its own complete baseline before practice.
+    for i in range(16):
+        state.record_question(f"C_pretest_{i}", form="pretest")
     state.record_question("C_new_question")
     assert state.current_arm == "C"
 
