@@ -331,3 +331,65 @@ def test_recovery_pause_is_registered_in_contact_vault_and_resumable(harness):
     ok(harness, "resume")
     assert runtime.contacts.inspect_redacted("SYN_CONTACT_F1")["paused_at"] is None
     assert ok(harness, "item", {"language": "en"})["kind"] == "question"
+
+
+
+def test_explicit_fictional_restart_preserves_scores_and_revokes_old_token(tmp_path):
+    from src.prototype.research_v2_proposal import ProposedStudyError
+
+    runtime1 = new_fictional_runtime(tmp_path, clock=lambda: NOW)
+    ref = runtime1.identities["F1"]
+    original_token = runtime1.tokens["F1"]
+    q = fictional_item(0, "pretest", 0, "en")
+    runtime1.store.record(
+        ref, original_token, request_id="saved_restart_01",
+        item_id=q["item_id"], form="pretest",
+        correct=True, concept=q["concept"],
+        selected_index=q["correct_index"], at=NOW,
+    )
+    runtime1.store.pause(ref, original_token, NOW)
+    runtime1.contacts.pause("SYN_CONTACT_F1", NOW)
+
+    runtime2 = new_fictional_runtime(
+        tmp_path, clock=lambda: NOW, resume_existing=True,
+    )
+    assert runtime2.store.redacted_progress(ref)["counts"]["pretest"] == 1
+    assert runtime2.store.redacted_progress(ref)["paused"]
+    assert runtime2.tokens["F1"] != original_token
+    with pytest.raises(ProposedStudyError, match="renewal"):
+        runtime2.store.resume(ref, original_token, NOW)
+    app = make_fictional_v2_app(runtime2, port=PORT)
+    client = app.test_client()
+    page = client.get("/", base_url=f"http://127.0.0.1:{PORT}")
+    nonce = re.search(
+        r'data-preview-nonce="([^"]+)"', page.get_data(as_text=True)
+    ).group(1)
+    h2 = (runtime2, client, nonce)
+    assert ok(h2, "status")["paused"] is True
+    ok(h2, "resume")
+    assert ok(h2, "status")["paused"] is False
+    assert ok(h2, "item", {"language":"fr"})["item_id"] == (
+        "SYN_P0_pretest_001"
+    )
+    assert not runtime2.contacts.inspect_redacted("SYN_CONTACT_F1")["paused_at"]
+
+
+def test_fictional_restart_rejects_partial_or_foreign_contact_roster(tmp_path):
+    from src.prototype.research_v2_crossover_fixture import FictionalCrossoverStore
+    # A half-created database must not be silently reinitialized or used.
+    FictionalCrossoverStore(tmp_path / "fictional_crossover.sqlite3")
+    with pytest.raises(ValueError, match="partial fictional database"):
+        new_fictional_runtime(tmp_path, clock=lambda: NOW)
+    # A fully seeded but tampered .test identity must also be rejected.
+    isolated = tmp_path / "complete"
+    isolated.mkdir()
+    runtime = new_fictional_runtime(isolated, clock=lambda: NOW)
+    with runtime.contacts._tx() as db:
+        db.execute(
+            "UPDATE contacts SET email=? WHERE ref=?",
+            ("real@university.edu", "SYN_CONTACT_F1"),
+        )
+    with pytest.raises(ValueError, match="foreign or incomplete"):
+        new_fictional_runtime(
+            isolated, clock=lambda: NOW, resume_existing=True,
+        )
