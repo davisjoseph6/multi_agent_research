@@ -553,7 +553,7 @@ class SupervisorSyntheticStore:
                 raise SyntheticStudyError("fatigue survey is not due")
             session = state["session"]
             db.execute(
-                "INSERT INTO surveys VALUES(?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO surveys VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (ref, session, iso(at), *values, time_ms),
             )
             db.execute(
