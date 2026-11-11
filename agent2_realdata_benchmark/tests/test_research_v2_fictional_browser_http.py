@@ -224,3 +224,72 @@ def test_no_script_inline_or_unprotected_browser_asset(harness):
         assert r.status_code==200 and r.headers["Cache-Control"]=="no-store"
     assert "fetch(" in client.get("/research-v2.js",
         base_url=f"http://127.0.0.1:{PORT}").get_data(as_text=True)
+
+
+
+def test_independent_assessment_feedback_is_hidden_until_period_end(harness):
+    for i in range(16):
+        result = synthetic_question(harness, "pretest", i)
+        assert "correct" not in result and "answer_key" not in result
+    during_practice = ok(harness, "mastery")
+    assert during_practice["available"] is True
+    assert during_practice["independent_scores"] == {
+        "pretest": None, "posttest": None,
+    }
+    for i in range(55):
+        synthetic_question(harness, "practice", i)
+    for i in range(15):
+        result = synthetic_question(harness, "posttest", i)
+        assert "correct" not in result
+        hidden = ok(harness, "mastery")
+        assert hidden["available"] is False
+        assert hidden["reason"] == "posttest_in_progress"
+    last = synthetic_question(harness, "posttest", 15)
+    assert "correct" not in last
+    after = ok(harness, "mastery")
+    assert after["available"] is True
+    assert after["independent_scores"] == {"pretest":16, "posttest":16}
+
+
+@pytest.mark.parametrize("fixture", ("F3", "F4", "F5", "F6"))
+def test_other_first_period_arms_do_not_force_a_recovery(harness, fixture):
+    # F3/F4 begin with B and F5/F6 with C. The HTTP surface does not
+    # reveal that mapping or the hidden synthetic policy label.
+    for i in range(16):
+        q = fictional_item(0, "pretest", i, "en")
+        response = post(harness, "answer", {
+            "fixture": fixture,
+            "item_id": q["item_id"],
+            "selected_index": q["correct_index"],
+            "request_id": f"{fixture}_pretest_{i:03d}",
+        })
+        assert response.status_code == 200
+    for i in range(2):
+        q = fictional_item(0, "practice", i, "en")
+        response = post(harness, "answer", {
+            "fixture": fixture, "item_id": q["item_id"],
+            "selected_index": (q["correct_index"] + 1) % 4,
+            "request_id": f"{fixture}_practice_{i:03d}",
+        })
+        assert response.status_code == 200
+        assert "recovery_required" not in response.json
+    visible = post(harness, "item", {"fixture": fixture, "language": "en"})
+    assert visible.status_code == 200
+    assert visible.json["kind"] == "question"
+    assert "arm" not in str(visible.json).lower()
+
+
+def test_oversize_request_and_non_json_are_refused(harness):
+    runtime, client, nonce = harness
+    url = f"http://127.0.0.1:{PORT}"
+    headers = {"Origin": url, "X-Preview-Nonce": nonce}
+    oversized = client.post("/research-v2/api/status",
+        data="x" * 5000,
+        headers=headers | {"Content-Type": "application/json"},
+        base_url=url)
+    assert oversized.status_code == 413
+    not_json = client.post("/research-v2/api/status",
+        data="fixture=F1", headers=headers, base_url=url)
+    assert not_json.status_code == 415
+    for invalid in ("F7", "SYN_CROSSOVER_F1", "../F1"):
+        assert post(harness, "status", {"fixture": invalid}).status_code == 409
