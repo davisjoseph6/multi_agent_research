@@ -440,7 +440,16 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                     policy["mastery"][item.concept] = BKT().posterior(
                         policy["mastery"][item.concept], correct
                     )
-                elif state.stage == "practice":
+                elif (
+                    state.stage == "practice"
+                    or (self.mandatory_two_wrong_recovery
+                        and kind == "DROP_2"
+                        and state.stage == "mvas_post"
+                        and selected.get("forced_trigger")
+                            == "TWO_CONSECUTIVE_WRONG_PRACTICE")
+                ):
+                    # Only scored responses update BKT. A completed text
+                    # summary/hint/example does not imply learning.
                     belief = Belief(policy["mastery"].copy())
                     belief.observe(item.concept, correct)
                     policy["mastery"] = belief.mastery
@@ -500,6 +509,53 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                         action_id=action_id, action_kind=kind,
                         assigned_arm=policy["arm"])
         return {**result, "replayed": False}
+
+    def choose_after_forced_recovery(
+        self, pid: str, *, decision: str,
+        at: datetime | None = None,
+    ) -> dict:
+        """Operator-less decision only in opt-in SYNTHETIC fictional UI.
+
+        The durable policy blocks new questions and the post-fatigue rating
+        until the fictional learner chooses to continue or save. Resumption
+        uses the same record. It does not send emails or authorize humans.
+        """
+        if not self.mandatory_two_wrong_recovery:
+            raise PilotSequenceError("experimental two-error mode is disabled")
+        if decision not in ("continue", "pause", "resume"):
+            raise PilotSequenceError("invalid post-recovery choice")
+        timestamp = _at(at)
+        with self._transaction() as db:
+            state = self._load(db, pid)
+            policy = self._policy(db, pid)
+            if policy["arm"] != "A":
+                raise PilotSequenceError("only fictional Arm A has a recovery choice")
+            pending = db.execute(
+                "SELECT COUNT(*) FROM pilot_actions WHERE pid=? "
+                "AND completed_at IS NULL", (pid,),
+            ).fetchone()[0]
+            if pending or (state.last_event_at is not None
+                           and timestamp < state.last_event_at):
+                raise PilotSequenceError("pending action or invalid event time")
+            previous = policy.get("awaiting_continue_choice")
+            if (previous == "ask" and decision not in ("continue", "pause")
+                    or previous == "paused" and decision != "resume"
+                    or previous not in ("ask", "paused")):
+                raise PilotSequenceError("choice is not expected in this state")
+            policy["awaiting_continue_choice"] = (
+                "paused" if decision == "pause" else None
+            )
+            self._save_policy(db, pid, policy)
+            self._event(
+                db, pid, timestamp, "fictional_recovery_continuation_choice",
+                decision=decision,
+            )
+            return {
+                "accepted": True,
+                "paused": decision == "pause",
+                "synthetic_only": True,
+                "human_enrollment_authorized": False,
+            }
 
     def snapshot(self, pid: str) -> dict:
         """Atomic, query-only synthetic status across state and arm policy."""
