@@ -463,6 +463,7 @@ class FictionalCrossoverStore:
                 "period_index": row["period"],
                 "counts": counts,
                 "paused": row["paused_at"] is not None,
+                "period_token_active": row["token_hash"] is not None,
                 "recovery_due": bool(row["recovery_pending"]),
                 "awaiting_continue": bool(row["awaiting_continue"]),
                 "finished": row["period"] == 3,
