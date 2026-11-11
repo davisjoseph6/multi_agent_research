@@ -42,6 +42,15 @@ def replay_case(case: int, directory: Path) -> dict:
     screening = {x.question_id:choose(
         bank,x.question_id,False,"screening")
         for x in bank.forms["screening"]}
+    # A/B/C allocation is by the number of eligible registrations.
+    # Advance the fictional rotation to B for case 6 or C for case 7.
+    for seed in range({6: 1, 7: 2}.get(case, 0)):
+        store.register(
+            contact_email=f"seed{seed}@example.test",
+            econ_course=False, screening_answers=screening,
+            consent_version="supervisor-synthetic-v1",
+            consent_given=True, age=24, program="Fictional seed", at=T0,
+        )
     identity = store.register(
         contact_email=f"case{case}@example.test",
         econ_course=False, screening_answers=screening,
