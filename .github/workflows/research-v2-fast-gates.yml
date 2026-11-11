@@ -7,6 +7,7 @@ on:
       - 'agent2_realdata_benchmark/scripts/research_v2_preflight.py'
       - 'agent2_realdata_benchmark/scripts/research_v2_fulljourney_smoke.py'
       - 'agent2_realdata_benchmark/scripts/research_v2_fictional_browser.py'
+      - 'agent2_realdata_benchmark/scripts/research_v2_reminder_dry_run.py'
       - 'agent2_realdata_benchmark/src/prototype/static/research_v2_fictional_browser.*'
       - 'agent2_realdata_benchmark/src/prototype/templates/research_v2_fictional_browser.html'
       - '.github/workflows/research-v2-fast-gates.yml'
@@ -37,6 +38,11 @@ jobs:
           tests/test_research_v2_fulljourney_smoke.py
           tests/test_research_v2_mastery_trace.py
           tests/test_research_v2_fictional_browser_http.py
+          tests/test_research_v2_reminder_dry_run.py
+      - name: Verify six-sequence browser-free and bilingual reminder demos
+        run: |
+          python -m scripts.research_v2_fulljourney_smoke
+          python -m scripts.research_v2_reminder_dry_run
       - name: Assert genuine study release stays blocked
         run: |
           python - <<'PY'
