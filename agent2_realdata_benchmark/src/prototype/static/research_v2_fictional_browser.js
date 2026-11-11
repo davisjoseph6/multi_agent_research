@@ -64,13 +64,17 @@
        $("mastery").textContent="Mastery unavailable outside an active fictional period";
      }else{
        const result=await call("mastery",{});
-       const last=result.points[result.points.length-1];
-       $("mastery").textContent=JSON.stringify({
-         provisional_mastery:last.mastery,
-         answered:last.answered,
-         independent_scores:result.independent_scores,
-         synthetic_only:true
-       },null,2);
+       if(result.available===false){
+         $("mastery").textContent="Assessment in progress: mastery feedback withheld.";
+       }else{
+         const last=result.points[result.points.length-1];
+         $("mastery").textContent=JSON.stringify({
+           provisional_mastery:last.mastery,
+           answered:last.answered,
+           independent_scores:result.independent_scores,
+           synthetic_only:true
+         },null,2);
+       }
      }
    }catch(e){message(e.message);show()}finally{waiting=false}
  }
