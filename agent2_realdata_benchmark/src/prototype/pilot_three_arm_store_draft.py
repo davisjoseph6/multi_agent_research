@@ -178,7 +178,8 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
         )
         if self.mandatory_two_wrong_recovery:
             policy.update(two_wrong_streak=0, forced_recovery_count=0,
-                          awaiting_continue_choice=None)
+                          awaiting_continue_choice=None,
+                          paused_at=None)
         with self._transaction() as db:
             db.execute(
                 "INSERT INTO pilot_people(pid,state,created_at) VALUES(?,?,?)",
@@ -215,6 +216,7 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                 policy["two_wrong_streak"] = 0
                 policy["forced_recovery_count"] = 0
                 policy["awaiting_continue_choice"] = None
+                policy["paused_at"] = None
             self._save(db, pid, updated)
             self._save_policy(db, pid, policy)
             self._event(db, pid, timestamp, "synthetic_visit_started",
@@ -545,8 +547,17 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                     or previous == "paused" and decision != "resume"
                     or previous not in ("ask", "paused")):
                 raise PilotSequenceError("choice is not expected in this state")
+            if decision == "resume":
+                started = policy.get("paused_at")
+                if started is None:
+                    raise PilotSequenceError("missing fictional pause timestamp")
+                if timestamp - datetime.fromisoformat(started) > timedelta(days=14):
+                    raise PilotSequenceError("fictional pause exceeded the 14-day limit")
             policy["awaiting_continue_choice"] = (
                 "paused" if decision == "pause" else None
+            )
+            policy["paused_at"] = (
+                timestamp.isoformat() if decision == "pause" else None
             )
             self._save_policy(db, pid, policy)
             self._event(
