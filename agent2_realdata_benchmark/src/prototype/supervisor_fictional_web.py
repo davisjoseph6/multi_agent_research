@@ -286,4 +286,24 @@ def make_supervisor_fictional_app(
             result=runtime.store.open_next_session(ref,token,at=runtime.clock())
             return jsonify(result)
 
+    # Legacy API compatibility names from Experimentation.pdf, but with
+    # safe server-side fictional identity and one-step assessment flow. These
+    # are restricted aliases, NOT a route for clients to choose their arm,
+    # import untrusted pretest outcomes, or self-register real participants.
+    @app.post("/initialize_learner")
+    def legacy_initialize():
+        data=payload({"fixture"})
+        with runtime.lock:
+            ref,token=runtime.verified(data["fixture"])
+            state=runtime.store.progress(ref,token)
+            if state["phase"]=="PRETEST":
+                raise SyntheticStudyError("complete 16 independent pretest items first")
+            return jsonify(initialized=True,synthetic_only=True,
+                           human_enrollment_authorized=False)
+
+    app.add_url_rule("/get_next_action",endpoint="legacy_get_next_action",
+                     view_func=item,methods=["POST"])
+    app.add_url_rule("/update_after_response",endpoint="legacy_update_after_response",
+                     view_func=answer,methods=["POST"])
+
     return app
