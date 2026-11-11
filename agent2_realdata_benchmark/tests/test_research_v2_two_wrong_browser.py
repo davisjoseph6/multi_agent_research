@@ -135,9 +135,15 @@ def test_all_twenty_wrong_trigger_ten_interventions_including_before_post_fatigu
                 choices = {key for key, _ in intervention["question"]["options"]}
                 assert choices == {original.answer_id, wrong}
                 response = {"choice_id": original.answer_id}
+                with study.learning._read_transaction() as db:
+                    mastery_before = study.learning._policy(db, learner)["mastery"]
             else:
                 response = {"status": "completed"}
             _send(study, learner, response, t)
+            if intervention["action"] == "DROP_2":
+                with study.learning._read_transaction() as db:
+                    mastery_after = study.learning._policy(db, learner)["mastery"]
+                assert mastery_after == mastery_before
             received.append(intervention["action"])
             assert study.learning.next_action(learner, at=t)["action"] == "CONTINUE_OR_PAUSE"
             study.learning.choose_after_forced_recovery(
