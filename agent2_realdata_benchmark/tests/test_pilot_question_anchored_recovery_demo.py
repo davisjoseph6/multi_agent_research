@@ -103,9 +103,6 @@ def test_each_recovery_is_based_on_last_wrong_question(tmp_path, monkeypatch, ac
         assert question["fictional_question_anchored_retry"]
         assert len(question["options"]) == 2
         assert {x for x, _ in question["options"]} == {wrong, mistaken.answer_id}
-        with pytest.raises(PilotSequenceError, match="not offered"):
-            store.mark_rendered(pid, response["action_id"], at=at)
-            # Never entered: see separate invalid-choice test.
         _submit(store, pid, response, {"choice_id": wrong}, at)
     else:
         assert "question" not in response
@@ -124,7 +121,6 @@ def test_recovery_cannot_be_offered_without_a_recorded_wrong_answer(tmp_path, mo
     def invented(state):
         assert state["last_incorrect_concept"] is None
         return {"action": "SOCRATIC_HINT", "concept": CONCEPTS[0], "item_id": None}
-    monkeypatch.setattr(store.selector, "_candidate", invented)
     # Complete pretest, M-VAS and one correct practice response to reach index 1.
     at = T0 + timedelta(seconds=1)
     for _ in range(16):
@@ -139,6 +135,7 @@ def test_recovery_cannot_be_offered_without_a_recorded_wrong_answer(tmp_path, mo
     item = store.policy_bank.by_id[a["question"]["item_id"]]
     _submit(store, pid, a, {"choice_id": item.answer_id}, at)
     at += timedelta(seconds=1)
+    monkeypatch.setattr(store.selector, "_candidate", invented)
     with pytest.raises(PilotSequenceError, match="no incorrect practice answer"):
         store.next_action(pid, at=at)
 
