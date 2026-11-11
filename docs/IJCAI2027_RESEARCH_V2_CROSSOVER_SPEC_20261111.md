@@ -206,3 +206,51 @@ verified source snapshot; never expose this app through Caddy.
 **No part of this proposal authorizes enrollment, email dispatch,
 production recruitment, an actual crossover RCT or claims of
 scientifically established recovery benefits.**
+
+## 7. Newly added isolated persistence and end-to-end smoke
+
+The following additional files are **synthetic-only** and intentionally not
+wired into a production public API:
+
+- `src/prototype/research_v2_reminder_outbox.py`: distinct private SQLite
+  contact store, explicit opt-in, three-day reminder reservations, second
+  notice three days after **actual fictional delivery**, withdrawal,
+  completion, opt-out, 14-day pause limit, and duplicate prevention.
+  Only reserved `.test` recipients and `SYN_CONTACT_*` identifiers are
+  accepted. It does **not** send actual emails or contain any SMTP credentials.
+- `src/prototype/research_v2_crossover_fixture.py`: fictional durable three-
+  period ledger, hashed 14-day period tokens, verified-fictional-identity
+  token rotation, sequential pretest/practice/posttest barriers, global
+  no-repeat questions, one-time immediate Arm-A DROP_2 retries, and
+  idempotent request replay with payload-integrity checks.
+- `scripts/research_v2_fulljourney_smoke.py`: an isolated six-sequence
+  rehearsal that passes 261 **synthetic IDs** through each period sequence,
+  checks two preview reminder acknowledgments and two synthetic recovery
+  triggers, and deliberately sends zero actual emails.
+
+These improvements DO NOT add 261 authored/reviewed research questions,
+French translation, authenticated web enrollment, a real contact-service
+sender, external ethics approval, or an actual integrated three-arm crossover
+participant browser. The fictional scores do NOT constitute empirical
+educational evidence.
+
+Run after checking out the proposed V2 branch:
+
+```bash
+cd agent2_realdata_benchmark
+python -m pip install pytest
+python -m pytest -q \
+  tests/test_research_v2_proposal.py \
+  tests/test_research_v2_preflight.py \
+  tests/test_research_v2_reminder_outbox.py \
+  tests/test_research_v2_crossover_fixture.py \
+  tests/test_research_v2_fulljourney_smoke.py
+python -m scripts.research_v2_fulljourney_smoke
+python -m scripts.research_v2_preflight
+# Expected: BLOCKED_NOT_APPROVED and exit status 2
+```
+
+GitHub workflow `.github/workflows/research-v2-fast-gates.yml` runs
+these lightweight tests and independently checks that human-study release
+remains prohibited. Full self-contained regression coverage still runs in
+`.github/workflows/rct-hardening-ci.yml`.
