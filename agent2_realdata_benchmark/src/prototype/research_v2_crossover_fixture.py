@@ -21,6 +21,7 @@ import sqlite3
 from .research_v2_proposal import (
     QUESTIONS_PER_ARM, ProposedStudyError, ordered_arms, utc,
 )
+from .study_v2 import RECOVERY_ACTIONS
 
 
 TOKEN_TTL = timedelta(days=14)
@@ -54,6 +55,10 @@ class FictionalCrossoverStore:
                     expires TEXT,
                     paused_at TEXT,
                     last_wrong TEXT,
+                    wrong_streak INTEGER NOT NULL DEFAULT 0,
+                    recovery_pending TEXT,
+                    recovery_completed INTEGER NOT NULL DEFAULT 0,
+                    awaiting_continue INTEGER NOT NULL DEFAULT 0,
                     withdrawn INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE TABLE IF NOT EXISTS exposures(
@@ -73,6 +78,12 @@ class FictionalCrossoverStore:
                     PRIMARY KEY(ref,request_id)
                 );
             """)
+            schema = {r["name"] for r in db.execute("PRAGMA table_info(fictional_learners)")}
+            if not {"wrong_streak", "recovery_pending", "recovery_completed",
+                    "awaiting_continue"}.issubset(schema):
+                raise ProposedStudyError(
+                    "old fictional crossover schema unsupported; use a new isolated test DB"
+                )
         os.chmod(self.path, 0o600)
 
     @contextmanager
@@ -202,15 +213,26 @@ class FictionalCrossoverStore:
             if row["period"] >= 3:
                 raise ProposedStudyError("all periods complete")
             arm = row["sequence"][row["period"]]
+            if row["awaiting_continue"]:
+                raise ProposedStudyError("learner must choose continue or pause after recovery")
             if kind == "DROP_2":
                 if (arm != "A" or form != "practice"
+                        or row["recovery_pending"] != "DROP_2"
                         or row["last_wrong"] != item_id):
-                    raise ProposedStudyError("DROP_2 must immediately retry latest wrong A item")
+                    raise ProposedStudyError(
+                        "DROP_2 requires the second consecutive wrong Arm A item"
+                    )
                 db.execute(
-                    "UPDATE fictional_learners SET last_wrong=NULL WHERE ref=?", (ref,)
+                    "UPDATE fictional_learners SET last_wrong=NULL,wrong_streak=0,"
+                    "recovery_pending=NULL,awaiting_continue=1,"
+                    "recovery_completed=recovery_completed+1 WHERE ref=?", (ref,)
                 )
                 counted = False
             else:
+                if row["recovery_pending"] is not None:
+                    raise ProposedStudyError(
+                        "recovery must complete before another question or fatigue"
+                    )
                 counts = self._counts(db, ref, row["period"])
                 if counts[form] >= QUESTIONS_PER_ARM[form]:
                     raise ProposedStudyError("period form exhausted")
@@ -225,16 +247,23 @@ class FictionalCrossoverStore:
                     )
                 except sqlite3.IntegrityError as exc:
                     raise ProposedStudyError("question repeated across periods") from exc
+                streak = (row["wrong_streak"] + 1 if not correct else 0
+                          ) if arm == "A" and form == "practice" else 0
+                recovery = (RECOVERY_ACTIONS[row["recovery_completed"] % len(RECOVERY_ACTIONS)]
+                            if streak >= 2 else None)
                 db.execute(
-                    "UPDATE fictional_learners SET last_wrong=? WHERE ref=?",
+                    "UPDATE fictional_learners SET last_wrong=?,wrong_streak=?,"
+                    "recovery_pending=? WHERE ref=?",
                     (item_id if arm == "A" and form == "practice" and not correct
-                     else None, ref),
+                     else None, streak, recovery, ref),
                 )
                 counted = True
             result = {
                 "accepted": True, "replayed": False, "counted": counted,
                 "synthetic_only": True,
             }
+            if kind == "QUESTION" and recovery is not None:
+                result["recovery_required"] = recovery
             db.execute(
                 "INSERT INTO submissions(ref,request_id,fingerprint,result) "
                 "VALUES(?,?,?,?)",
@@ -242,18 +271,92 @@ class FictionalCrossoverStore:
             )
             return result
 
+
+    def pending_recovery(self, ref: str) -> dict:
+        """Private offline operator state; never exposed as participant auth."""
+        self._ref(ref)
+        with self._transaction() as db:
+            row = self._state(db, ref)
+            return {
+                "action": row["recovery_pending"],
+                "target_item_id": row["last_wrong"] if row["recovery_pending"] else None,
+                "awaiting_continue": bool(row["awaiting_continue"]),
+                "synthetic_only": True,
+            }
+
+    def acknowledge_recovery(self, ref: str, token: str, *, request_id: str,
+                             kind: str, at: datetime) -> dict:
+        """Complete a specific non-DROP_2 intervention before any next question.
+
+        Text acknowledgments never change BKT mastery: they are not scored
+        independent observations. The trusted fictional caller provides kind.
+        """
+        self._ref(ref)
+        if (not isinstance(request_id, str)
+                or not re.fullmatch(r"[A-Za-z0-9_-]{8,80}", request_id)
+                or kind not in RECOVERY_ACTIONS or kind == "DROP_2"):
+            raise ProposedStudyError("invalid fictional recovery acknowledgment")
+        fingerprint = hashlib.sha256(("RESOURCE:" + kind).encode()).hexdigest()
+        with self._transaction() as db:
+            row = self._state(db, ref)
+            self._authorize(row, token, at)
+            prior = db.execute(
+                "SELECT fingerprint,result FROM submissions WHERE ref=? AND request_id=?",
+                (ref, request_id),
+            ).fetchone()
+            if prior:
+                if not hmac.compare_digest(prior["fingerprint"], fingerprint):
+                    raise ProposedStudyError("request replay changed the recovery response")
+                return dict(json.loads(prior["result"])) | {"replayed": True}
+            if row["recovery_pending"] != kind or row["awaiting_continue"]:
+                raise ProposedStudyError("recovery type is not currently pending")
+            db.execute(
+                "UPDATE fictional_learners SET recovery_pending=NULL,wrong_streak=0,"
+                "last_wrong=NULL,awaiting_continue=1,"
+                "recovery_completed=recovery_completed+1 WHERE ref=?", (ref,),
+            )
+            result = {"accepted": True, "replayed": False,
+                      "counted": False, "synthetic_only": True}
+            db.execute(
+                "INSERT INTO submissions(ref,request_id,fingerprint,result) VALUES(?,?,?,?)",
+                (ref, request_id, fingerprint, json.dumps(result, sort_keys=True)),
+            )
+            return result
+
+    def decide_after_recovery(self, ref: str, token: str, *, decision: str,
+                              at: datetime) -> dict:
+        """An explicit learner decision is required after every intervention."""
+        self._ref(ref)
+        if decision not in ("continue", "pause"):
+            raise ProposedStudyError("choose continue or pause")
+        with self._transaction() as db:
+            row = self._state(db, ref)
+            self._authorize(row, token, at)
+            if not row["awaiting_continue"] or row["recovery_pending"]:
+                raise ProposedStudyError("no completed recovery awaiting learner decision")
+            db.execute(
+                "UPDATE fictional_learners SET awaiting_continue=0,paused_at=? WHERE ref=?",
+                (_iso(at) if decision == "pause" else None, ref),
+            )
+        return {"accepted": True, "paused": decision == "pause",
+                "synthetic_only": True}
+
     def finish_period(self, ref: str, token: str, at: datetime) -> int:
         """No next arm until all three independent sections are complete."""
         self._ref(ref)
         with self._transaction() as db:
             row = self._state(db, ref)
             self._authorize(row, token, at)
+            if row["recovery_pending"] or row["awaiting_continue"]:
+                raise ProposedStudyError("complete recovery and continuation before finishing")
             if self._counts(db, ref, row["period"]) != QUESTIONS_PER_ARM:
                 raise ProposedStudyError("87 distinct items required to finish a period")
             next_period = row["period"] + 1
             db.execute(
                 "UPDATE fictional_learners SET period=?,token_hash=NULL,"
-                "expires=NULL,paused_at=NULL,last_wrong=NULL WHERE ref=?",
+                "expires=NULL,paused_at=NULL,last_wrong=NULL,"
+                "wrong_streak=0,recovery_pending=NULL,recovery_completed=0,"
+                "awaiting_continue=0 WHERE ref=?",
                 (next_period, ref),
             )
             return next_period
@@ -294,6 +397,8 @@ class FictionalCrossoverStore:
                 "period_index": row["period"],
                 "counts": counts,
                 "paused": row["paused_at"] is not None,
+                "recovery_due": bool(row["recovery_pending"]),
+                "awaiting_continue": bool(row["awaiting_continue"]),
                 "finished": row["period"] == 3,
                 "synthetic_only": True,
             }
