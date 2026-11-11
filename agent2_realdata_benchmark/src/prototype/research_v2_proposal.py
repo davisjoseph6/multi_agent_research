@@ -158,6 +158,7 @@ class PauseEpisode:
     paused_at: datetime
     last_activity_at: datetime
     reminders_sent: set[int] = field(default_factory=set)
+    first_reminder_at: datetime | None = None
     email_opt_in: bool = False
     withdrawn: bool = False
     completed: bool = False
@@ -171,15 +172,21 @@ class PauseEpisode:
                 or utc(self.last_activity_at) > started
                 or when - started > MAX_PAUSE):
             return ()
-        return tuple(
-            n for n, delta in enumerate(REMIND_AFTER, start=1)
-            if n not in self.reminders_sent and when - started >= delta
-        )
+        # Dispatch at most one email at a time. If a worker is late,
+        # the second reminder is still separated by three actual days,
+        # rather than sending two simultaneous messages on day six.
+        if 1 not in self.reminders_sent:
+            return (1,) if when - started >= REMIND_AFTER[0] else ()
+        if 2 not in self.reminders_sent and self.first_reminder_at is not None:
+            return (2,) if when - utc(self.first_reminder_at) >= timedelta(days=3) else ()
+        return ()
 
     def claim(self, number: int, now: datetime) -> None:
         if number not in self.due(now):
             raise ProposedStudyError("duplicate, premature, or unauthorized reminder")
         self.reminders_sent.add(number)
+        if number == 1:
+            self.first_reminder_at = utc(now)
 
     def may_resume(self, now: datetime) -> bool:
         return (not self.withdrawn and not self.completed
