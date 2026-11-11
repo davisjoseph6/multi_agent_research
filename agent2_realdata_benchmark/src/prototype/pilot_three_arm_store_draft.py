@@ -18,6 +18,9 @@ from pathlib import Path
 import uuid
 
 from .pilot_item_bank_draft import PilotDraftItemBank
+from .pilot_question_anchored_recovery_demo import (
+    contextual_resource, two_choice_retry, verify_error_anchor,
+)
 from .pilot_measurements_draft import MVAS_PROPOSED_VERSION
 from .pilot_session_flow_draft import (
     PilotSequenceError, PilotSessionFlow, answer_question, fatigue_deltas,
@@ -55,7 +58,11 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
 
     def __init__(self, path: str | Path, *,
                  items_path: str | Path, resources_path: str | Path,
-                 simulations: int = 240):
+                 simulations: int = 240,
+                 question_anchored_recovery: bool = False):
+        if type(question_anchored_recovery) is not bool:
+            raise ValueError("synthetic question_anchored_recovery must be a boolean")
+        self.question_anchored_recovery = question_anchored_recovery
         self.policy_bank = PilotDraftItemBank(items_path)
         resource_rows = read_csv(resources_path)
         if len(resource_rows) != 32 or len({
@@ -92,6 +99,8 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
             resource_budget_each_session=2,
             practice_counts=[20, 20, 15],
             mvas_version=MVAS_PROPOSED_VERSION,
+            recovery_targeting=("last_wrong_practice_this_visit_v1"
+                if question_anchored_recovery else "original_concept_level_v3"),
         ))
         super().__init__(path, items_path=items_path)
         with self._transaction() as db:
@@ -183,6 +192,8 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
             # Reset ONLY visit-specific recovery budget. Mastery and 55-item
             # no-repeat history persist over all three visits.
             policy["recovery"] = asdict(RecoveryStatus())
+            if self.question_anchored_recovery:
+                policy["last_incorrect_practice"] = None
             self._save(db, pid, updated)
             self._save_policy(db, pid, policy)
             self._event(db, pid, timestamp, "synthetic_visit_started",
@@ -219,10 +230,29 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                     policy, stage="practice", session=state.session,
                     index=state.index,
                 )
+                if self.question_anchored_recovery and policy["arm"] == "A":
+                    recorded = policy.get("last_incorrect_practice")
+                    selector_state["question_anchored_recovery"] = True
+                    selector_state["last_incorrect_concept"] = (
+                        self.policy_bank.by_id[recorded["item_id"]].concept
+                        if recorded is not None else None
+                    )
                 # V3 selects A planner+recovery, B greedy, C fixed.
                 # The planner can update the recovery-spent counter.
                 selected = self.selector._candidate(selector_state)
                 policy["recovery"] = selector_state["recovery"]
+                if self.question_anchored_recovery and selected["action"] in RECOVERY_ACTIONS:
+                    anchor = policy.get("last_incorrect_practice")
+                    if anchor is None:
+                        raise PilotSequenceError("no incorrect practice answer available for recovery")
+                    item, choice, _wrong_text = verify_error_anchor(
+                        self.policy_bank.by_id, anchor, selected["concept"],
+                        session=state.session,
+                    )
+                    selected["target_item_id"] = item.item_id
+                    selected["target_wrong_choice_id"] = choice
+                    if selected["action"] == "DROP_2":
+                        selected["item_id"] = item.item_id
             else:
                 item = self.policy_bank.select(state)
                 selected = dict(
@@ -248,16 +278,31 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                 if item is None:
                     raise PilotSequenceError("selector returned missing item")
                 required_form = (
-                    "recovery_drop2" if kind == "DROP_2" else state.stage
+                    "practice" if kind == "DROP_2" and self.question_anchored_recovery
+                    else "recovery_drop2" if kind == "DROP_2" else state.stage
                 )
                 if item.form != required_form:
                     raise PilotSequenceError("selector returned incorrect item form")
                 if kind == "QUESTION" and state.stage == "practice" \
                         and item.item_id in policy["used"]:
                     raise PilotSequenceError("practice item already used")
-                public["question"] = item.public()
+                public["question"] = (
+                    two_choice_retry(item, selected["target_wrong_choice_id"])
+                    if kind == "DROP_2" and self.question_anchored_recovery
+                    else item.public()
+                )
             if kind in RECOVERY_ACTIONS:
-                public["resource"] = self.resources[(selected["concept"], kind)]
+                resource = self.resources[(selected["concept"], kind)]
+                if self.question_anchored_recovery:
+                    anchor = policy.get("last_incorrect_practice")
+                    item, choice, wrong_text = verify_error_anchor(
+                        self.policy_bank.by_id, anchor, selected["concept"],
+                        session=state.session,
+                    )
+                    resource = contextual_resource(
+                        resource, item, choice, wrong_text, action=kind,
+                    )
+                public["resource"] = resource
             public["draft_content_not_approved"] = True
             public_json = _json(public)
             db.execute(
@@ -321,8 +366,10 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                 if set(response) != {"choice_id"} or type(response["choice_id"]) is not str:
                     raise PilotSequenceError("one choice_id required")
                 item = self.policy_bank.by_id[selected["item_id"]]
-                if response["choice_id"] not in {k for k, _ in item.options}:
-                    raise PilotSequenceError("option not valid for selected question")
+                if response["choice_id"] not in {
+                    k for k, _ in public.get("question", {}).get("options", ())
+                }:
+                    raise PilotSequenceError("option not offered for selected question")
                 if public.get("question", {}).get("item_id") != item.item_id:
                     raise PilotSequenceError("public/private item mismatch")
                 correct = response["choice_id"] == item.answer_id
@@ -344,6 +391,13 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                         if item.item_id in policy["used"]:
                             raise PilotSequenceError("repeated practice item")
                         policy["used"].append(item.item_id)
+                        if (self.question_anchored_recovery and policy["arm"] == "A"
+                                and not correct):
+                            policy["last_incorrect_practice"] = {
+                                "item_id": item.item_id,
+                                "choice_id": response["choice_id"],
+                                "session": state.session,
+                            }
                     updated = answer_question(state, at=timestamp)
                 else:
                     # DROP_2 is a recovery action, not a 56th practice question.
