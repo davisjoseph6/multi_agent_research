@@ -42,7 +42,15 @@ provided by the local fictional SQLite idempotency key.
 8. Start: python -m scripts.research_v2_fictional_browser --port 8774
 9. In the local machine browser, visit http://127.0.0.1:8774
 
-The launcher uses a temporary SQLite directory, deleted on process exit.
+By default the launcher uses a temporary SQLite directory, deleted on process exit.
+For a **fictional restart/resume drill only**, create a private 0700 directory
+with: mkdir -m 700 ~/ijcai_v2_fictional_state
+Then start with:
+    python -m scripts.research_v2_fictional_browser --state-dir ~/ijcai_v2_fictional_state --port 8774
+Stop the process and run the same command again: the six fake quiz histories,
+paused progress and opt-out preferences remain in the separate SQLite files.
+Active fake tokens are rotated on restart. Unexpected or partial/mixed rosters
+are rejected. Do not put real participant records in that directory.
 Do NOT expose this endpoint to a public interface, reverse proxy, VPS,
 or third-party tunnel.
 
