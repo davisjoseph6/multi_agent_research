@@ -40,6 +40,9 @@ not 261. More than 166 additional normal items would be needed
 to meet the proposed counts: **174** new normal question IDs
 (261-87), assuming no existing item is disqualified.
 All 261 must be translated and independently reviewed in both languages.
+The release validator also requires a shared canonical scored answer position
+(never sent to the learner), distinct choices within each language and
+coverage of all eight concepts in every independent question form.
 
 The explicit `DROP_2` request **re-presents** the last incorrect
 question with the original wrong option and correct option, whereas
@@ -75,6 +78,8 @@ on a new, **empty**, fictional SQLite database:
   discretionary resources are disabled in this mode to prevent
   uncontrolled dose differences. **Do not present this as the
   original pure-POMCP Arm A intervention policy.**
+- The pure crossover progression gate rejects practice before a complete
+  pretest and posttest before complete practice.
 - A 20-question all-wrong visit can trigger 10 interventions.
   These count **in addition** to the 20 practice questions, unlike
   the original per-visit resource budget of **2**.
@@ -150,6 +155,8 @@ or another legally established basis where appropriate.
   261 bilingual independent questions and validated bilingual
   recovery/fatigue materials.
 - The current preview only serves English draft question content.
+- The CSV preflight requires a one-to-one French translation mapping:
+  duplicate approved rows cannot mask an untranslated item.
 - `validate_cross_language_bank` and
   `scripts.research_v2_preflight` fail closed on incomplete French
   translations/review. Never quietly fall back to English questions

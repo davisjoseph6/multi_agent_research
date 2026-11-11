@@ -42,16 +42,20 @@ def preflight(bank_csv: Path, fr_csv: Path | None = None) -> dict:
     else:
         with fr_csv.open(newline="", encoding="utf-8-sig") as stream:
             translations = list(csv.DictReader(stream))
+        # Require exactly one approved translation per English item. A
+        # duplicated approved row must not hide a missing French translation.
+        source_ids = set(ids)
+        translation_counts = Counter(r.get("item_id") for r in translations)
         french_count = sum(
-            r.get("prompt_fr", "").strip() != ""
+            r.get("item_id") in source_ids
+            and bool(r.get("prompt_fr", "").strip())
             and r.get("review_decision_fr") == "approved"
             and all(r.get(f"option_{c}_fr", "").strip() for c in "ABCD")
             for r in translations
         )
-        if french_count < len(rows) or {
-            r.get("item_id") for r in translations
-        } != set(ids):
-            blockers.append("Missing French item/option translations or French independent review")
+        if (french_count != len(rows) or len(translations) != len(rows)
+                or translation_counts != Counter(ids)):
+            blockers.append("Missing, duplicated, or unreviewed French item/option translations")
     blockers.extend([
         "Parallel A/B/C design not approved for within-person crossover with period/carryover control",
         "New 3-period power analysis, estimand, and per-period scoring not approved",

@@ -29,6 +29,7 @@ def _items(*, all_translated=True):
                     english_options=("one", "two", "three", "four"),
                     french_options=("un", "deux", "trois", "quatre"),
                     independently_reviewed_en=True, independently_reviewed_fr=True,
+                    correct_option_index=0,
                 ))
     return rows
 
@@ -69,6 +70,42 @@ def test_missing_items_translation_review_and_duplicates_fail_closed():
         visible_item(full[0], "de")
 
 
+def test_bilingual_bank_rejects_missing_keys_duplicate_choices_and_missing_concepts():
+    from dataclasses import replace
+    complete = _items()
+    changed = complete[:]
+    changed[0] = replace(changed[0], correct_option_index=None)
+    with pytest.raises(ProposedStudyError, match="answer key"):
+        validate_cross_language_bank(changed)
+    with pytest.raises(ProposedStudyError, match="answer key"):
+        visible_item(changed[0], "fr")
+    changed = complete[:]
+    changed[0] = replace(changed[0], correct_option_index=4)
+    with pytest.raises(ProposedStudyError, match="answer key"):
+        validate_cross_language_bank(changed)
+    changed = complete[:]
+    changed[0] = replace(changed[0], english_options=("one", "ONE", "three", "four"))
+    with pytest.raises(ProposedStudyError, match="duplicate answer"):
+        validate_cross_language_bank(changed)
+    changed = [replace(x, concept=CONCEPTS[0]) for x in complete]
+    with pytest.raises(ProposedStudyError, match="eight concepts"):
+        validate_cross_language_bank(changed)
+
+
+def test_crossover_rejects_question_forms_out_of_order():
+    state = CrossoverProgress(("A", "C", "B"))
+    state.issue_next_token(T0, prior_period_complete=True)
+    with pytest.raises(ProposedStudyError, match="pretest"):
+        state.record_question("early_practice", form="practice")
+    with pytest.raises(ProposedStudyError, match="practice"):
+        state.record_question("early_posttest", form="posttest")
+    for i in range(16):
+        state.record_question(f"pre_{i}", form="pretest")
+    state.record_question("practice_0", form="practice")
+    with pytest.raises(ProposedStudyError, match="practice"):
+        state.record_question("early_posttest", form="posttest")
+
+
 def test_bilingual_welcome_does_not_promise_untrue_complete_anonymity():
     assert "Bienvenue" in EMAIL_TEMPLATES["fr"]["welcome"]
     assert "Welcome" in EMAIL_TEMPLATES["en"]["welcome"]
@@ -105,6 +142,8 @@ def test_counterbalanced_period_sequence_and_single_current_arm():
     assert not state.authenticate(first, T0 + timedelta(days=13))
     assert state.authenticate(second, T0 + timedelta(days=27))
 
+    for i in range(16):
+        state.record_question(f"BASE_{i}", form="pretest")
     state.record_question("ITEM001")
     with pytest.raises(ProposedStudyError, match="cannot repeat"):
         state.record_question("ITEM001")

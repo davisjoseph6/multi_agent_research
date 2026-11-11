@@ -96,6 +96,8 @@ class ReviewedItem:
     french_options: tuple[str, ...]
     independently_reviewed_en: bool = False
     independently_reviewed_fr: bool = False
+    # Shared canonical answer position: never returned to the learner.
+    correct_option_index: int | None = None
 
 
 def validate_cross_language_bank(items: Sequence[ReviewedItem]) -> dict:
@@ -117,6 +119,8 @@ def validate_cross_language_bank(items: Sequence[ReviewedItem]) -> dict:
     for form, per_period in QUESTIONS_PER_ARM.items():
         if by_form[form] < 3 * per_period:
             raise ProposedStudyError("not enough unique " + form + " forms for all periods")
+        if {item.concept for item in items if item.form == form} != set(CONCEPTS):
+            raise ProposedStudyError("all eight concepts required in each independent form")
     for item in items:
         if item.form not in QUESTIONS_PER_ARM:
             raise ProposedStudyError("only assessment and practice items count toward 261")
@@ -125,6 +129,14 @@ def validate_cross_language_bank(items: Sequence[ReviewedItem]) -> dict:
                 or len(item.english_options) != len(item.french_options)
                 or any(not x.strip() for x in item.english_options + item.french_options)):
             raise ProposedStudyError("question or answer translation missing")
+        if (type(item.correct_option_index) is not int
+                or not 0 <= item.correct_option_index < len(item.english_options)):
+            raise ProposedStudyError("missing or invalid shared English/French answer key")
+        if (len({option.strip().casefold() for option in item.english_options})
+                != len(item.english_options)
+                or len({option.strip().casefold() for option in item.french_options})
+                != len(item.french_options)):
+            raise ProposedStudyError("duplicate answer choices within a language")
         if not (item.independently_reviewed_en and item.independently_reviewed_fr):
             raise ProposedStudyError("unreviewed English/French content cannot be released")
     return {
@@ -142,6 +154,10 @@ def visible_item(item: ReviewedItem, language: str) -> dict:
         raise ProposedStudyError("unsupported UI language")
     if not (item.independently_reviewed_en and item.independently_reviewed_fr):
         raise ProposedStudyError("unreviewed French/English question withheld")
+    if (type(item.correct_option_index) is not int
+            or not 0 <= item.correct_option_index < len(item.english_options)
+            or len(item.english_options) != len(item.french_options)):
+        raise ProposedStudyError("missing or invalid bilingual answer key")
     prompt, choices = (
         (item.english_prompt, item.english_options)
         if language == "en" else (item.french_prompt, item.french_options)
@@ -283,6 +299,10 @@ class CrossoverProgress:
             raise ProposedStudyError("question has unknown independent form")
         if self.form_counts_current_period[form] >= QUESTIONS_PER_ARM[form]:
             raise ProposedStudyError("period form budget exhausted")
+        if form == "practice" and self.form_counts_current_period["pretest"] != 16:
+            raise ProposedStudyError("practice cannot precede a complete pretest")
+        if form == "posttest" and self.form_counts_current_period["practice"] != 55:
+            raise ProposedStudyError("posttest cannot precede complete practice")
         self.exposed_assessment_practice_ids.add(item_id)
         self.seen_in_current_period.add(item_id)
         self.form_counts_current_period[form] += 1
