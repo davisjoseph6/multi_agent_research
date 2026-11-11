@@ -187,6 +187,24 @@ def test_quiz_question_and_reading_recovery_commit_atomically(fixture):
             "SELECT COUNT(*) FROM state_history WHERE learner_id=?", (ref,)
         ).fetchone()[0]
         assert n == h == 28  # 24 before quiz + 2 questions + 2 recovery
+        recent = db.execute(
+            "SELECT action_type,trigger,rule_tags,recovery_attempt,"
+            "recovery_outcome,D_before,D_after,mastery_before,mastery_after "
+            "FROM events WHERE learner_id=? AND phase='QUIZ' ORDER BY event_id",
+            (ref,),
+        ).fetchall()
+        assert len(recent) == 4
+        assert recent[0]["trigger"] == ""
+        assert recent[1]["trigger"] == "5a"
+        assert "5a" in recent[1]["rule_tags"]
+        assert recent[1]["recovery_attempt"].startswith("C1: concept 1/2")
+        assert recent[2]["action_type"] == "CONCEPT_SUMMARY"
+        assert recent[2]["trigger"] == ""
+        assert recent[2]["mastery_before"] == recent[2]["mastery_after"]
+        assert recent[3]["action_type"] == "DROP_2"
+        assert recent[3]["trigger"] == ""
+        assert recent[3]["D_after"] < recent[3]["D_before"]
+        assert recent[3]["recovery_outcome"] == ""
         with pytest.raises(sqlite3.DatabaseError, match="append-only"):
             db.execute("DELETE FROM events WHERE learner_id=?", (ref,))
         with pytest.raises(sqlite3.DatabaseError, match="append-only"):
