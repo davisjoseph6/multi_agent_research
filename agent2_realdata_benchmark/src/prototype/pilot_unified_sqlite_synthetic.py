@@ -240,6 +240,11 @@ class UnifiedSyntheticStudyStore:
             policy["recovery"] = asdict(RecoveryStatus())
             if self.learning.question_anchored_recovery:
                 policy["last_incorrect_practice"] = None
+            if self.learning.mandatory_two_wrong_recovery:
+                policy["two_wrong_streak"] = 0
+                policy["forced_recovery_count"] = 0
+                policy["awaiting_continue_choice"] = None
+                policy["paused_at"] = None
             db.execute(
                 "INSERT INTO admission_visits(pid,visit,started_at) VALUES(?,?,?)",
                 (pid, visit, now.isoformat()),
