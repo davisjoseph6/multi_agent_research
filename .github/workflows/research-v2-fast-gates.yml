@@ -5,6 +5,7 @@ on:
       - 'agent2_realdata_benchmark/src/prototype/research_v2_*.py'
       - 'agent2_realdata_benchmark/tests/test_research_v2_*.py'
       - 'agent2_realdata_benchmark/scripts/research_v2_preflight.py'
+      - 'agent2_realdata_benchmark/scripts/research_v2_fulljourney_smoke.py'
       - '.github/workflows/research-v2-fast-gates.yml'
   workflow_dispatch:
 permissions:
@@ -30,6 +31,7 @@ jobs:
           tests/test_research_v2_preflight.py
           tests/test_research_v2_reminder_outbox.py
           tests/test_research_v2_crossover_fixture.py
+          tests/test_research_v2_fulljourney_smoke.py
       - name: Assert genuine study release stays blocked
         run: |
           python - <<'PY'
