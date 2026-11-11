@@ -55,9 +55,17 @@ class SupervisorTraceEngine:
                 not 0 <= m <= 1 for m in self.mastery.values()):
             raise ValueError("one valid initial mastery per concept required")
         if set(self.bloom) != set(CONCEPT_IDS) or any(
+                type(level) is not int or not 1 <= level <= 6
+                for level in self.bloom.values()):
+            raise ValueError("Bloom level must be 1 through 6")
+        if self.elapsed == 0 and any(
                 level != 1 for level in self.bloom.values()):
             raise ValueError("all Bloom levels must initially equal L1")
-        self.session_peak = self.mastery.copy()
+        if not self.session_peak:
+            self.session_peak = self.mastery.copy()
+        elif (set(self.session_peak) != set(CONCEPT_IDS)
+              or any(not 0 <= p <= 1 for p in self.session_peak.values())):
+            raise ValueError("invalid preserved session mastery peaks")
 
     def snapshot(self) -> dict:
         """JSON-serializable state for atomic persistence after each step."""
