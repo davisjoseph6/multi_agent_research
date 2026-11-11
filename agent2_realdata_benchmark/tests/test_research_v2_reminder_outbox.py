@@ -109,3 +109,32 @@ def test_same_email_cannot_register_as_two_different_fictional_learners(tmp_path
         q.register("SYN_CONTACT_F2", "DEMO@example.test", locale="fr", opted_in=True)
     with pytest.raises(ProposedStudyError, match="already registered"):
         q.register("SYN_CONTACT_F1", "other@example.test", locale="en", opted_in=True)
+
+
+def test_abandoned_outbox_claim_retries_same_queue_id_after_lease(tmp_path):
+    q1 = make(tmp_path)
+    q2 = make(tmp_path)
+    q1.register("SYN_CONTACT_F1", "lease@example.test", locale="en", opted_in=True)
+    q1.pause("SYN_CONTACT_F1", T0)
+    first, = q1.reserve_due(T0 + timedelta(days=3))
+    assert q2.reserve_due(T0 + timedelta(days=3, minutes=29)) == ()
+    assert q2.reserve_due(T0 + timedelta(days=3, minutes=30)) == (first,)
+    assert q1.reserve_due(T0 + timedelta(days=3, minutes=30)) == ()
+    delivered = q2.deliver_preview(first, T0 + timedelta(days=3, minutes=31))
+    assert delivered["preview_delivered"] and not delivered["replayed"]
+    assert q1.reserve_due(T0 + timedelta(days=3, hours=2)) == ()
+    # A second attempt is not counted as a second email.
+    with q1._tx() as db:
+        row = db.execute("SELECT attempts,COUNT(*) AS n FROM outbox WHERE id=?", (first,)).fetchone()
+    assert row["attempts"] == 2
+    assert row["n"] == 1
+
+
+def test_expired_reminder_episode_never_retry_after_lease(tmp_path):
+    q = make(tmp_path)
+    q.register("SYN_CONTACT_F1", "expiry@example.test", locale="fr", opted_in=True)
+    q.pause("SYN_CONTACT_F1", T0)
+    first, = q.reserve_due(T0 + timedelta(days=3))
+    assert q.reserve_due(T0 + timedelta(days=15)) == ()
+    with pytest.raises(ProposedStudyError, match="withheld"):
+        q.deliver_preview(first, T0 + timedelta(days=15))
