@@ -213,6 +213,11 @@ class SupervisorTraceEngine:
         if self.pending:
             self.pending.pop(0)
         c, action = step["concept"], step["action"]
+        tags = []
+        if step.get("skipped_concepts"):
+            tags.append("4a")
+        if step.get("repeated_by_rule_4b"):
+            tags.append("4b")
         if action == "QUESTION":
             if answer not in ("correct", "wrong"):
                 raise ValueError("scored regular question required")
@@ -232,11 +237,13 @@ class SupervisorTraceEngine:
             if (answer == "correct" and self.correct_streak[c] >= 2
                     and self.bloom[c] < 6):
                 self.bloom[c] += 1
+                tags.append("BLOOM_PROMOTION")
                 self.correct_streak[c] = 0
                 self.wrong_streak[c] = 0
             elif (answer == "wrong" and self.wrong_streak[c] >= 2
                     and self.bloom[c] > 1):
                 self.bloom[c] -= 1
+                tags.append("BLOOM_DEMOTION")
                 self.correct_streak[c] = 0
                 self.wrong_streak[c] = 0
             self.session_peak[c] = max(
@@ -248,11 +255,26 @@ class SupervisorTraceEngine:
                     trigger = "5a"
                 elif self.recovery_wrong[c] >= 3:
                     trigger = "5b"
-                if (trigger and self.attempts_session < 2
-                        and self.per_concept_recovery[c] < 2
-                        and c not in self.nonrecoverable):
-                    self.start_recovery(c, trigger)
+                if trigger:
+                    step["trigger"] = trigger
+                    tags.append(trigger)
+                    if self.attempts_session >= 2:
+                        step["trigger"] = "blocked by 6a"
+                        tags.append("6a")
+                    elif self.per_concept_recovery[c] >= 2:
+                        step["trigger"] = "blocked by 6b"
+                        tags.append("6b")
+                    elif c in self.nonrecoverable:
+                        step["trigger"] = "non-recoverable 6c"
+                        tags.append("6c")
+                    else:
+                        self.start_recovery(c, trigger)
+                        step["recovery_attempt"] = (
+                            f"{c}: concept {self.per_concept_recovery[c]}/2, "
+                            f"session {self.attempts_session}/2"
+                        )
         elif action in ("DROP_2", "SOCRATIC_HINT"):
+            tags.append("1")
             if answer not in ("correct", "wrong"):
                 raise ValueError("graded recovery re-attempt required")
             if action != "SOCRATIC_HINT" or step["qid"] not in self.seen:
@@ -262,18 +284,25 @@ class SupervisorTraceEngine:
             self.mastery[c] = BKT().update(
                 self.mastery[c], answer == "correct")
             if action == "SOCRATIC_HINT":
-                if (self.mastery[c] < 0.50
-                        and self.per_concept_recovery[c] >= 2):
+                if self.mastery[c] >= .50:
+                    step["recovery_outcome"] = "RECOVERED"
+                elif self.per_concept_recovery[c] >= 2:
                     self.nonrecoverable.add(c)
                     self.bloom[c] = 1
+                    step["recovery_outcome"] = "NON-RECOVERABLE"
+                    tags.append("6c")
+                else:
+                    step["recovery_outcome"] = "NOT RECOVERED"
                 self.recovery_wrong[c] = 0
                 self.session_peak[c] = self.mastery[c]
                 self.current_recovery = None
         elif action in ("CONCEPT_SUMMARY", "WORKED_EXAMPLE"):
+            tags.append("1")
             if answer != "":
                 raise ValueError("reading resource has no scored answer")
         else:
             raise ValueError("unknown action type")
+        step["rule_tags"] = ";".join(tags)
         return step
 
     def start_recovery(self, concept: str, trigger: str) -> None:
