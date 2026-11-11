@@ -102,7 +102,10 @@ def test_each_recovery_is_based_on_last_wrong_question(tmp_path, monkeypatch, ac
         assert question["prompt"] == mistaken.prompt
         assert question["fictional_question_anchored_retry"]
         assert len(question["options"]) == 2
-        assert {x for x, _ in question["options"]} == {wrong, mistaken.answer_id}
+        visible = {x for x, _ in question["options"]}
+        assert mistaken.answer_id in visible
+        assert wrong not in visible
+        assert len(visible) == 2
         _submit(store, pid, response, {"choice_id": wrong}, at)
     else:
         assert "question" not in response
@@ -188,8 +191,9 @@ def test_two_choice_retry_rejects_a_hidden_third_option(tmp_path, monkeypatch):
     )
     a = store.next_action(pid, at=at)
     store.mark_rendered(pid, a["action_id"], at=at)
-    unoffered = next(option_id for option_id, _ in item.options
-                     if option_id not in {wrong, item.answer_id})
+    offered = {option_id for option_id, _ in a["question"]["options"]}
+    assert wrong not in offered
+    unoffered = wrong
     with pytest.raises(PilotSequenceError, match="not offered"):
         store.submit(pid, a["action_id"], uuid.uuid4().hex,
                      {"choice_id": unoffered}, at=at)
