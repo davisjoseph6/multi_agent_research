@@ -227,3 +227,45 @@ def test_four_step_recovery_is_not_skippable_in_http(h):
     with h[0].store._tx() as db:
         snap=h[0].store._state(db,h[0].roster["F1"][0])
         assert snap["engine"]["question_in_session"]==2
+
+
+
+def test_legacy_supervisor_api_aliases_remain_fictional_and_no_arm_override(h):
+    assert register(h)["eligible"]
+    runtime,client,nonce=h
+    url=f"http://127.0.0.1:{PORT}"
+    headers={"Origin":url,"X-Preview-Nonce":nonce}
+    assert client.post("/initialize_learner",
+        json={"fixture":"F1"},headers=headers,base_url=url
+    ).status_code==409
+    assert client.post("/initialize_learner",
+        json={"fixture":"F1","group":"C"},headers=headers,base_url=url
+    ).status_code==409
+    bank=runtime.store.bank
+    for _ in range(16):
+        answer(h,bank)
+    initialized=client.post("/initialize_learner",
+        json={"fixture":"F1"},headers=headers,base_url=url)
+    assert initialized.status_code==200
+    assert initialized.json["initialized"] is True
+    assert not initialized.json["human_enrollment_authorized"]
+    action=client.post("/get_next_action",
+        json={"fixture":"F1"},headers=headers,base_url=url)
+    assert action.status_code==200
+    assert action.json["kind"]=="question"
+    assert "correct_answer" not in action.json
+    # Answer endpoint rejects any client-specified arm/graded score.
+    qid=action.json["question_id"]
+    selected=bank.get(qid,form="practice").correct_answer
+    forged=client.post("/update_after_response",
+        json={"fixture":"F1","group":"B","question_id":qid,
+              "choice":selected,"request_id":"override_0001"},
+        headers=headers,base_url=url)
+    assert forged.status_code==409
+    genuine=client.post("/update_after_response",
+        json={"fixture":"F1","question_id":qid,
+              "choice":selected,"request_id":"genuine_0001"},
+        headers=headers,base_url=url)
+    assert genuine.status_code==200
+    assert "correct" not in genuine.json
+    assert "token" not in str(genuine.json)
