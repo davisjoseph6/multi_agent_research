@@ -134,8 +134,8 @@ class SyntheticReminderOutbox:
             if row is None or row["withdrawn"] or row["completed"] or row["paused_at"]:
                 raise ProposedStudyError("cannot start a new pause episode")
             db.execute(
-                "UPDATE contacts SET pause_episode=pause_episode+1,paused_at=?,"
-                "first_delivered_at=NULL,second_delivered_at=NULL WHERE ref=?",
+                "UPDATE contacts SET pause_episode=pause_episode+1,paused_at=? "
+                "WHERE ref=?",
                 (at_iso, ref),
             )
 
@@ -201,7 +201,8 @@ class SyntheticReminderOutbox:
                     number = 1 if now - start >= FIRST_AFTER else None
                 elif row["second_delivered_at"] is None:
                     number = (2 if now - _time(row["first_delivered_at"])
-                              >= FOLLOWUP_AFTER_SEND else None)
+                              >= FOLLOWUP_AFTER_SEND
+                              and now - start >= FIRST_AFTER else None)
                 else:
                     number = None
                 if number is None:
@@ -266,7 +267,8 @@ class SyntheticReminderOutbox:
                 valid = (row["first_delivered_at"] is not None
                          and row["second_delivered_at"] is None
                          and now - _time(row["first_delivered_at"])
-                         >= FOLLOWUP_AFTER_SEND)
+                         >= FOLLOWUP_AFTER_SEND
+                         and now - _time(row["paused_at"]) >= FIRST_AFTER)
             if not valid:
                 raise ProposedStudyError("fictional message not yet due")
             if not row["email"].lower().endswith(".test"):
@@ -313,7 +315,8 @@ class SyntheticReminderOutbox:
                 valid = first is None and now - start >= FIRST_AFTER
             else:
                 valid = (first is not None and row["second_delivered_at"] is None
-                         and now - _time(first) >= FOLLOWUP_AFTER_SEND)
+                         and now - _time(first) >= FOLLOWUP_AFTER_SEND
+                         and now - start >= FIRST_AFTER)
             if not valid:
                 raise ProposedStudyError("preview delivery is premature or out of sequence")
             column = "first_delivered_at" if row["reminder"] == 1 else "second_delivered_at"
