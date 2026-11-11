@@ -100,3 +100,12 @@ def test_inactive_and_not_opted_in_contacts_are_never_queued(tmp_path):
     q.pause("SYN_CONTACT_F1", T0)
     assert q.reserve_due(T0 + timedelta(days=10)) == ()
     assert "email" not in q.inspect_redacted("SYN_CONTACT_F1")
+
+
+def test_same_email_cannot_register_as_two_different_fictional_learners(tmp_path):
+    q = make(tmp_path)
+    q.register("SYN_CONTACT_F1", "demo@example.test", locale="en", opted_in=True)
+    with pytest.raises(ProposedStudyError, match="already registered"):
+        q.register("SYN_CONTACT_F2", "DEMO@example.test", locale="fr", opted_in=True)
+    with pytest.raises(ProposedStudyError, match="already registered"):
+        q.register("SYN_CONTACT_F1", "other@example.test", locale="en", opted_in=True)
