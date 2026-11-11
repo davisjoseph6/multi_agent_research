@@ -108,7 +108,7 @@ def test_sequential_unlock_disallows_next_arm_and_repeated_questions():
     assert state.authenticate(t1, T0)
     for form, n in (("pretest", 16), ("practice", 55), ("posttest", 16)):
         for i in range(n):
-            state.record_question(f"A_{form}_{i}")
+            state.record_question(f"A_{form}_{i}", form=form)
     # An immediate Arm A DROP_2 retry is the explicit one-time exception
     # needed to reconcile the original "never repeat" and "re-present" rules.
     last = "A_practice_54"
