@@ -32,6 +32,7 @@ jobs:
           tests/test_research_v2_reminder_outbox.py
           tests/test_research_v2_crossover_fixture.py
           tests/test_research_v2_fulljourney_smoke.py
+          tests/test_research_v2_mastery_trace.py
       - name: Assert genuine study release stays blocked
         run: |
           python - <<'PY'
