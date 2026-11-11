@@ -14,6 +14,7 @@ from tempfile import TemporaryDirectory
 from werkzeug.serving import make_server
 
 from src.prototype.research_v2_crossover_fixture import FictionalCrossoverStore
+from src.prototype.research_v2_reminder_outbox import SyntheticReminderOutbox
 from src.prototype.research_v2_fictional_browser import (
     FIXTURES, FictionalV2Runtime, make_fictional_v2_app,
 )
@@ -26,6 +27,8 @@ def new_fictional_runtime(directory: Path, *, clock=None) -> FictionalV2Runtime:
     if not directory.is_dir():
         raise ValueError("existing isolated directory required")
     study = FictionalCrossoverStore(directory / "fictional_crossover.sqlite3")
+    contacts = SyntheticReminderOutbox(
+        directory / "fictional_contact_outbox.sqlite3")
     now = (clock or (lambda: datetime.now(timezone.utc)))()
     fixtures = {}
     for label, order in zip(FIXTURES, all_sequences()):
@@ -33,7 +36,12 @@ def new_fictional_runtime(directory: Path, *, clock=None) -> FictionalV2Runtime:
         study.enroll_fictional(ref, order)
         token = study.issue_token(ref, now)
         fixtures[label] = (ref, token)
-    return FictionalV2Runtime(study, fixtures, clock=clock)
+        contacts.register(
+            f"SYN_CONTACT_{label}", f"fictional-{label.lower()}@example.test",
+            locale=("en" if label in FIXTURES[:3] else "fr"),
+            opted_in=True,
+        )
+    return FictionalV2Runtime(study, fixtures, clock=clock, contacts=contacts)
 
 
 def main() -> None:
