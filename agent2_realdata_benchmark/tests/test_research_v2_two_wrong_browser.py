@@ -154,6 +154,30 @@ def test_all_twenty_wrong_trigger_ten_interventions_including_before_post_fatigu
     assert study.learning.snapshot(learner)["stage"] == "awaiting_visit"
 
 
+def test_paused_fictional_session_expires_after_fourteen_days(tmp_path):
+    study, roster, operator, fixture, learner = _setup(tmp_path)
+    t = _pretest(study, learner)
+    _wrong(study, learner, t)
+    t += timedelta(minutes=1)
+    _wrong(study, learner, t)
+    t += timedelta(minutes=1)
+    offered = study.learning.next_action(learner, at=t)
+    assert offered["action"] in RECOVERY_ACTIONS
+    _send(study, learner, {"status": "completed"}, t)
+    study.learning.choose_after_forced_recovery(
+        learner, decision="pause", at=t,
+    )
+    assert study.learning.next_action(learner, at=t)["action"] == "PAUSED"
+    with pytest.raises(PilotSequenceError, match="14-day"):
+        study.learning.choose_after_forced_recovery(
+            learner, decision="resume", at=t + timedelta(days=15),
+        )
+    assert study.learning.next_action(learner, at=t)["action"] == "PAUSED"
+    assert not study.learning.choose_after_forced_recovery(
+        learner, decision="resume", at=t + timedelta(days=14),
+    )["paused"]
+
+
 def test_second_wrong_rule_does_not_change_other_arms(tmp_path):
     study, roster, operator, fixture, learner = _setup(tmp_path)
     for f, pid in roster.items():
