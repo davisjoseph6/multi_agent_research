@@ -161,6 +161,10 @@ class SupervisorBank:
         """Cutoff is six; ineligible candidates do not consume arm rotation."""
         if type(econ_course) is not bool:
             raise ValueError("economics background must be explicit boolean")
+        # Explicit economics course exclusion happens BEFORE screening, as
+        # required by Experimentation.pdf's registration instructions.
+        if econ_course:
+            return False, 0
         screening = self.forms["screening"]
         if set(screening_answers) != {
             q.question_id for q in screening
