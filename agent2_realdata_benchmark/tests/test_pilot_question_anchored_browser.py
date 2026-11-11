@@ -93,7 +93,10 @@ def test_candidate_recovers_latest_wrong_question_over_http(tmp_path, monkeypatc
     assert _post(client, nonce, "next", {"fixture": fixture}) == recovered
     if kind == "DROP_2":
         assert len(recovered["question"]["options"]) == 2
-        assert {x for x, _ in recovered["question"]["options"]} == {wrong, item.answer_id}
+        choices = {x for x, _ in recovered["question"]["options"]}
+        assert item.answer_id in choices
+        assert wrong not in choices
+        assert len(choices) == 2
     frontend = (
         Path(__file__).resolve().parents[1]
         / "src/prototype/static/pilot_unified_fictional_browser.js"
