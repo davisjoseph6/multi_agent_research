@@ -14,6 +14,7 @@ from pathlib import Path
 from threading import RLock
 import re
 import secrets
+import time
 from typing import Callable
 
 from flask import Flask, jsonify, render_template, request, send_file
@@ -30,11 +31,18 @@ DEFAULT_EPOCH = datetime(2026,11,11,12,tzinfo=timezone.utc)
 
 class FictionalSupervisorClock:
     def __init__(self, start=DEFAULT_EPOCH):
-        self.now = start
+        self.epoch = start
+        self.started_monotonic = time.monotonic()
+        self.day_offset = 0
+
     def __call__(self):
-        return self.now
+        # Keep the synthetic Day0/Day4/Day8 clock while accurately
+        # measuring wall-clock interaction elapsed time.
+        return (self.epoch + timedelta(days=self.day_offset)
+                + timedelta(seconds=time.monotonic()-self.started_monotonic))
+
     def advance(self):
-        self.now += timedelta(days=4)
+        self.day_offset += 4
 
 
 class FictionalSupervisorRuntime:
@@ -265,9 +273,14 @@ def make_supervisor_fictional_app(
                 raise SyntheticStudyError("survey must be shown first")
             if type(v["values"]) is not list or len(v["values"])!=6:
                 raise SyntheticStudyError("six fatigue responses required")
+            at=runtime.clock()
+            survey_elapsed_ms=max(0,int(
+                (at-prior[1]).total_seconds()*1000,
+            ))
             result=runtime.store.submit_survey(
-                ref,token,values=tuple(v["values"]),time_ms=0,
-                request_id=v["request_id"],at=runtime.clock(),
+                ref,token,values=tuple(v["values"]),
+                time_ms=survey_elapsed_ms,
+                request_id=v["request_id"],at=at,
             )
             runtime.pending.pop(v["fixture"],None)
             return jsonify(result)
