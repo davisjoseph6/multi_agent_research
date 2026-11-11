@@ -147,6 +147,21 @@ function renderResource(payload) {
   if (resource.source) {
     descriptionBox.append(element("p", "Draft source: " + resource.source, "small-print"));
   }
+  // The optional candidate is grounded in a recorded wrong practice answer.
+  // Text is inserted only with textContent, never injected as HTML. Do not
+  // reveal the correct option or private answer key in these annotations.
+  if (resource.question_anchor) {
+    const anchor = resource.question_anchor;
+    descriptionBox.append(
+      element("h3", "Your most recent incorrect practice question"),
+      element("p", anchor.target_question, "question-prompt"),
+      element("p", "Previously selected: " +
+        anchor.prior_selected_option.id + ". " +
+        anchor.prior_selected_option.text, "small-print"),
+      element("p", resource.application_prompt, "resource-text"),
+      element("p", "Question-specific scaffold · draft / not reviewed", "small-print"),
+    );
+  }
   if (payload.action === "DROP_2") {
     renderQuestion(payload);
     return;
