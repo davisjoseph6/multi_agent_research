@@ -49,7 +49,7 @@ class SyntheticReminderOutbox:
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS contacts (
                     ref TEXT PRIMARY KEY,
-                    email TEXT NOT NULL,
+                    email TEXT NOT NULL COLLATE NOCASE UNIQUE,
                     locale TEXT NOT NULL CHECK(locale IN ('en','fr')),
                     opted_in INTEGER NOT NULL CHECK(opted_in IN (0,1)),
                     withdrawn INTEGER NOT NULL DEFAULT 0 CHECK(withdrawn IN (0,1)),
@@ -102,11 +102,16 @@ class SyntheticReminderOutbox:
         self._require_fixture(ref, email)
         if locale not in EMAIL_TEMPLATES or type(opted_in) is not bool:
             raise ProposedStudyError("supported language and explicit email opt-in required")
-        with self._tx() as db:
-            db.execute(
-                "INSERT INTO contacts(ref,email,locale,opted_in) VALUES(?,?,?,?)",
-                (ref, email, locale, int(opted_in)),
-            )
+        try:
+            with self._tx() as db:
+                db.execute(
+                    "INSERT INTO contacts(ref,email,locale,opted_in) VALUES(?,?,?,?)",
+                    (ref, email, locale, int(opted_in)),
+                )
+        except sqlite3.IntegrityError as exc:
+            raise ProposedStudyError(
+                "fictional contact or case-insensitive email already registered"
+            ) from exc
 
     def pause(self, ref: str, at: datetime):
         self._require_fixture(ref)
