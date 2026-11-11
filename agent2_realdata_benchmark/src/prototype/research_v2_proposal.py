@@ -198,6 +198,8 @@ class PauseEpisode:
 class CrossoverProgress:
     """Pure, per-participant synthetic state machine; identity vault is separate."""
     sequence: tuple[str, str, str]
+    # Only a pseudonymous reference to a SEPARATE contact vault, not email.
+    contact_reference: str | None = None
     current_period: int = 0
     finished_periods: set[str] = field(default_factory=set)
     exposed_assessment_practice_ids: set[str] = field(default_factory=set)
@@ -212,6 +214,11 @@ class CrossoverProgress:
         self.sequence = ordered_arms(self.sequence)
         if self.current_period not in (0, 1, 2, 3):
             raise ProposedStudyError("invalid crossover period")
+        if self.contact_reference is not None and (
+            not isinstance(self.contact_reference, str)
+            or not self.contact_reference.startswith("SYN_CONTACT_")
+        ):
+            raise ProposedStudyError("research store accepts only fictional contact references")
 
     @property
     def current_arm(self) -> str | None:
@@ -224,6 +231,26 @@ class CrossoverProgress:
             raise ProposedStudyError("cannot enter next arm before completing current arm")
         if self.active_token_hash is not None:
             raise ProposedStudyError("one active token per learner and period")
+        token = secrets.token_urlsafe(32)
+        self.active_token_hash = hashlib.sha256(token.encode()).hexdigest()
+        self.token_expires_at = utc(now) + TOKEN_LIFETIME
+        return token
+
+    def renew_same_arm_token(
+        self, now: datetime, *, contact_identity_verified: bool,
+    ) -> str:
+        """Rotate credential, never change the active arm or replay questions.
+
+        A separate contact-controller must authenticate the same person.
+        Renewing a token does NOT override the separate 14-day pause limit.
+        """
+        if (contact_identity_verified is not True
+                or self.contact_reference is None
+                or self.current_arm is None
+                or self.active_token_hash is None):
+            raise ProposedStudyError(
+                "independent verified fictional contact and active period required"
+            )
         token = secrets.token_urlsafe(32)
         self.active_token_hash = hashlib.sha256(token.encode()).hexdigest()
         self.token_expires_at = utc(now) + TOKEN_LIFETIME
