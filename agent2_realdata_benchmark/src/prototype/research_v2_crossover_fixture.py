@@ -19,9 +19,9 @@ import secrets
 import sqlite3
 
 from .research_v2_proposal import (
-    QUESTIONS_PER_ARM, ProposedStudyError, ordered_arms, utc,
+    QUESTIONS_PER_ARM, ProposedStudyError, ordered_arms, utc, bkt_trace,
 )
-from .study_v2 import RECOVERY_ACTIONS
+from .study_v2 import CONCEPTS, RECOVERY_ACTIONS
 
 
 TOKEN_TTL = timedelta(days=14)
@@ -66,6 +66,7 @@ class FictionalCrossoverStore:
                     item_id TEXT NOT NULL,
                     period INTEGER NOT NULL,
                     form TEXT NOT NULL,
+                    concept TEXT,
                     correct INTEGER NOT NULL,
                     PRIMARY KEY(ref,item_id),
                     FOREIGN KEY(ref) REFERENCES fictional_learners(ref)
@@ -79,8 +80,12 @@ class FictionalCrossoverStore:
                 );
             """)
             schema = {r["name"] for r in db.execute("PRAGMA table_info(fictional_learners)")}
-            if not {"wrong_streak", "recovery_pending", "recovery_completed",
-                    "awaiting_continue"}.issubset(schema):
+            exposures_schema = {
+                r["name"] for r in db.execute("PRAGMA table_info(exposures)")
+            }
+            if (not {"wrong_streak", "recovery_pending", "recovery_completed",
+                     "awaiting_continue"}.issubset(schema)
+                    or "concept" not in exposures_schema):
                 raise ProposedStudyError(
                     "old fictional crossover schema unsupported; use a new isolated test DB"
                 )
@@ -178,7 +183,8 @@ class FictionalCrossoverStore:
 
     def record(self, ref: str, token: str, *, request_id: str,
                item_id: str, form: str, correct: bool, at: datetime,
-               kind: str = "QUESTION") -> dict:
+               kind: str = "QUESTION",
+               concept: str | None = None) -> dict:
         """The trusted fictional grader supplies scored observations.
 
         Request-ID replay is safe only when the entire payload matches.
@@ -195,8 +201,10 @@ class FictionalCrossoverStore:
             raise ProposedStudyError("invalid scored fictional question")
         if kind == "QUESTION" and form not in QUESTIONS_PER_ARM:
             raise ProposedStudyError("unknown form")
+        if concept is not None and concept not in CONCEPTS:
+            raise ProposedStudyError("unexpected concept metadata")
         payload = json.dumps(
-            [item_id, form, correct, kind], separators=(",", ":"),
+            [item_id, form, correct, kind, concept], separators=(",", ":"),
         )
         fingerprint = hashlib.sha256(payload.encode()).hexdigest()
         with self._transaction() as db:
@@ -242,8 +250,9 @@ class FictionalCrossoverStore:
                     raise ProposedStudyError("complete 55 practice items before posttest")
                 try:
                     db.execute(
-                        "INSERT INTO exposures(ref,item_id,period,form,correct) VALUES(?,?,?,?,?)",
-                        (ref, item_id, row["period"], form, int(correct)),
+                        "INSERT INTO exposures(ref,item_id,period,form,concept,correct)"
+                        " VALUES(?,?,?,?,?,?)",
+                        (ref, item_id, row["period"], form, concept, int(correct)),
                     )
                 except sqlite3.IntegrityError as exc:
                     raise ProposedStudyError("question repeated across periods") from exc
@@ -271,6 +280,47 @@ class FictionalCrossoverStore:
             )
             return result
 
+
+
+    def mastery_trace(self, ref: str, token: str, at: datetime) -> dict:
+        """Current-period provisional eight-concept BKT, never a causal estimate.
+
+        Only trusted server-scored observations with known concept metadata are
+        eligible. The 16-item pre/post observed scores remain independent of
+        BKT and withheld until each assessment is fully completed. This is an
+        authenticated fictional record reader, not a public dashboard route.
+        """
+        self._ref(ref)
+        with self._transaction() as db:
+            row = self._state(db, ref)
+            self._authorize(row, token, at)
+            if row["period"] >= 3:
+                raise ProposedStudyError("completed period token is invalid")
+            answers = db.execute(
+                "SELECT form,concept,correct FROM exposures "
+                "WHERE ref=? AND period=? ORDER BY rowid",
+                (ref, row["period"]),
+            ).fetchall()
+            if any(r["concept"] not in CONCEPTS for r in answers):
+                raise ProposedStudyError(
+                    "cannot estimate BKT without trusted concept metadata"
+                )
+            events = [
+                {"action": "QUESTION", "stage": r["form"],
+                 "concept": r["concept"], "correct": bool(r["correct"])}
+                for r in answers
+            ]
+            report = bkt_trace(events)
+            report["independent_scores"] = {
+                form: (
+                    sum(int(r["correct"]) for r in answers if r["form"] == form)
+                    if sum(r["form"] == form for r in answers)
+                    == QUESTIONS_PER_ARM[form] else None
+                )
+                for form in ("pretest", "posttest")
+            }
+            report.update(period_index=row["period"], synthetic_only=True)
+            return report
 
     def pending_recovery(self, ref: str) -> dict:
         """Private offline operator state; never exposed as participant auth."""
