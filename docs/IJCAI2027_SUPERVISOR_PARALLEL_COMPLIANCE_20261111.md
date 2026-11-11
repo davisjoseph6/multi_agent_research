@@ -53,12 +53,13 @@ existing repository, WITHOUT merging the incompatible crossover proposal in PR #
 | Reminder 24h ahead; reschedule within 48h; remove after two misses | Memory-only fake due notifier and attendance flags | Yes (synthetic) | **No actual email/WhatsApp transport** |
 | Contacts with email/token hash separately stored | Separate SQLite contact DB, .test-only fake identities | Yes | Needs authorization, encryption/key/retention audit |
 | Seven remaining research tables | Config, participants, sessions, state, history, events, surveys | Yes | Institutional data controller signoff |
+| Daily research+contacts database backup; delete contacts at collection end | Integrity-checked local fake SQLite backups to a 0700 folder; explicit fake-contact purge only after all learners inactive | Yes (synthetic tests) | **No production encrypted daily scheduler, offsite restore verification or approved retention** |
 | Each response atomically records events + current state + history | Transactional SQLite; append-only triggers | Yes | Production backup/recovery untested |
 | Never export contacts or treatment to learner UI | No join with PII in research event exports | Yes | Need independent privacy review |
 | Close/reopen during recovery resumes correct state | JSON snapshot and SQLite integration | Yes | End-to-end real browser restart test pending |
 | Exact seven reference cases and 465 rows | Oracle test and full SQLite 3-session rehearsals | Yes | Scripted fixtures not empirical outcomes |
 | Flask/browser interface from Sara/Wiam tasks | Private localhost-only proof-of-concept with fake registrations | Yes | Device/UX/accessibility acceptance pending |
-| NN after real Session1, retrain after Session2, AUC comparison NN/BKT/DKT | Existing repository NeuralCD/BKT research is NOT automatically this 20/21-input NN | No | **Real data and feature schema decision needed** |
+| NN after real Session1, retrain after Session2, AUC comparison NN/BKT/DKT | New strict pre-question 20-feature extraction, 20→64→32→1 optional PyTorch synthetic trainer, grouped holdout; paired AUC/Brier comparison contract | Yes (synthetic tests only) | **Real training data, 20-vs-21 schema choice, DKT predictions and scientific validation needed** |
 | Claude API runtime resource generation | No supplied approved prompt/API entitlement; placeholder deliberately flagged | No | **Requires prompt, provider contract, content review** |
 | 75 eligible real learners, 3 sessions each, 5-person UI check | Nothing conducted; recruitment belongs to institution/team | No | **Requires ethics/admin authorization and actual testing** |
 | Live TLS, mail, monitoring, device/load/security audits | Existing unrelated RCT infrastructure left untouched | No | **14 required release evidence gates** |
@@ -102,3 +103,26 @@ are met, and the 14 mandatory release evidence gates have been signed.
 
 **Passing synthetic tests is evidence of implementation consistency,
 not approval or empirical educational effectiveness.**
+
+## Offline NN software rehearsal, not a scientific result
+
+After installing the pinned project PyTorch environment, the following
+commands display the feature contract and execute an entirely fictional
+train/validation smoke test:
+
+    python -m scripts.supervisor_neural_rehearsal --feature-contract
+    python -m scripts.supervisor_neural_rehearsal --self-test --epochs 2
+
+The module deliberately rejects genuine learner IDs. Real NN/BKT/DKT AUC
+cannot be measured until approved heldout model predictions from actual
+study data exist, and the 20-vs-21 input discrepancy is resolved.
+
+## Fictional database retention drill
+
+A separate optional operator-only module
+`src/prototype/supervisor_fictional_backup.py` makes integrity-checked
+local copies of BOTH fake databases into an existing 0700 directory.
+It never sends them to an external service. Purging contacts additionally
+requires an explicit end-of-collection flag and zero active learners.
+These helpers do NOT substitute for production encrypted, scheduled,
+monitored and independently restored backups.
