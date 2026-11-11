@@ -1,0 +1,436 @@
+"""HTTP integration of private fictional V2 browser with durable crossover."""
+from datetime import datetime, timezone
+from pathlib import Path
+import re
+
+import pytest
+
+from scripts.research_v2_fictional_browser import new_fictional_runtime
+from src.prototype.research_v2_fictional_browser import (
+    fictional_item, make_fictional_v2_app, FIXTURES,
+)
+
+NOW = datetime(2026, 11, 11, 12, tzinfo=timezone.utc)
+PORT = 8774
+
+
+@pytest.fixture
+def harness(tmp_path):
+    runtime = new_fictional_runtime(tmp_path, clock=lambda: NOW)
+    app = make_fictional_v2_app(runtime, port=PORT)
+    app.config["TESTING"] = True
+    client = app.test_client()
+    index = client.get("/", base_url=f"http://127.0.0.1:{PORT}")
+    assert index.status_code == 200
+    html = index.get_data(as_text=True)
+    nonce = re.search(r'data-preview-nonce="([^"]+)"', html).group(1)
+    return runtime, client, nonce
+
+
+def post(h, route, obj=None, *, include_nonce=True, include_origin=True):
+    runtime, client, nonce = h
+    headers = {}
+    if include_nonce:
+        headers["X-Preview-Nonce"] = nonce
+    if include_origin:
+        headers["Origin"] = f"http://127.0.0.1:{PORT}"
+    return client.post(
+        f"/research-v2/api/{route}",
+        json={"fixture": "F1", **(obj or {})},
+        headers=headers,
+        base_url=f"http://127.0.0.1:{PORT}",
+    )
+
+
+def ok(h, route, obj=None):
+    response = post(h, route, obj)
+    assert response.status_code == 200, response.json
+    return response.json
+
+
+def synthetic_question(h, form, index, *, period=0, correct=True,
+                       req_prefix="a"):
+    q = fictional_item(period, form, index, "en")
+    choice = q["correct_index"] if correct else (q["correct_index"] + 1) % 4
+    result = ok(h, "answer", {
+        "item_id": q["item_id"],
+        "selected_index": choice,
+        "request_id": f"{req_prefix}_{period}_{form}_{index:03d}",
+    })
+    return result
+
+
+def test_localhost_origin_nonce_csp_no_human_enrollment_routes(harness):
+    runtime, client, nonce = harness
+    assert post(harness, "status", include_nonce=False).status_code == 403
+    assert post(harness, "status", include_origin=False).status_code == 403
+    assert client.get(
+        "/", base_url=f"http://127.0.0.1:{PORT}",
+        environ_overrides={"REMOTE_ADDR": "203.0.113.9"}
+    ).status_code == 403
+    assert client.get("/", base_url="http://example.invalid").status_code == 403
+    home = client.get("/", base_url=f"http://127.0.0.1:{PORT}")
+    assert home.headers["X-Frame-Options"] == "DENY"
+    assert "frame-ancestors 'none'" in home.headers["Content-Security-Policy"]
+    assert home.headers["Cache-Control"] == "no-store"
+    assert home.headers["X-Synthetic-Only"] == "1"
+    for path in ("/enroll", "/consent", "/admin", "/api/enroll", "/v2/human"):
+        assert client.post(path, base_url=f"http://127.0.0.1:{PORT}").status_code in (403,404)
+    stat = ok(harness, "status")
+    assert not stat["human_enrollment_authorized"]
+    assert not stat["real_email_sent"]
+    assert "arm" not in stat and "token" not in stat
+    assert set(FIXTURES) == set(runtime.identities)
+
+
+def test_bilingual_placeholder_is_explicitly_fake_and_answer_key_is_private(harness):
+    item = ok(harness, "item", {"language": "fr"})
+    assert item["kind"] == "question"
+    assert "FICTIF" in item["prompt"]
+    assert len(item["options"]) == 4
+    assert "correct_index" not in item and "answer_key" not in item
+    assert item["form"] == "pretest"
+    mastery = ok(harness, "mastery")
+    assert mastery["available"] is False
+    assert mastery["reason"] == "pretest_in_progress"
+    assert "email" not in str(mastery).lower()
+
+
+def test_wrong_item_and_forged_scores_cannot_advance(harness):
+    item = ok(harness, "item", {"language": "en"})
+    forged = post(harness, "answer", {
+        "item_id": "SYN_P0_pretest_005",
+        "selected_index": 0, "request_id": "forged_00001",
+    })
+    assert forged.status_code == 409
+    assert post(harness, "answer", {
+        "item_id": item["item_id"], "selected_index": True,
+        "request_id": "forged_00002",
+    }).status_code == 409
+    assert post(harness, "answer", {
+        "item_id": item["item_id"], "selected_index": 0,
+        "request_id": "forged_00003", "correct": True,
+    }).status_code == 409
+    q = fictional_item(0, "pretest", 0, "en")
+    payload = {"item_id": q["item_id"], "selected_index": q["correct_index"],
+               "request_id": "idempotent_00001"}
+    first = ok(harness, "answer", payload)
+    second = ok(harness, "answer", payload)
+    assert "correct" not in first and "correct" not in second
+    assert first["accepted"] and second["replayed"]
+    altered = post(harness, "answer", payload | {
+        "selected_index": (q["correct_index"] + 1) % 4
+    })
+    assert altered.status_code == 409
+    assert ok(harness, "status")["counts"]["pretest"] == 1
+    assert ok(harness, "mastery")["available"] is False
+
+
+def test_two_wrong_intervention_is_anchored_before_next_question(harness):
+    for i in range(16):
+        synthetic_question(harness, "pretest", i)
+    synthetic_question(harness, "practice", 0, correct=False)
+    result = synthetic_question(harness, "practice", 1, correct=False)
+    assert result["recovery_required"] == "CONCEPT_SUMMARY"
+    rec = ok(harness, "item", {"language": "en"})
+    assert rec["kind"] == "recovery" and rec["action"] == "CONCEPT_SUMMARY"
+    assert rec["item_id"] == "SYN_P0_practice_001"
+    assert "counting both groups" in rec["prompt"]
+    assert post(harness, "answer", {
+        "item_id": "SYN_P0_practice_002", "selected_index": 0,
+        "request_id": "bad_during_recovery",
+    }).status_code == 409
+    assert post(harness, "recovery/drop2", {
+        "item_id": rec["item_id"], "selected_index": 0,
+        "request_id": "bad_wrong_action",
+    }).status_code == 409
+    ok(harness, "recovery/ack", {"request_id": "ack_00001"})
+    assert ok(harness, "item", {"language": "en"})["kind"] == "awaiting_continue"
+    assert post(harness, "answer", {
+        "item_id": "SYN_P0_practice_002", "selected_index": 0,
+        "request_id": "bad_skip_continue",
+    }).status_code == 409
+    ok(harness, "decision", {"decision": "continue"})
+    synthetic_question(harness, "practice", 2, correct=False)
+    assert synthetic_question(harness, "practice", 3, correct=False)[
+        "recovery_required"] == "DROP_2"
+    drop = ok(harness, "item", {"language": "fr"})
+    assert len(drop["options"]) == 2
+    expected = fictional_item(0, "practice", 3, "en")
+    indices = {i["choice_index"] for i in drop["options"]}
+    assert indices == {expected["correct_index"],
+                       (expected["correct_index"] + 1) % 4}
+    bad = ok(harness, "recovery/drop2", {
+        "item_id": drop["item_id"],
+        "selected_index": (expected["correct_index"] + 1) % 4,
+        "request_id": "bad_drop2_choice",
+    })
+    assert bad["retry_required"] and not bad["accepted"]
+    completion = ok(harness, "recovery/drop2", {
+        "item_id": drop["item_id"],
+        "selected_index": expected["correct_index"],
+        "request_id": "correct_drop2_choice",
+    })
+    assert completion["accepted"] and not completion["counted"]
+    assert ok(harness, "item", {"language": "en"})["kind"] == "awaiting_continue"
+    ok(harness, "decision", {"decision": "pause"})
+    assert ok(harness, "status")["paused"]
+    assert ok(harness, "item", {"language": "en"})["kind"] == "paused"
+    ok(harness, "resume")
+    assert not ok(harness, "status")["paused"]
+    assert ok(harness, "item", {"language": "en"})["kind"] == "question"
+    trace = ok(harness, "mastery")
+    assert trace["points"][-1]["answered"] == 20
+
+
+def test_all_three_periods_without_repeat_or_cross_participant_leak(harness):
+    # F1 maps to one synthetic sequence; no policy assignment is exposed.
+    for period in range(3):
+        for form in ("pretest", "practice", "posttest"):
+            for i in range({"pretest":16,"practice":55,"posttest":16}[form]):
+                synthetic_question(harness, form, i, period=period)
+        mastery = ok(harness, "mastery")
+        assert mastery["independent_scores"]["pretest"] == 16
+        assert mastery["independent_scores"]["posttest"] == 16
+        assert len(mastery["points"]) == 88
+        assert mastery["available"] is True
+        assert ok(harness, "item", {"language":"en"})["kind"] == "period_complete"
+        outcome = ok(harness, "finish")
+        assert outcome["periods_finished"] == period + 1
+        expected_counts = (
+            {"pretest":0,"practice":0,"posttest":0}
+            if period < 2 else
+            {"pretest":16,"practice":55,"posttest":16}
+        )
+        assert ok(harness, "status")["counts"] == expected_counts
+        if period < 2:
+            assert ok(harness, "item", {"language":"fr"})["kind"] == "between_periods"
+            ok(harness, "start-next")
+        else:
+            assert ok(harness, "item", {"language":"en"})["kind"] == "finished"
+    # F2 has not answered anything; the cohort shares no scored state.
+    other = post(harness, "status", {"fixture": "F2"})
+    assert other.json["counts"] == {"pretest": 0, "practice": 0, "posttest": 0}
+    assert ok(harness, "status")["finished"]
+
+
+def test_no_script_inline_or_unprotected_browser_asset(harness):
+    runtime, client, nonce = harness
+    home = client.get("/", base_url=f"http://127.0.0.1:{PORT}").get_data(as_text=True)
+    assert '<script src="/research-v2.js" defer></script>' in home
+    assert "<script>" not in home and "onclick=" not in home
+    for asset in ("/research-v2.js","/research-v2.css"):
+        r = client.get(asset,base_url=f"http://127.0.0.1:{PORT}")
+        assert r.status_code==200 and r.headers["Cache-Control"]=="no-store"
+    assert "fetch(" in client.get("/research-v2.js",
+        base_url=f"http://127.0.0.1:{PORT}").get_data(as_text=True)
+
+
+
+def test_independent_assessment_feedback_is_hidden_until_period_end(harness):
+    for i in range(16):
+        result = synthetic_question(harness, "pretest", i)
+        assert "correct" not in result and "answer_key" not in result
+    during_practice = ok(harness, "mastery")
+    assert during_practice["available"] is True
+    assert during_practice["independent_scores"] == {
+        "pretest": None, "posttest": None,
+    }
+    for i in range(55):
+        synthetic_question(harness, "practice", i)
+    for i in range(15):
+        result = synthetic_question(harness, "posttest", i)
+        assert "correct" not in result
+        hidden = ok(harness, "mastery")
+        assert hidden["available"] is False
+        assert hidden["reason"] == "posttest_in_progress"
+    last = synthetic_question(harness, "posttest", 15)
+    assert "correct" not in last
+    after = ok(harness, "mastery")
+    assert after["available"] is True
+    assert after["independent_scores"] == {"pretest":16, "posttest":16}
+
+
+@pytest.mark.parametrize("fixture", ("F3", "F4", "F5", "F6"))
+def test_other_first_period_arms_do_not_force_a_recovery(harness, fixture):
+    # F3/F4 begin with B and F5/F6 with C. The HTTP surface does not
+    # reveal that mapping or the hidden synthetic policy label.
+    for i in range(16):
+        q = fictional_item(0, "pretest", i, "en")
+        response = post(harness, "answer", {
+            "fixture": fixture,
+            "item_id": q["item_id"],
+            "selected_index": q["correct_index"],
+            "request_id": f"{fixture}_pretest_{i:03d}",
+        })
+        assert response.status_code == 200
+    for i in range(2):
+        q = fictional_item(0, "practice", i, "en")
+        response = post(harness, "answer", {
+            "fixture": fixture, "item_id": q["item_id"],
+            "selected_index": (q["correct_index"] + 1) % 4,
+            "request_id": f"{fixture}_practice_{i:03d}",
+        })
+        assert response.status_code == 200
+        assert "recovery_required" not in response.json
+    visible = post(harness, "item", {"fixture": fixture, "language": "en"})
+    assert visible.status_code == 200
+    assert visible.json["kind"] == "question"
+    assert "arm" not in str(visible.json).lower()
+
+
+def test_oversize_request_and_non_json_are_refused(harness):
+    runtime, client, nonce = harness
+    url = f"http://127.0.0.1:{PORT}"
+    headers = {"Origin": url, "X-Preview-Nonce": nonce}
+    oversized = client.post("/research-v2/api/status",
+        data="x" * 5000,
+        headers=headers | {"Content-Type": "application/json"},
+        base_url=url)
+    assert oversized.status_code == 413
+    not_json = client.post("/research-v2/api/status",
+        data="fixture=F1", headers=headers, base_url=url)
+    assert not_json.status_code == 415
+    for invalid in ("F7", "SYN_CROSSOVER_F1", "../F1"):
+        assert post(harness, "status", {"fixture": invalid}).status_code == 409
+
+
+
+def test_browser_pause_and_resume_are_reflected_in_separate_contact_vault(harness):
+    runtime, _, _ = harness
+    assert ok(harness, "status")["reminders_opted_in"] is True
+    assert runtime.contacts.inspect_redacted("SYN_CONTACT_F1")["paused_at"] is None
+    ok(harness, "pause")
+    assert ok(harness, "status")["paused"] is True
+    contact = runtime.contacts.inspect_redacted("SYN_CONTACT_F1")
+    assert contact["paused_at"] is not None
+    assert contact["pause_episode"] == 1
+    ok(harness, "resume")
+    assert ok(harness, "status")["paused"] is False
+    assert runtime.contacts.inspect_redacted("SYN_CONTACT_F1")["paused_at"] is None
+
+
+def test_explicit_email_optout_suppresses_future_fictional_queue_claims(harness):
+    runtime, _, _ = harness
+    assert ok(harness, "opt-out")["reminders_opted_in"] is False
+    assert ok(harness, "status")["reminders_opted_in"] is False
+    ok(harness, "pause")
+    assert runtime.contacts.reserve_due(NOW.replace(day=14)) == ()
+    assert ok(harness, "resume")["paused"] is False
+
+
+def test_recovery_pause_is_registered_in_contact_vault_and_resumable(harness):
+    runtime, _, _ = harness
+    for i in range(16):
+        synthetic_question(harness, "pretest", i)
+    synthetic_question(harness, "practice", 0, correct=False)
+    synthetic_question(harness, "practice", 1, correct=False)
+    ok(harness, "recovery/ack", {"request_id": "finished_summary_001"})
+    assert ok(harness, "decision", {"decision": "pause"})["paused"]
+    assert runtime.contacts.inspect_redacted("SYN_CONTACT_F1")["paused_at"]
+    ok(harness, "resume")
+    assert runtime.contacts.inspect_redacted("SYN_CONTACT_F1")["paused_at"] is None
+    assert ok(harness, "item", {"language": "en"})["kind"] == "question"
+
+
+
+def test_explicit_fictional_restart_preserves_scores_and_revokes_old_token(tmp_path):
+    from src.prototype.research_v2_proposal import ProposedStudyError
+
+    runtime1 = new_fictional_runtime(tmp_path, clock=lambda: NOW)
+    ref = runtime1.identities["F1"]
+    original_token = runtime1.tokens["F1"]
+    q = fictional_item(0, "pretest", 0, "en")
+    runtime1.store.record(
+        ref, original_token, request_id="saved_restart_01",
+        item_id=q["item_id"], form="pretest",
+        correct=True, concept=q["concept"],
+        selected_index=q["correct_index"], at=NOW,
+    )
+    runtime1.store.pause(ref, original_token, NOW)
+    runtime1.contacts.pause("SYN_CONTACT_F1", NOW)
+
+    runtime2 = new_fictional_runtime(
+        tmp_path, clock=lambda: NOW, resume_existing=True,
+    )
+    assert runtime2.store.redacted_progress(ref)["counts"]["pretest"] == 1
+    assert runtime2.store.redacted_progress(ref)["paused"]
+    assert runtime2.tokens["F1"] != original_token
+    with pytest.raises(ProposedStudyError, match="renewal"):
+        runtime2.store.resume(ref, original_token, NOW)
+    app = make_fictional_v2_app(runtime2, port=PORT)
+    client = app.test_client()
+    page = client.get("/", base_url=f"http://127.0.0.1:{PORT}")
+    nonce = re.search(
+        r'data-preview-nonce="([^"]+)"', page.get_data(as_text=True)
+    ).group(1)
+    h2 = (runtime2, client, nonce)
+    assert ok(h2, "status")["paused"] is True
+    ok(h2, "resume")
+    assert ok(h2, "status")["paused"] is False
+    assert ok(h2, "item", {"language":"fr"})["item_id"] == (
+        "SYN_P0_pretest_001"
+    )
+    assert not runtime2.contacts.inspect_redacted("SYN_CONTACT_F1")["paused_at"]
+
+
+def test_fictional_restart_rejects_partial_or_foreign_contact_roster(tmp_path):
+    from src.prototype.research_v2_crossover_fixture import FictionalCrossoverStore
+    # A half-created database must not be silently reinitialized or used.
+    FictionalCrossoverStore(tmp_path / "fictional_crossover.sqlite3")
+    with pytest.raises(ValueError, match="partial fictional database"):
+        new_fictional_runtime(tmp_path, clock=lambda: NOW)
+    # A fully seeded but tampered .test identity must also be rejected.
+    isolated = tmp_path / "complete"
+    isolated.mkdir()
+    runtime = new_fictional_runtime(isolated, clock=lambda: NOW)
+    with runtime.contacts._tx() as db:
+        db.execute(
+            "UPDATE contacts SET email=? WHERE ref=?",
+            ("real@university.edu", "SYN_CONTACT_F1"),
+        )
+    with pytest.raises(ValueError, match="foreign or incomplete"):
+        new_fictional_runtime(
+            isolated, clock=lambda: NOW, resume_existing=True,
+        )
+
+
+
+def test_concurrent_duplicate_submit_and_competing_forged_answers(harness):
+    from concurrent.futures import ThreadPoolExecutor
+
+    runtime, _client, nonce = harness
+    app = _client.application
+    q = fictional_item(0, "pretest", 0, "en")
+    original = {
+        "fixture": "F1", "item_id": q["item_id"],
+        "selected_index": q["correct_index"],
+        "request_id": "concurrent_replay_same_request",
+    }
+    def submit(payload):
+        # Each concurrent thread has a separate Flask test client, but the
+        # server shares the same SQLite-backed fictional learner and lock.
+        with app.test_client() as c:
+            resp = c.post("/research-v2/api/answer", json=payload,
+                headers={
+                    "Origin": f"http://127.0.0.1:{PORT}",
+                    "X-Preview-Nonce": nonce,
+                },
+                base_url=f"http://127.0.0.1:{PORT}")
+            return resp.status_code, resp.json
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(submit, [original] * 8))
+    assert all(code == 200 for code, _ in results)
+    assert sum(not result["replayed"] for _, result in results) == 1
+    assert ok(harness, "status")["counts"]["pretest"] == 1
+    next_q = fictional_item(0, "pretest", 1, "en")
+    competing = [
+        {"fixture":"F1", "item_id":next_q["item_id"],
+         "selected_index":i, "request_id":f"conflict_{i:03d}"}
+        for i in range(4)
+    ]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        conflicts = list(pool.map(submit, competing))
+    assert sum(code == 200 for code, _ in conflicts) == 1
+    assert sum(code == 409 for code, _ in conflicts) == 3
+    assert ok(harness, "status")["counts"]["pretest"] == 2

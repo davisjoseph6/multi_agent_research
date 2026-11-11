@@ -14,6 +14,8 @@ const descriptionBox = document.getElementById("activity-description");
 const form = document.getElementById("answer-form");
 const fields = document.getElementById("answer-fields");
 const submitButton = document.getElementById("submit-button");
+const masteryChart = document.getElementById("mastery-chart");
+const independentScores = document.getElementById("independent-scores");
 
 let action = null;
 let busy = false;
@@ -186,10 +188,148 @@ function renderResource(payload) {
   form.hidden = false;
 }
 
+const CONCEPT_PALETTE = [
+  "#2454a6", "#a43d25", "#137b63", "#8c48a2",
+  "#9b6500", "#166682", "#9f355e", "#535b35",
+];
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function svgNode(tag, attrs) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    node.setAttribute(key, String(value));
+  }
+  return node;
+}
+
+async function updateMasteryTrace(fixture) {
+  if (!masteryChart || !independentScores) return;
+  const report = await requestPreview("mastery", {fixture});
+  if (!report.synthetic_only || report.fixture !== fixture ||
+      !Array.isArray(report.points) || report.points.length < 1 ||
+      !Array.isArray(report.concepts) || report.concepts.length !== 8) {
+    throw new Error("Unexpected synthetic BKT trace");
+  }
+  const width = 680, height = 250, x0 = 42, x1 = 668, y0 = 16, y1 = 218;
+  const last = Math.max(1, report.points[report.points.length - 1].answered);
+  const svg = svgNode("svg", {
+    viewBox: "0 0 " + width + " " + height,
+    role: "img", "aria-label": "Live BKT mastery curves, eight concepts",
+    width: "100%",
+  });
+  for (let tick = 0; tick <= 4; tick++) {
+    const y = y1 - tick * (y1 - y0) / 4;
+    svg.append(svgNode("line", {
+      x1: x0, x2: x1, y1: y, y2: y, stroke: "#b3bbc6",
+      "stroke-width": tick === 0 ? 1.5 : 0.5,
+    }));
+    const label = svgNode("text", {
+      x: x0 - 6, y: y + 4, "text-anchor": "end",
+      "font-size": 11, fill: "#51565e",
+    });
+    label.textContent = String(tick * 25) + "%";
+    svg.append(label);
+  }
+  report.concepts.forEach((concept, n) => {
+    const path = [];
+    for (const point of report.points) {
+      const value = point.mastery[concept];
+      if (typeof value !== "number" || value < 0 || value > 1) {
+        throw new Error("Invalid mastery estimate");
+      }
+      const x = x0 + point.answered / last * (x1 - x0);
+      const y = y1 - value * (y1 - y0);
+      path.push((path.length ? "L" : "M") +
+                x.toFixed(2) + "," + y.toFixed(2));
+    }
+    const line = svgNode("path", {
+      d: path.join(" "), fill: "none",
+      stroke: CONCEPT_PALETTE[n], "stroke-width": 2.2,
+      "stroke-linecap": "round", "stroke-linejoin": "round",
+    });
+    const title = svgNode("title", {});
+    title.textContent = concept;
+    line.append(title);
+    svg.append(line);
+  });
+  const nlabel = svgNode("text", {
+    x: x1, y: height - 8, "text-anchor": "end",
+    "font-size": 11, fill: "#51565e",
+  });
+  nlabel.textContent = "Completed scored answers: " +
+    report.points[report.points.length - 1].answered;
+  svg.append(nlabel);
+  const legend = document.createElement("div");
+  legend.className = "mastery-legend";
+  report.concepts.forEach((concept, n) => {
+    const item = document.createElement("span");
+    const key = document.createElement("span");
+    key.textContent = "● ";
+    key.style.color = CONCEPT_PALETTE[n];
+    item.append(key, document.createTextNode(concept + "  "));
+    legend.append(item);
+  });
+  masteryChart.replaceChildren(svg, legend);
+  const scores = report.independent_scores || {};
+  independentScores.textContent =
+    "Independent pretest (16 items): " +
+    (scores.pretest === null ? "pending" : scores.pretest + "/16") +
+    " · Independent posttest (16 items): " +
+    (scores.posttest === null ? "pending" : scores.posttest + "/16") +
+    " · Model mastery is not a score.";
+}
+
+async function chooseFictionalContinuation(decision) {
+  if (busy) return;
+  busy = true;
+  try {
+    const result = await requestPreview("continue", {
+      fixture: currentFixture(), decision,
+    });
+    if (!result.accepted || !result.synthetic_only) {
+      throw new Error("Fictional recovery choice not acknowledged");
+    }
+    note(decision === "pause" ?
+      "Fictional session saved. Resume when ready." :
+      "Fictional session continues.", false);
+  } catch (error) {
+    note(error.message, true);
+  } finally {
+    busy = false;
+  }
+  await refresh();
+}
+
 async function present(payload) {
   // A refresh reconciles with the server's durable state. Any newly fetched
   // action is authoritative; a previous uncertain local attempt is discarded.
   submissionAttempt = null;
+  if (payload.action === "CONTINUE_OR_PAUSE" || payload.action === "PAUSED") {
+    const paused = payload.action === "PAUSED";
+    resetActivity(paused ? "Your fictional session is saved" :
+      "Would you like to continue learning?", "OPTIONAL RESEARCH-V2 RECOVERY CHOICE");
+    descriptionBox.append(element("p", paused ?
+      "Resume the same fictional visit when ready. No real reminder email is sent." :
+      "A recovery intervention has finished. This does not establish that " +
+      "mastery was restored. You may continue now or save your fictional progress.",
+      "question-prompt"));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = paused ? "Resume fictional session" : "Continue learning";
+    button.addEventListener("click", () =>
+      chooseFictionalContinuation(paused ? "resume" : "continue"));
+    descriptionBox.append(button);
+    if (!paused) {
+      const save = document.createElement("button");
+      save.type = "button";
+      save.className = "secondary";
+      save.textContent = "Save and resume later";
+      save.addEventListener("click", () =>
+        chooseFictionalContinuation("pause"));
+      descriptionBox.append(save);
+    }
+    return;
+  }
   if (payload.action === "AWAITING_SUPERVISOR") {
     resetActivity("Waiting for the next fictional supervised visit", "SESSION BREAK");
     descriptionBox.append(
@@ -253,6 +393,13 @@ async function refresh() {
     );
     const next = await requestPreview("next", {fixture});
     await present(next);
+    // Read the same participant's committed actions after rendering.
+    try {
+      await updateMasteryTrace(fixture);
+    } catch (chartError) {
+      if (masteryChart) masteryChart.textContent =
+        "Synthetic mastery history unavailable: " + chartError.message;
+    }
   } catch (error) {
     note(error.message, true);
     resetActivity("Unable to load the fictional activity", "ERROR");

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Research V2 — Fictional private browser</title>
+<link rel="stylesheet" href="/research-v2.css">
+<script src="/research-v2.js" defer></script>
+</head>
+<body>
+<main id="app" data-preview-nonce="{{ preview_nonce }}">
+<h1>Research V2 — Fictional browser</h1>
+<p class="warning" role="status">SYNTHETIC ONLY. No real student enrollment, approved questions or emails. Do not deploy publicly.</p>
+<div class="controls">
+<label for="fixture">Fictional learner</label>
+<select id="fixture">
+<option value="F1">F1</option><option value="F2">F2</option>
+<option value="F3">F3</option><option value="F4">F4</option>
+<option value="F5">F5</option><option value="F6">F6</option>
+</select>
+<label for="language">Language</label>
+<select id="language"><option value="en">English</option><option value="fr">Français</option></select>
+<button id="refresh" type="button">Load fictional state</button>
+</div>
+<p id="status" aria-live="polite"></p>
+<section aria-labelledby="exercise-title"><h2 id="exercise-title">Fictional exercise</h2>
+<p id="prompt"></p><fieldset id="choices"><legend>Choose one answer</legend></fieldset>
+<div id="buttons">
+<button id="submit" type="button" hidden>Submit answer</button>
+<button id="ack" type="button" hidden>Acknowledge resource</button>
+<button id="continue" type="button" hidden>Continue</button>
+<button id="after-pause" type="button" hidden>Pause after recovery</button>
+<button id="pause" type="button">Pause fictional quiz</button>
+<button id="optout" type="button">Disable fictional email reminders</button>
+<button id="resume" type="button" hidden>Resume</button>
+<button id="finish" type="button" hidden>Complete period</button>
+<button id="next" type="button" hidden>Start next period</button>
+</div>
+</section>
+<section><h2>Provisional, uncalibrated mastery simulation</h2>
+<pre id="mastery" aria-live="polite">No scored observations yet.</pre>
+</section>
+<p id="message" role="alert"></p>
+</main>
+</body>
+</html>

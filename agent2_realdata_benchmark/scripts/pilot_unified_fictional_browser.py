@@ -36,7 +36,8 @@ CONSENT_HASH = sha256(b"UNAPPROVED_SYNTHETIC_BROWSER_INFORMATION").hexdigest()
 
 
 def open_synthetic_study(path: Path, *,
-                         question_anchored_recovery: bool = False):
+                         question_anchored_recovery: bool = False,
+                         mandatory_two_wrong_recovery: bool = False):
     """Create isolated test-only capabilities for the current process."""
     clock = FixtureClock()
     operator = secrets.token_bytes(32)
@@ -49,6 +50,7 @@ def open_synthetic_study(path: Path, *,
         resources_path=CONTENT / "resources.csv",
         simulations=41,
         question_anchored_recovery=question_anchored_recovery,
+        mandatory_two_wrong_recovery=mandatory_two_wrong_recovery,
     )
     roster = ensure_unified_fictional_roster(
         store, operator, screening_version=SCREENING_VERSION,
@@ -71,6 +73,10 @@ def main() -> None:
         "--question-anchored-recovery", action="store_true",
         help="unapproved last-incorrect-question targeting; requires a fresh fictional DB",
     )
+    parser.add_argument(
+        "--mandatory-two-wrong-recovery", action="store_true",
+        help="experimental forced remediation and pause/continue; new fictional DB only",
+    )
     offline = parser.add_mutually_exclusive_group()
     offline.add_argument("--advance-fixture", choices=("F1", "F2", "F3"))
     offline.add_argument("--finish-fixture", choices=("F1", "F2", "F3"))
@@ -84,6 +90,7 @@ def main() -> None:
             parser.error("an existing fictional database is required for offline visit actions")
     study, roster, operator, clock = open_synthetic_study(
         args.db, question_anchored_recovery=args.question_anchored_recovery,
+        mandatory_two_wrong_recovery=args.mandatory_two_wrong_recovery,
     )
     if args.advance_fixture or args.finish_fixture:
         fixture = args.advance_fixture or args.finish_fixture

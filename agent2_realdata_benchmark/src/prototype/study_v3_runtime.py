@@ -104,7 +104,8 @@ class SyntheticPOMCPProtocolEngine(SyntheticProtocolEngine):
             seed_state, sort_keys=True,
         ).encode()).digest()[:8], "big")
         resource_actions = (
-            RECOVERY_ACTIONS if remaining and (not targeted or target_concept)
+            () if s.get("mandatory_two_wrong_recovery") is True
+            else RECOVERY_ACTIONS if remaining and (not targeted or target_concept)
             else ()
         )
         planner_args = (

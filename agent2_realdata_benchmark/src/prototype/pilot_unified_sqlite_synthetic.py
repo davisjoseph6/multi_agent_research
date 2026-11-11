@@ -44,7 +44,8 @@ class UnifiedSyntheticStudyStore:
                  operator_key: bytes, auditor_key: bytes,
                  items_path: str | Path, resources_path: str | Path,
                  clock=None, simulations: int = 41,
-                 question_anchored_recovery: bool = False):
+                 question_anchored_recovery: bool = False,
+                 mandatory_two_wrong_recovery: bool = False):
         self.admission = SyntheticAdmissionStore(
             path, consent_sha256=consent_sha256,
             screening_version=screening_version,
@@ -56,6 +57,7 @@ class UnifiedSyntheticStudyStore:
             path, items_path=items_path, resources_path=resources_path,
             simulations=simulations,
             question_anchored_recovery=question_anchored_recovery,
+            mandatory_two_wrong_recovery=mandatory_two_wrong_recovery,
         )
         if self.admission.path.resolve() != self.learning.path.resolve():
             raise UnifiedSyntheticError("both fixtures must use the same SQLite file")
@@ -151,6 +153,13 @@ class UnifiedSyntheticStudyStore:
                 arm=arm, mastery={concept: .2 for concept in CONCEPTS},
                 used=[], recovery=asdict(RecoveryStatus()),
             )
+            if self.learning.mandatory_two_wrong_recovery:
+                policy.update(
+                    two_wrong_streak=0,
+                    forced_recovery_count=0,
+                    awaiting_continue_choice=None,
+                    paused_at=None,
+                )
             db.execute(
                 "INSERT INTO pilot_people(pid,state,created_at) VALUES(?,?,?)",
                 (learning_pid, _serialize(PilotSessionFlow()), now.isoformat()),
@@ -231,6 +240,11 @@ class UnifiedSyntheticStudyStore:
             policy["recovery"] = asdict(RecoveryStatus())
             if self.learning.question_anchored_recovery:
                 policy["last_incorrect_practice"] = None
+            if self.learning.mandatory_two_wrong_recovery:
+                policy["two_wrong_streak"] = 0
+                policy["forced_recovery_count"] = 0
+                policy["awaiting_continue_choice"] = None
+                policy["paused_at"] = None
             db.execute(
                 "INSERT INTO admission_visits(pid,visit,started_at) VALUES(?,?,?)",
                 (pid, visit, now.isoformat()),

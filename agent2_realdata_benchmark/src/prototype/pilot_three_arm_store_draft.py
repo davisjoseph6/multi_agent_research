@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import asdict, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -59,10 +59,16 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
     def __init__(self, path: str | Path, *,
                  items_path: str | Path, resources_path: str | Path,
                  simulations: int = 240,
-                 question_anchored_recovery: bool = False):
+                 question_anchored_recovery: bool = False,
+                 mandatory_two_wrong_recovery: bool = False):
         if type(question_anchored_recovery) is not bool:
             raise ValueError("synthetic question_anchored_recovery must be a boolean")
+        if type(mandatory_two_wrong_recovery) is not bool:
+            raise ValueError("mandatory_two_wrong_recovery must be a boolean")
+        if mandatory_two_wrong_recovery and not question_anchored_recovery:
+            raise ValueError("two-error trigger requires question-anchored recovery")
         self.question_anchored_recovery = question_anchored_recovery
+        self.mandatory_two_wrong_recovery = mandatory_two_wrong_recovery
         self.policy_bank = PilotDraftItemBank(items_path)
         resource_rows = read_csv(resources_path)
         if len(resource_rows) != 32 or len({
@@ -86,6 +92,10 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
         if type(simulations) is not int or not 41 <= simulations <= 100000:
             raise ValueError("V3 simulations must be in 41..100000")
         self.selector = _OfflineV3Selector(self.policy_bank, simulations)
+        if mandatory_two_wrong_recovery:
+            # A 20-question visit can contain ten consecutive two-error pairs.
+            # Existing default V3 still permits at most two resources per visit.
+            self.selector.max_resources_per_session = 10
         self.policy_config = _json(dict(
             version=POLICY_VERSION,
             item_sha256=self.policy_bank.sha256,
@@ -101,6 +111,10 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
             mvas_version=MVAS_PROPOSED_VERSION,
             recovery_targeting=("last_wrong_practice_this_visit_v1"
                 if question_anchored_recovery else "original_concept_level_v3"),
+            forced_two_wrong_trigger=mandatory_two_wrong_recovery,
+            forced_resource_max_per_visit=(10 if mandatory_two_wrong_recovery else 2),
+            forced_selection_rule=("deterministic_four_type_rotation_not_POMCP"
+                if mandatory_two_wrong_recovery else "off"),
         ))
         super().__init__(path, items_path=items_path)
         with self._transaction() as db:
@@ -162,6 +176,10 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
             arm=arm, mastery={c: 0.2 for c in CONCEPTS},
             used=[], recovery=asdict(RecoveryStatus()),
         )
+        if self.mandatory_two_wrong_recovery:
+            policy.update(two_wrong_streak=0, forced_recovery_count=0,
+                          awaiting_continue_choice=None,
+                          paused_at=None)
         with self._transaction() as db:
             db.execute(
                 "INSERT INTO pilot_people(pid,state,created_at) VALUES(?,?,?)",
@@ -194,6 +212,11 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
             policy["recovery"] = asdict(RecoveryStatus())
             if self.question_anchored_recovery:
                 policy["last_incorrect_practice"] = None
+            if self.mandatory_two_wrong_recovery:
+                policy["two_wrong_streak"] = 0
+                policy["forced_recovery_count"] = 0
+                policy["awaiting_continue_choice"] = None
+                policy["paused_at"] = None
             self._save(db, pid, updated)
             self._save_policy(db, pid, policy)
             self._event(db, pid, timestamp, "synthetic_visit_started",
@@ -223,7 +246,43 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
             if pending:
                 return json.loads(pending[0]["public"])
 
-            if state.stage in ("mvas_pre", "mvas_post"):
+            if self.mandatory_two_wrong_recovery and policy["arm"] == "A":
+                decision = policy.get("awaiting_continue_choice")
+                if decision in ("ask", "paused"):
+                    return dict(
+                        action=("CONTINUE_OR_PAUSE" if decision == "ask" else "PAUSED"),
+                        stage=state.stage, session=state.session,
+                        index=state.index, synthetic_only=True,
+                        draft_content_not_approved=True,
+                    )
+
+            trigger_now = (
+                self.mandatory_two_wrong_recovery and policy["arm"] == "A"
+                and state.stage in ("practice", "mvas_post")
+                and policy["two_wrong_streak"] >= 2
+                and policy["recovery"].get("pomcp_resource_spent", 0) < 10
+            )
+            if trigger_now:
+                # A deterministic rule, not a POMCP choice. It is a new
+                # experimental Arm A intervention, never the frozen RCT.
+                anchor = policy.get("last_incorrect_practice")
+                item, choice, _wrong_text = verify_error_anchor(
+                    self.policy_bank.by_id, anchor,
+                    self.policy_bank.by_id[anchor["item_id"]].concept,
+                    session=state.session,
+                )
+                kind = RECOVERY_ACTIONS[policy["forced_recovery_count"] % 4]
+                selected = dict(action=kind, concept=item.concept,
+                    item_id=item.item_id if kind == "DROP_2" else None,
+                    forced_trigger="TWO_CONSECUTIVE_WRONG_PRACTICE",
+                    selector="deterministic_forced_recovery_not_POMCP")
+                policy["recovery"]["pomcp_resource_spent"] = (
+                    policy["recovery"].get("pomcp_resource_spent", 0) + 1
+                )
+                policy["forced_recovery_count"] += 1
+                selected["target_item_id"] = item.item_id
+                selected["target_wrong_choice_id"] = choice
+            elif state.stage in ("mvas_pre", "mvas_post"):
                 selected = dict(action="MVAS")
             elif state.stage == "practice":
                 selector_state = dict(
@@ -233,6 +292,8 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                 if self.question_anchored_recovery and policy["arm"] == "A":
                     recorded = policy.get("last_incorrect_practice")
                     selector_state["question_anchored_recovery"] = True
+                    if self.mandatory_two_wrong_recovery:
+                        selector_state["mandatory_two_wrong_recovery"] = True
                     selector_state["last_incorrect_concept"] = (
                         self.policy_bank.by_id[recorded["item_id"]].concept
                         if recorded is not None else None
@@ -287,7 +348,10 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                         and item.item_id in policy["used"]:
                     raise PilotSequenceError("practice item already used")
                 public["question"] = (
-                    two_choice_retry(item, selected["target_wrong_choice_id"])
+                    two_choice_retry(
+                        item, selected["target_wrong_choice_id"],
+                        include_prior_wrong=self.mandatory_two_wrong_recovery,
+                    )
                     if kind == "DROP_2" and self.question_anchored_recovery
                     else item.public()
                 )
@@ -381,16 +445,35 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                     policy["mastery"][item.concept] = BKT().posterior(
                         policy["mastery"][item.concept], correct
                     )
-                elif state.stage == "practice":
-                    belief = Belief(policy["mastery"].copy())
-                    belief.observe(item.concept, correct)
-                    policy["mastery"] = belief.mastery
+                elif (
+                    state.stage == "practice"
+                    or (self.mandatory_two_wrong_recovery
+                        and kind == "DROP_2"
+                        and state.stage == "mvas_post"
+                        and selected.get("forced_trigger")
+                            == "TWO_CONSECUTIVE_WRONG_PRACTICE")
+                ):
+                    # In the proposed V2, the learner has already been
+                    # informed that the earlier choice was wrong; DROP_2 then
+                    # shows that known-wrong option and the correct one.
+                    # A successful retry can be solved by elimination, so it
+                    # is NOT an independent BKT mastery observation.
+                    # Wait for the next independent practice question to
+                    # update the belief. Legacy policies are unchanged.
+                    if not (self.mandatory_two_wrong_recovery and kind == "DROP_2"):
+                        belief = Belief(policy["mastery"].copy())
+                        belief.observe(item.concept, correct)
+                        policy["mastery"] = belief.mastery
                     extra["correct"] = correct
                 if kind == "QUESTION":
                     if state.stage == "practice":
                         if item.item_id in policy["used"]:
                             raise PilotSequenceError("repeated practice item")
                         policy["used"].append(item.item_id)
+                        if (self.mandatory_two_wrong_recovery and policy["arm"] == "A"):
+                            policy["two_wrong_streak"] = (
+                                0 if correct else policy["two_wrong_streak"] + 1
+                            )
                         if (self.question_anchored_recovery and policy["arm"] == "A"
                                 and not correct):
                             policy["last_incorrect_practice"] = {
@@ -414,6 +497,13 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                 updated = record_mvas(state, at=timestamp, rating=response["rating"])
             else:
                 raise PilotSequenceError("unknown response type")
+            if (self.mandatory_two_wrong_recovery and policy["arm"] == "A"
+                    and selected.get("forced_trigger")
+                        == "TWO_CONSECUTIVE_WRONG_PRACTICE"):
+                # Text completion does not demonstrate restored mastery.
+                # An answered DROP_2 is the only scored recovery observation.
+                policy["two_wrong_streak"] = 0
+                policy["awaiting_continue_choice"] = "ask"
             db.execute(
                 "UPDATE pilot_actions SET completed_at=?,response=? "
                 "WHERE action_id=?", (timestamp.isoformat(), _json(recorded), action_id)
@@ -430,6 +520,62 @@ class SyntheticThreeArmPilotStore(SyntheticPilotStore):
                         action_id=action_id, action_kind=kind,
                         assigned_arm=policy["arm"])
         return {**result, "replayed": False}
+
+    def choose_after_forced_recovery(
+        self, pid: str, *, decision: str,
+        at: datetime | None = None,
+    ) -> dict:
+        """Operator-less decision only in opt-in SYNTHETIC fictional UI.
+
+        The durable policy blocks new questions and the post-fatigue rating
+        until the fictional learner chooses to continue or save. Resumption
+        uses the same record. It does not send emails or authorize humans.
+        """
+        if not self.mandatory_two_wrong_recovery:
+            raise PilotSequenceError("experimental two-error mode is disabled")
+        if decision not in ("continue", "pause", "resume"):
+            raise PilotSequenceError("invalid post-recovery choice")
+        timestamp = _at(at)
+        with self._transaction() as db:
+            state = self._load(db, pid)
+            policy = self._policy(db, pid)
+            if policy["arm"] != "A":
+                raise PilotSequenceError("only fictional Arm A has a recovery choice")
+            pending = db.execute(
+                "SELECT COUNT(*) FROM pilot_actions WHERE pid=? "
+                "AND completed_at IS NULL", (pid,),
+            ).fetchone()[0]
+            if pending or (state.last_event_at is not None
+                           and timestamp < state.last_event_at):
+                raise PilotSequenceError("pending action or invalid event time")
+            previous = policy.get("awaiting_continue_choice")
+            if (previous == "ask" and decision not in ("continue", "pause")
+                    or previous == "paused" and decision != "resume"
+                    or previous not in ("ask", "paused")):
+                raise PilotSequenceError("choice is not expected in this state")
+            if decision == "resume":
+                started = policy.get("paused_at")
+                if started is None:
+                    raise PilotSequenceError("missing fictional pause timestamp")
+                if timestamp - datetime.fromisoformat(started) > timedelta(days=14):
+                    raise PilotSequenceError("fictional pause exceeded the 14-day limit")
+            policy["awaiting_continue_choice"] = (
+                "paused" if decision == "pause" else None
+            )
+            policy["paused_at"] = (
+                timestamp.isoformat() if decision == "pause" else None
+            )
+            self._save_policy(db, pid, policy)
+            self._event(
+                db, pid, timestamp, "fictional_recovery_continuation_choice",
+                decision=decision,
+            )
+            return {
+                "accepted": True,
+                "paused": decision == "pause",
+                "synthetic_only": True,
+                "human_enrollment_authorized": False,
+            }
 
     def snapshot(self, pid: str) -> dict:
         """Atomic, query-only synthetic status across state and arm policy."""

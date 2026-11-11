@@ -21,6 +21,7 @@ from flask import Flask, jsonify, render_template, request, send_file
 
 from .pilot_admission_controls_draft import AdmissionDenied
 from .pilot_session_flow_draft import PilotSequenceError
+from .research_v2_proposal import bkt_trace
 from .pilot_unified_sqlite_synthetic import (
     UnifiedSyntheticStudyStore, UnifiedSyntheticError,
 )
@@ -308,6 +309,65 @@ def create_unified_fictional_browser_app(
             visits_finished=state["visits_finished"],
             synthetic_only=True, human_enrollment_authorized=False,
         )
+
+    @app.post("/unified/api/mastery")
+    def mastery_trace():
+        # The browser receives only this fixture's synthetic event history,
+        # never raw answer keys, invitation tokens or explicit arm labels.
+        _fixture, learner, body = resolve()
+        if set(body) != {"fixture"}:
+            raise UnifiedSyntheticError("unexpected fictional mastery fields")
+        with study.learning._read_transaction() as db:
+            rows = db.execute(
+                "SELECT public,response FROM pilot_actions "
+                "WHERE pid=? AND completed_at IS NOT NULL ORDER BY rowid",
+                (learner,),
+            ).fetchall()
+        answers = []
+        for row in rows:
+            public = json.loads(row["public"])
+            if public["action"] not in ("QUESTION", "DROP_2"):
+                continue
+            if (study.learning.mandatory_two_wrong_recovery
+                    and public["action"] == "DROP_2"):
+                # The instructed retry is trivially solved by elimination
+                # after the prior wrong choice is identified. Exclude from
+                # model-estimated mastery, while recording completion elsewhere.
+                continue
+            recorded = json.loads(row["response"])
+            # A final two-error recovery is still practice evidence, even
+            # if the learning session has advanced to mvas_post.
+            stage = ("practice"
+                     if public["action"] == "DROP_2"
+                     and public["stage"] == "mvas_post"
+                     else public["stage"])
+            answers.append({
+                "action": public["action"],
+                "stage": stage,
+                "concept": public["question"]["concept"],
+                "correct": recorded["correct"],
+            })
+        result = bkt_trace(answers)
+        independent = study.learning.scores(learner)
+        # Independent assessments are only scored after all 16 items.
+        # Do not reveal incomplete assessment correctness.
+        result["independent_scores"] = {
+            form: independent[form]["score"]
+            for form in ("pretest", "posttest")
+        }
+        result.update(synthetic_only=True, fixture=body["fixture"])
+        return jsonify(result)
+
+    @app.post("/unified/api/continue")
+    def choose_after_recovery():
+        if not study.learning.mandatory_two_wrong_recovery:
+            return jsonify(error="experimental recovery continuation disabled"), 404
+        _fixture, learner, body = resolve()
+        if set(body) != {"fixture", "decision"} or type(body["decision"]) is not str:
+            raise UnifiedSyntheticError("unexpected fictional recovery choice")
+        return jsonify(study.learning.choose_after_forced_recovery(
+            learner, decision=body["decision"], at=virtual_action_time(learner),
+        ))
 
     @app.post("/unified/api/next")
     def next_action():
