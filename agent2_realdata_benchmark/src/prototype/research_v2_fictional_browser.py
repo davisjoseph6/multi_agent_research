@@ -19,6 +19,7 @@ from typing import Callable, Mapping
 from flask import Flask, jsonify, render_template, request, send_file
 
 from .research_v2_crossover_fixture import FictionalCrossoverStore
+from .research_v2_reminder_outbox import SyntheticReminderOutbox
 from .research_v2_proposal import ProposedStudyError, QUESTIONS_PER_ARM, all_sequences, utc
 from .study_v2 import CONCEPTS
 
@@ -111,7 +112,8 @@ class FictionalV2Runtime:
 
     def __init__(self, store: FictionalCrossoverStore,
                  fixtures: Mapping[str, tuple[str, str | None]],
-                 *, clock: Callable[[], datetime] | None = None):
+                 *, clock: Callable[[], datetime] | None = None,
+                 contacts: SyntheticReminderOutbox | None = None):
         if not isinstance(store, FictionalCrossoverStore):
             raise TypeError("fictional crossover store required")
         if set(fixtures) != set(FIXTURES):
@@ -124,8 +126,17 @@ class FictionalV2Runtime:
             for ref in self.identities.values()
         ):
             raise ProposedStudyError("six distinct fictional learners required")
+        if contacts is not None and not isinstance(contacts, SyntheticReminderOutbox):
+            raise TypeError("separate fictional contact outbox required")
+        self.contacts = contacts
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.lock = RLock()
+
+    @staticmethod
+    def contact_ref(fixture: str) -> str:
+        if fixture not in FIXTURES:
+            raise ProposedStudyError("fictional contact mapping required")
+        return f"SYN_CONTACT_{fixture}"
 
     def at(self) -> datetime:
         return utc(self.clock())
@@ -210,6 +221,11 @@ def make_fictional_v2_app(runtime: FictionalV2Runtime, *, port: int = 8774) -> F
             "finished": progress["finished"],
             "synthetic_only": True, "human_enrollment_authorized": False,
             "real_email_sent": False,
+            "reminders_opted_in": (
+                bool(runtime.contacts.inspect_redacted(
+                    runtime.contact_ref(fixture))["opted_in"])
+                if runtime.contacts is not None else False
+            ),
         }
 
     @app.get("/")
@@ -337,8 +353,21 @@ def make_fictional_v2_app(runtime: FictionalV2Runtime, *, port: int = 8774) -> F
         body = parameters({"fixture", "decision"})
         with runtime.lock:
             ref, token = runtime.require_token(body["fixture"])
+            at = runtime.at()
+            if body["decision"] == "pause" and runtime.contacts is not None:
+                # Cancel the fictional email reservation on failed state change;
+                # no actual email leaves this contact database.
+                contact_ref = runtime.contact_ref(body["fixture"])
+                runtime.contacts.pause(contact_ref, at)
+                try:
+                    return jsonify(runtime.store.decide_after_recovery(
+                        ref, token, decision="pause", at=at,
+                    ))
+                except Exception:
+                    runtime.contacts.resume(contact_ref, at)
+                    raise
             return jsonify(runtime.store.decide_after_recovery(
-                ref, token, decision=body["decision"], at=runtime.at(),
+                ref, token, decision=body["decision"], at=at,
             ))
 
     @app.post("/research-v2/api/pause")
@@ -346,7 +375,16 @@ def make_fictional_v2_app(runtime: FictionalV2Runtime, *, port: int = 8774) -> F
         body = parameters({"fixture"})
         with runtime.lock:
             ref, token = runtime.require_token(body["fixture"])
-            runtime.store.pause(ref, token, runtime.at())
+            at = runtime.at()
+            runtime.store.pause(ref, token, at)
+            if runtime.contacts is not None:
+                try:
+                    runtime.contacts.pause(
+                        runtime.contact_ref(body["fixture"]), at,
+                    )
+                except Exception:
+                    runtime.store.resume(ref, token, at)
+                    raise
             return jsonify(paused=True, synthetic_only=True)
 
     @app.post("/research-v2/api/resume")
@@ -354,7 +392,12 @@ def make_fictional_v2_app(runtime: FictionalV2Runtime, *, port: int = 8774) -> F
         body = parameters({"fixture"})
         with runtime.lock:
             ref, token = runtime.require_token(body["fixture"])
-            runtime.store.resume(ref, token, runtime.at())
+            at = runtime.at()
+            if runtime.contacts is not None:
+                # Cancel the reminder queue first. If resumption is rejected
+                # by the study DB, no unattended email will be sent.
+                runtime.contacts.resume(runtime.contact_ref(body["fixture"]), at)
+            runtime.store.resume(ref, token, at)
             return jsonify(paused=False, synthetic_only=True)
 
     @app.post("/research-v2/api/finish")
@@ -364,6 +407,8 @@ def make_fictional_v2_app(runtime: FictionalV2Runtime, *, port: int = 8774) -> F
             ref, token = runtime.require_token(body["fixture"])
             period = runtime.store.finish_period(ref, token, runtime.at())
             runtime.tokens[body["fixture"]] = None
+            if period == 3 and runtime.contacts is not None:
+                runtime.contacts.complete(runtime.contact_ref(body["fixture"]), runtime.at())
             return jsonify(periods_finished=period,
                            finished=period == 3, synthetic_only=True)
 
@@ -379,6 +424,16 @@ def make_fictional_v2_app(runtime: FictionalV2Runtime, *, port: int = 8774) -> F
                 ref, runtime.at())
             return jsonify(period=progress["period_index"] + 1,
                            synthetic_only=True)
+
+    @app.post("/research-v2/api/opt-out")
+    def opt_out():
+        body = parameters({"fixture"})
+        with runtime.lock:
+            if runtime.contacts is None:
+                raise ProposedStudyError("no fictional reminder contact configured")
+            runtime.contacts.opt_out(runtime.contact_ref(body["fixture"]), runtime.at())
+            return jsonify(reminders_opted_in=False, synthetic_only=True,
+                           real_email_sent=False)
 
     @app.post("/research-v2/api/mastery")
     def mastery():
