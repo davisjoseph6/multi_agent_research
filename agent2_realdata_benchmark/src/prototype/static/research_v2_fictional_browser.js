@@ -58,7 +58,8 @@
      message("");
      const info=await call("status",{});
      $("status").textContent="Learner "+info.fixture+" — period "+Math.min(info.period,3)+"/3; "+
-       "pretest "+info.counts.pretest+"/16, practice "+info.counts.practice+"/55, posttest "+info.counts.posttest+"/16";
+       "pretest "+info.counts.pretest+"/16, practice "+info.counts.practice+"/55, posttest "+info.counts.posttest+"/16; "+
+       (info.reminders_opted_in?"fictional reminders ON":"fictional reminders OFF");
      draw(await call("item",{language:language.value}));
      if(info.paused||info.finished||info.between_periods){
        $("mastery").textContent="Mastery unavailable outside an active fictional period";
