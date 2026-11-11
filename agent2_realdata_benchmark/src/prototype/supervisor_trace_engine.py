@@ -59,6 +59,44 @@ class SupervisorTraceEngine:
             raise ValueError("all Bloom levels must initially equal L1")
         self.session_peak = self.mastery.copy()
 
+    def snapshot(self) -> dict:
+        """JSON-serializable state for atomic persistence after each step."""
+        return {
+            "arm": self.arm, "mastery": dict(self.mastery),
+            "bloom": dict(self.bloom),
+            "correct_streak": dict(self.correct_streak),
+            "wrong_streak": dict(self.wrong_streak),
+            "recovery_wrong": dict(self.recovery_wrong),
+            "seen": dict(self.seen), "last_failed": dict(self.last_failed),
+            "session_peak": dict(self.session_peak),
+            "per_concept_recovery": dict(self.per_concept_recovery),
+            "nonrecoverable": sorted(self.nonrecoverable),
+            "attempts_session": self.attempts_session,
+            "session": self.session, "question_in_session": self.question_in_session,
+            "elapsed": self.elapsed, "pending": list(self.pending),
+            "current_recovery": self.current_recovery,
+            "last_recovery_trigger": self.last_recovery_trigger,
+        }
+
+    @classmethod
+    def restore(cls, snapshot: dict) -> "SupervisorTraceEngine":
+        """Rebuild a pending recovery without modifying its action order."""
+        if type(snapshot) is not dict:
+            raise ValueError("invalid state snapshot")
+        keys = set(cls("A", dict.fromkeys(CONCEPT_IDS, .20)).snapshot())
+        if set(snapshot) != keys:
+            raise ValueError("snapshot has missing or unexpected keys")
+        data = dict(snapshot)
+        data["nonrecoverable"] = set(data["nonrecoverable"])
+        instance = cls(**data)
+        if (instance.session not in (1, 2, 3)
+                or not 0 <= instance.question_in_session <=
+                SESSION_BLOCKS[instance.session - 1]
+                or any(step.get("action") not in RECOVERY_SEQUENCE
+                       for step in instance.pending)):
+            raise ValueError("corrupted supervisor state snapshot")
+        return instance
+
     @property
     def degradation(self) -> float:
         """Monitoring ONLY; never a recovery trigger."""
