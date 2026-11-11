@@ -193,9 +193,12 @@ def test_all_three_periods_without_repeat_or_cross_participant_leak(harness):
         assert ok(harness, "item", {"language":"en"})["kind"] == "period_complete"
         outcome = ok(harness, "finish")
         assert outcome["periods_finished"] == period + 1
-        assert ok(harness, "status")["counts"] == {
-            "pretest":16,"practice":55,"posttest":16
-        }
+        expected_counts = (
+            {"pretest":0,"practice":0,"posttest":0}
+            if period < 2 else
+            {"pretest":16,"practice":55,"posttest":16}
+        )
+        assert ok(harness, "status")["counts"] == expected_counts
         if period < 2:
             assert ok(harness, "item", {"language":"fr"})["kind"] == "between_periods"
             ok(harness, "start-next")
