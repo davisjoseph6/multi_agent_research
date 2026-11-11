@@ -293,3 +293,41 @@ def test_oversize_request_and_non_json_are_refused(harness):
     assert not_json.status_code == 415
     for invalid in ("F7", "SYN_CROSSOVER_F1", "../F1"):
         assert post(harness, "status", {"fixture": invalid}).status_code == 409
+
+
+
+def test_browser_pause_and_resume_are_reflected_in_separate_contact_vault(harness):
+    runtime, _, _ = harness
+    assert ok(harness, "status")["reminders_opted_in"] is True
+    assert runtime.contacts.inspect_redacted("SYN_CONTACT_F1")["paused_at"] is None
+    ok(harness, "pause")
+    assert ok(harness, "status")["paused"] is True
+    contact = runtime.contacts.inspect_redacted("SYN_CONTACT_F1")
+    assert contact["paused_at"] is not None
+    assert contact["pause_episode"] == 1
+    ok(harness, "resume")
+    assert ok(harness, "status")["paused"] is False
+    assert runtime.contacts.inspect_redacted("SYN_CONTACT_F1")["paused_at"] is None
+
+
+def test_explicit_email_optout_suppresses_future_fictional_queue_claims(harness):
+    runtime, _, _ = harness
+    assert ok(harness, "opt-out")["reminders_opted_in"] is False
+    assert ok(harness, "status")["reminders_opted_in"] is False
+    ok(harness, "pause")
+    assert runtime.contacts.reserve_due(NOW.replace(day=14)) == ()
+    assert ok(harness, "resume")["paused"] is False
+
+
+def test_recovery_pause_is_registered_in_contact_vault_and_resumable(harness):
+    runtime, _, _ = harness
+    for i in range(16):
+        synthetic_question(harness, "pretest", i)
+    synthetic_question(harness, "practice", 0, correct=False)
+    synthetic_question(harness, "practice", 1, correct=False)
+    ok(harness, "recovery/ack", {"request_id": "finished_summary_001"})
+    assert ok(harness, "decision", {"decision": "pause"})["paused"]
+    assert runtime.contacts.inspect_redacted("SYN_CONTACT_F1")["paused_at"]
+    ok(harness, "resume")
+    assert runtime.contacts.inspect_redacted("SYN_CONTACT_F1")["paused_at"] is None
+    assert ok(harness, "item", {"language": "en"})["kind"] == "question"
