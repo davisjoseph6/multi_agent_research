@@ -1,0 +1,50 @@
+name: Supervisor 2026-11-11 parallel RCT trace acceptance
+on:
+  push:
+    branches:
+      - research/ijcai2027-supervisor-parallel-protocol-20261111
+    paths:
+      - 'agent2_realdata_benchmark/data/supervisor_20261111/**'
+      - 'agent2_realdata_benchmark/src/prototype/supervisor_*.py'
+      - 'agent2_realdata_benchmark/tests/test_supervisor_*.py'
+      - '.github/workflows/supervisor-parallel-traces-ci.yml'
+  pull_request:
+    paths:
+      - 'agent2_realdata_benchmark/data/supervisor_20261111/**'
+      - 'agent2_realdata_benchmark/src/prototype/supervisor_*.py'
+      - 'agent2_realdata_benchmark/tests/test_supervisor_*.py'
+      - '.github/workflows/supervisor-parallel-traces-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  trace-oracle:
+    name: Offline exact 465-step reference acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: agent2_realdata_benchmark
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install standalone test framework
+        run: python -m pip install pytest==9.1.1
+      - name: Exactly compare all supervisor scenarios and bank constraints
+        run: python -m pytest -q tests/test_supervisor_20261111_traces.py
+      - name: Verify all canonical CSV files are present
+        run: |
+          python - <<'PY'
+          from src.prototype.supervisor_content import SupervisorBank
+          b=SupervisorBank('data/supervisor_20261111')
+          print('screening',len(b.forms['screening']))
+          print('pretest',len(b.forms['pretest']))
+          print('practice',len(b.forms['practice']))
+          print('posttest',len(b.forms['posttest']))
+          print('content sha256',b.sha256)
+          assert (len(b.forms['screening']),len(b.forms['pretest']),
+                  len(b.forms['practice']),len(b.forms['posttest'])) == (
+                      8,16,192,16)
+          PY
