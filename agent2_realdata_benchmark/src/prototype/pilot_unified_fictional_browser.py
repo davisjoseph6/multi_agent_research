@@ -342,6 +342,13 @@ def create_unified_fictional_browser_app(
                 "correct": recorded["correct"],
             })
         result = bkt_trace(answers)
+        independent = study.learning.scores(learner)
+        # Independent assessments are only scored after all 16 items.
+        # Do not reveal incomplete assessment correctness.
+        result["independent_scores"] = {
+            form: independent[form]["score"]
+            for form in ("pretest", "posttest")
+        }
         result.update(synthetic_only=True, fixture=body["fixture"])
         return jsonify(result)
 
