@@ -7,7 +7,7 @@
  const colors=["#0073a8","#cc4b34","#7352ae","#237c53","#a35a00",
                "#bc2c7b","#4d6578","#835d1c"];
  const svgNs="http://www.w3.org/2000/svg";
- let current="",inFlight=false;
+ let current="",inFlight=false,refreshQueued=false;
  function svg(tag,attributes={},text=""){
    const el=document.createElementNS(svgNs,tag);
    for(const [k,v] of Object.entries(attributes))el.setAttribute(k,String(v));
@@ -107,7 +107,9 @@
    section.append(title,dl);
  }
  async function update(){
-   if(inFlight)return;
+   // Do not drop a selector change while the previous poll is in progress.
+   // The queued pass reads the newest selected student and concept.
+   if(inFlight){refreshQueued=true;return;}
    inFlight=true;
    try{
      const list=await fetchData("/admin/api/participants");
@@ -135,7 +137,10 @@
      $("notice").textContent="Updated "+new Date().toLocaleTimeString()+
        " — read-only, no participant data modified.";
    }catch(error){$("notice").textContent=error.message}
-   finally{inFlight=false}
+   finally{
+     inFlight=false;
+     if(refreshQueued){refreshQueued=false;void update();}
+   }
  }
  const selector=$("concept");
  for(let i=0;i<concepts.length;i++){
