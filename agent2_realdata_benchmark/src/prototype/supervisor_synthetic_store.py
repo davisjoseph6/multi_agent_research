@@ -218,6 +218,18 @@ class SupervisorSyntheticStore:
                     )
                 """)
                 db.execute("""
+                    CREATE TABLE IF NOT EXISTS pii.reminder_outbox(
+                        learner_id TEXT NOT NULL,
+                        session_no INTEGER NOT NULL,
+                        kind TEXT NOT NULL CHECK(kind IN ('visit_reminder')),
+                        status TEXT NOT NULL CHECK(status IN ('pending','sent')),
+                        attempts INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        sent_at TEXT,
+                        PRIMARY KEY(learner_id,session_no,kind)
+                    )
+                """)
+                db.execute("""
                     CREATE TABLE IF NOT EXISTS pii.invitations(
                         token_hash TEXT PRIMARY KEY,
                         email TEXT NOT NULL COLLATE NOCASE UNIQUE,
@@ -917,6 +929,8 @@ class SupervisorSyntheticStore:
                     if self.operational:
                         db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
                                    (ref,))
+                        db.execute("DELETE FROM pii.reminder_outbox WHERE learner_id=?",
+                                   (ref,))
                         db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
                                    (ref,))
                     for name in ("state_history","events","surveys",
@@ -1031,6 +1045,7 @@ class SupervisorSyntheticStore:
             db.execute("DELETE FROM pii.contacts")
             if self.operational:
                 db.execute("DELETE FROM pii.invitations")
+                db.execute("DELETE FROM pii.reminder_outbox")
             db.execute(
                 "UPDATE collection_status SET closed_at=? WHERE one=1",
                 (datetime.now(timezone.utc).isoformat(),),
