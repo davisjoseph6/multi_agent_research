@@ -437,8 +437,12 @@ def make_supervisor_fictional_app(
                            else "screening")
                 else:
                     stage="information"
+                draft_language=(
+                    runtime.consent.drafts[fixture]["consent_lang"]
+                    if fixture in runtime.consent.drafts else None
+                )
                 return jsonify(registered=False,consent_stage=stage,
-                               synthetic_only=True)
+                               consent_lang=draft_language,synthetic_only=True)
             ref,token=pair
             state=runtime.store.progress(ref,token)
             with runtime.store._tx() as db:
