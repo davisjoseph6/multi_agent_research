@@ -171,8 +171,14 @@
  }
  async function act(action,data={}){
    if(working)return;working=true;
-   try{message("");await call(action,data)}
-   catch(e){message(e.message);working=false;return}
+   try{
+     message("");
+     const outcome=await call(action,data);
+     if(action==="consent/register"&&outcome.message){
+       $("registered-message").textContent=outcome.message+
+         " (Fictional preview: no real email was sent.)";
+     }
+   }catch(e){message(e.message);working=false;return}
    working=false;await refresh();
  }
  $("continue-info").addEventListener("click",()=>showSection("consent-stage"));
