@@ -99,6 +99,7 @@ ExecStart=${PREFIX}/venv/bin/gunicorn --bind 127.0.0.1:8788 --workers 1 --thread
 Restart=on-failure
 RestartSec=5
 StateDirectory=ijcai-supervisor-staging
+StateDirectoryMode=0700
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
