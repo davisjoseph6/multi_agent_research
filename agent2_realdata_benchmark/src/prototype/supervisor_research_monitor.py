@@ -19,6 +19,7 @@ import sqlite3
 
 from flask import Flask, jsonify, request, send_file
 from werkzeug.exceptions import Unauthorized, Forbidden, MethodNotAllowed
+from werkzeug.datastructures import WWWAuthenticate
 
 from .supervisor_trace_engine import CONCEPT_IDS
 
@@ -79,7 +80,7 @@ def make_monitor_app(research_db: str | Path, *, admin_password_hash: str) -> Fl
                 or not password_matches(user.password or "", admin_password_hash)):
             raise Unauthorized(
                 "Individual authorized researcher login required",
-                www_authenticate='Basic realm="Researcher monitoring", charset="UTF-8"',
+                www_authenticate=WWWAuthenticate("basic", {"realm": "Researcher monitoring"}),
             )
 
     @app.after_request
@@ -142,7 +143,7 @@ def make_monitor_app(research_db: str | Path, *, admin_password_hash: str) -> Fl
     @app.get("/admin/api/mastery/<ref>")
     def mastery(ref):
         if not STUDENT_RE.fullmatch(ref):
-            raise ValueError("invalid pseudonymous participant reference")
+            return jsonify(error="invalid pseudonymous reference"), 404
         with connect() as db:
             participant = db.execute(
                 "SELECT p.learner_id,p.grp,p.status,ls.session_no,ls.step,"
