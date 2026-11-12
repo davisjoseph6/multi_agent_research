@@ -117,3 +117,5 @@ jobs:
         run: node scripts/supervisor_browser_playwright.cjs
       - name: Full A/B/C end-to-end 3-session English/French Chromium journey
         run: node scripts/supervisor_three_arm_browser_playwright.cjs
+      - name: Operational /study/ real-browser A/B/C onboarding and session-one acceptance
+        run: node scripts/supervisor_vps_browser_playwright.cjs
