@@ -173,10 +173,10 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         value=data("language")
         if value["language"] not in ("en","fr"):
             raise SyntheticStudyError("unsupported consent language")
-        from .supervisor_consent_texts import optional
+        statements, optional_text=required(value["language"])
         return jsonify(
-            required=list(required(value["language"])),
-            optional=optional(value["language"]),
+            required=list(statements),
+            optional=optional_text,
             version=CONSENT_VERSION,
         )
 
@@ -215,6 +215,14 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         if not result["eligible"]:
             response.delete_cookie(COOKIE,path="/study/")
         return response
+
+    @app.post("/study/api/programs")
+    def programs():
+        data()
+        status=intake.status(credential(),at=now())
+        if status["stage"] not in ("screened","participant"):
+            raise SyntheticStudyError("registration has not been authorized")
+        return jsonify(programs=list(intake.programs))
 
     @app.post("/study/api/register")
     def register():
@@ -350,7 +358,6 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         ref,token=enrolled()
         result=store.withdraw(ref,token,delete=value["delete"],
                               at=now(),channel="website")
-        clear_render(ref,"")
         response=jsonify(
             withdrawn=bool(result["withdrawn"]),
             data_deleted=bool(result["data_deleted"]),
