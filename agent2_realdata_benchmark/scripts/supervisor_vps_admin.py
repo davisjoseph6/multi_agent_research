@@ -12,6 +12,7 @@ from email.message import EmailMessage
 import json
 import os
 from pathlib import Path
+import secrets
 import smtplib
 import ssl
 
@@ -92,6 +93,8 @@ def main():
     group=parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--issue",metavar="EMAIL")
     group.add_argument("--counts",action="store_true")
+    group.add_argument("--rotate-registered-test",metavar="EMAIL",
+                       help="STAGING only; replace an existing registered .example invitation without losing progress")
     group.add_argument("--withdraw-verified-ref",metavar="STUDY_PNNN")
     parser.add_argument("--withdraw-mode",choices=("keep","delete"))
     parser.add_argument("--verification-record",type=Path,
@@ -139,6 +142,35 @@ def main():
             "email_sent":False,
             "identity_authority_verified_by_software":False,
         },indent=2))
+        return
+    if args.rotate_registered_test:
+        if mode!="staging" or args.send:
+            parser.error("registered test credential rotation is STAGING only")
+        if args.output is None:
+            parser.error("new private output path required for rotation")
+        if (not args.output.is_absolute() or args.output.exists()
+                or args.output.is_symlink() or not args.output.parent.is_dir()):
+            parser.error("new absolute private output file required")
+        host=os.environ["SUPERVISOR_VPS_HOST"]
+        if not host or "/" in host or ":" in host:
+            parser.error("canonical host is required")
+        # File must be created successfully BEFORE changing the only working
+        # participant credential; a filesystem failure must not lock them out.
+        new_token=secrets.token_urlsafe(40)
+        new_link=f"https://{host}/study/#invite={new_token}"
+        write_private(args.output,new_link)
+        try:
+            intake.rotate_registered_test(
+                args.rotate_registered_test, new_token=new_token,
+                at=datetime.now(timezone.utc),
+            )
+        except BaseException:
+            args.output.unlink(missing_ok=True)
+            raise
+        print("Registered fictional credential rotated. Previous invitation "
+              "and browser sessions are invalid. Study progress is preserved.")
+        print("New link saved to an existing restricted directory as mode 0600; "
+              "no token printed and no email sent.")
         return
     if args.send and mode!="live":
         parser.error("--send is disabled for all staging deployments")
