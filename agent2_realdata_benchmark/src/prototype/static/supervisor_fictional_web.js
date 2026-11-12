@@ -427,6 +427,16 @@
    await refresh();
  });
  $("load").addEventListener("click",refresh);
- fixture.addEventListener("change",refresh);
+ fixture.addEventListener("change",()=>{
+   // F1/F2/F3 are separate fictional people. Never accidentally copy the
+   // previous participant's locale into another participant's consent.
+   currentLanguage="en";
+   $("study-lang").value="en";
+   $("info-lang").value="en";
+   previousFeedback=null;
+   applyLanguage();
+   renderPreviousFeedback();
+   refresh();
+ });
  refresh();
 })();
