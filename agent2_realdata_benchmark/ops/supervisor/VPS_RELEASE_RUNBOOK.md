@@ -315,6 +315,67 @@ architecture, training and tests must be revised as a new version.
 Signatures are meaningful only if the public key is trusted and the PI's
 approval is independently verified.
 
+## 4e. Authenticated-encrypted operational study backups
+
+Optional code is available for paired research/contact SQLite backups with
+AES-256-GCM encryption, private binary key files, corruption detection and
+**memory-only restore verification**. It does not store either plaintext
+database in the backup directory. Encryption requires the Python
+`cryptography` library in the *administrative backup environment*
+(`python -m pip install cryptography`). It does **not** touch the study
+service's pinned dependencies, and has not been deployed to the VPS yet.
+
+For a controlled backup operation, the staff operator must first arrange
+a quiet period (pausing recruitment/session access), arrange institutionally
+approved secure backup-key custody and offsite storage, and create a new
+private destination folder. The backup CLI **refuses** if systemd reports
+the staging study service running. Example (on the VPS, privileged staff
+only, after arranging authorization and key custody):
+
+```bash
+# One-time key creation; DO NOT regenerate a key for existing backups.
+sudo install -d -m 0700 -o ijcai-supervisor -g ijcai-supervisor \
+  /var/lib/ijcai-supervisor-backup
+sudo -u ijcai-supervisor bash -c '
+umask 077
+head -c 32 /dev/urandom > /var/lib/ijcai-supervisor-backup/key.bin
+'
+# Stop the study service for a coherent paired research/contact snapshot.
+sudo systemctl stop ijcai-supervisor-staging
+sudo -u ijcai-supervisor bash -c '
+cd /srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark
+/srv/ijcai-supervisor-staging/venv/bin/python \
+  -m scripts.supervisor_operational_backup_cli \
+  --create \
+  --state-dir /var/lib/ijcai-supervisor-staging \
+  --key-file /var/lib/ijcai-supervisor-backup/key.bin \
+  --encrypted-file /var/lib/ijcai-supervisor-backup/dated-unique.enc
+'
+sudo systemctl start ijcai-supervisor-staging
+```
+
+Restore drill **without writing to the live databases**:
+
+```bash
+sudo -u ijcai-supervisor bash -c '
+cd /srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark
+/srv/ijcai-supervisor-staging/venv/bin/python \
+  -m scripts.supervisor_operational_backup_cli \
+  --verify \
+  --key-file /var/lib/ijcai-supervisor-backup/key.bin \
+  --encrypted-file /var/lib/ijcai-supervisor-backup/dated-unique.enc
+'
+```
+
+The operator must ensure the participant portal is restarted even after
+failures (e.g. via a reviewed `trap` handler). A complete recovery plan
+also needs an externally protected key copy, offsite encrypted replica,
+scheduled/monitored execution, rotation and retention policies, successful
+disaster-recovery drills on another host and GDPR backup erasure handling.
+A successful local encrypted backup is **not** evidence that these
+institutionally controlled operations have happened. The CLI never
+restores or overwrites production files automatically.
+
 ## 5. Operations, security and known blockers
 
 - Caddy terminates HTTPS and preserves existing Basic Auth, which includes
