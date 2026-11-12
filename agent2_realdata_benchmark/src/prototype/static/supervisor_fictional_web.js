@@ -146,7 +146,7 @@
    const resource=item.resource;
    $("recovery-content").hidden=false;
    $("options").hidden=true;
-   $("question").textContent="SOCRATIC_HINT — reflect before re-attempting";
+   $("question").textContent=t("socratic_reflect");
    $("recovery-title").textContent=resource.title;
    $("recovery-paragraphs").replaceChildren();
    const intro=document.createElement("p");
@@ -160,7 +160,7 @@
    $("hint-reflection").hidden=false;
    $("hint-reflection").value="";
    $("hint-next").textContent=(hintIndex+1===resource.prompts.length)
-     ? "Show original question for re-attempt" : "Next guiding question";
+     ? t("reveal_re_ask") : t("next_hint");
    buttons("hint-next");
  }
  function showCurrent(data){
@@ -204,11 +204,10 @@
        buttons("continue");
      }else throw new Error("Unknown recovery action");
    }else if(data.kind==="survey"){
-     $("question").textContent="Six provisional 1–7 fatigue responses. "+
-       "Exact NASA-TLX wording requires supervisor approval.";
+     $("question").textContent=t("provisional_survey");
      for(let i=0;i<6;i++){
        const label=document.createElement("label");
-       label.textContent="Fatigue item Q"+(i+1);
+       label.textContent=t("survey_item",i+1);
        const select=document.createElement("select");select.id="fatigue_"+i;
        for(let v=1;v<=7;v++){
          const option=document.createElement("option");
@@ -218,10 +217,10 @@
      }
      buttons("survey");
    }else if(data.kind==="waiting_next_session"){
-     $("question").textContent="Next fictional visit: "+data.scheduled_for;
+     $("question").textContent=t("next_visit",data.scheduled_for);
      buttons("advance");
    }else if(data.kind==="done"){
-     $("question").textContent="Three fictional sessions completed.";
+     $("question").textContent=t("completed_3");
    }else $("question").textContent=data.kind||"No fictional step";
  }
  async function refresh(){
@@ -242,10 +241,10 @@
                      ? "consent-stage" : "information");
        }
      }else{
-       currentLanguage=status.consent_lang||"en";
+       currentLanguage=status.study_language||"en";
+       applyLanguage();
        $("footer-information").href="/content/consent/"+currentLanguage+"/info";
-       $("progress").textContent="Fictional "+fixture.value+" — Session "+
-          status.session+"/3 — "+status.phase+" — step "+status.index;
+       $("progress").textContent=t("session_progress",fixture.value,status.session,status.phase,status.index);
        if(status.phase==="DONE"){
          const deb=await call("consent/debrief");
          $("debrief").textContent=deb.text;
@@ -264,8 +263,7 @@
      message("");
      const outcome=await call(action,data);
      if(action==="consent/register"&&outcome.message){
-       $("registered-message").textContent=outcome.message+
-         " (Fictional preview: no real email was sent.)";
+       $("registered-message").textContent=t("register_done");
      }
    }catch(e){message(e.message);working=false;return}
    working=false;await refresh();
@@ -304,7 +302,7 @@
    try{
      const stat=await call("status");
      if(!stat.registered){
-       message("No registered fictional participant data to withdraw.");
+       message(t("no_consent"));
        return;
      }
      showSection("withdraw-stage");
@@ -312,7 +310,7 @@
  });
  async function withdraw(deleteData){
    if(!window.confirm(
-     "Confirm stop participating? No AI points are awarded before completion of Session 3."
+     t("withdrawal_confirm")
    ))return;
    if(working)return;working=true;
    try{
@@ -320,8 +318,10 @@
        delete:deleteData,confirmed:true,
      });
      showSection("excluded-stage");
-     $("excluded-stage").querySelector("p").textContent=outcome.message;
-     message("Fictional withdrawal completed; no real email was sent.");
+     $("excluded-stage").querySelector("p").textContent=t(
+       deleteData?"delete_confirm":"keep_confirm"
+     );
+     message(t("withdrawal_done"));
    }catch(e){message(e.message)}
    finally{working=false}
  }
@@ -333,7 +333,7 @@
      return;
    const response=$("hint-reflection").value.trim();
    if(!response || response.length>500){
-     message("Please enter a brief reflection before continuing.");
+     message(t("enter_reflection"));
      return;
    }
    hintResponses.push(response);
@@ -344,7 +344,7 @@
    }else{
      $("recovery-content").hidden=true;
      $("question").textContent=
-       "Socratic re-attempt — original practice question: "+item.question_text;
+       t("socratic_reask")+item.question_text;
      $("options").hidden=false;
      options($("options"),item.options,"current");
      buttons("answer");
@@ -356,7 +356,7 @@
                  choice:selected("current"),request_id:requestId()};
      if(item.kind==="recovery"&&item.action==="SOCRATIC_HINT"){
        if(hintResponses.length!==2)
-         throw new Error("Complete both Socratic reflection prompts first.");
+         throw new Error(t("finish_reflections"));
        data.reflection=hintResponses.slice();
      }
      act("answer",data);
@@ -380,8 +380,7 @@
      if(!outcome.prepared||outcome.next_action!=="CONCEPT_SUMMARY")
        throw new Error("Recovery preparation did not complete");
      $("registered-message").textContent=
-       "Fictional Group A: three incorrect C2 questions triggered Rule 5b. "+
-       "Next: Concept Summary → DROP_2 → Worked Example → Socratic Hint.";
+       t("loss_aversion_demo");
    }catch(e){message(e.message);working=false;return}
    working=false;
    await refresh();
