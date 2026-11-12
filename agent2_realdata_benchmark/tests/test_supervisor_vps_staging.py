@@ -201,3 +201,27 @@ def test_screening_exclusion_has_no_recruitment_pii(tmp_path):
         assert db.execute("SELECT COUNT(*) FROM pii.contacts").fetchone()[0]==0
         assert db.execute("SELECT COUNT(*) FROM screening_log").fetchone()[0]==1
     assert post("status").status_code==409
+
+
+def test_offline_verified_withdrawal_and_collection_close_gate(tmp_path):
+    store,intake,_,_=stack(tmp_path)
+    token=intake.issue("offline@example.example",at=NOW(),allow_example=True)
+    complete_intake(intake,store,token)
+    ref=intake.learner(token,at=NOW())
+    with pytest.raises(SyntheticStudyError,match="remain active"):
+        store.close_collection()
+    result=store.offline_admin_withdraw(
+        ref,delete=True,channel="email",at=NOW(),
+    )
+    assert result["withdrawn"] and result["data_deleted"]
+    with store._tx() as db:
+        assert db.execute(
+            "SELECT COUNT(*) FROM participants WHERE learner_id=?",(ref,)
+        ).fetchone()[0]==0
+        assert db.execute(
+            "SELECT COUNT(*) FROM pii.invitations WHERE learner_id=?",(ref,)
+        ).fetchone()[0]==0
+        assert db.execute(
+            "SELECT COUNT(*) FROM deletion_log WHERE learner_id=?",(ref,)
+        ).fetchone()[0]==1
+    assert store.close_collection()["research_preserved"]
