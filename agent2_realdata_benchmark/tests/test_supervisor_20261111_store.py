@@ -288,5 +288,6 @@ def test_missed_visit_reschedule_within_48_hours_and_remove_after_two(fixture):
         reschedule_for=None,
     )
     assert second["missed_count"] == 2 and second["removed"]
-    with pytest.raises(SyntheticStudyError, match="inactive"):
+    # New consent guide mandates revocation, so the old token must be denied.
+    with pytest.raises(SyntheticStudyError, match="invalid fictional token"):
         store.progress(ref, token)
