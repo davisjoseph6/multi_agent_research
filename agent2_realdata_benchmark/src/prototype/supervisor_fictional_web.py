@@ -20,6 +20,8 @@ from typing import Callable
 from flask import Flask, jsonify, render_template, request, send_file
 
 from .supervisor_content import SupervisorBank
+from .supervisor_consent_flow import SyntheticConsentFlow
+from .supervisor_consent_texts import CONSENT_VERSION, required, STOP_PAGE
 from .supervisor_synthetic_store import (
     SupervisorSyntheticStore, SyntheticStudyError,
 )
@@ -53,6 +55,7 @@ class FictionalSupervisorRuntime:
         self.store = store
         self.clock = clock or FictionalSupervisorClock()
         self.roster = {}
+        self.consent = SyntheticConsentFlow(store)
         self.pending = {}
         self.lock = RLock()
 
@@ -138,6 +141,85 @@ def make_supervisor_fictional_app(
         return send_file(ROOT/"static/supervisor_fictional_web.css",
                          mimetype="text/css")
 
+    @app.get("/content/consent/<lang>/info")
+    def information(lang):
+        if lang not in ("en", "fr"):
+            raise SyntheticStudyError("unsupported information sheet language")
+        filename="info_sheet_"+lang+"_v1.0.html"
+        return send_file(ROOT.parents[1]/"content"/"consent"/filename,
+                         mimetype="text/html")
+
+    @app.get("/content/consent/<lang>/pdf")
+    def information_pdf(lang):
+        if lang not in ("en","fr"):
+            raise SyntheticStudyError("unsupported information sheet language")
+        filename="info_sheet_"+lang+"_v1.0.pdf"
+        pdf=ROOT.parents[1]/"content"/"consent"/filename
+        if not pdf.exists():
+            raise SyntheticStudyError("versioned PDF must be built before deployment")
+        return send_file(pdf,mimetype="application/pdf")
+
+    @app.post("/supervisor/api/consent/copy")
+    def consent_copy():
+        v=payload({"fixture","language"})
+        required_text,optional_text=required(v["language"])
+        return jsonify(version=CONSENT_VERSION,required=required_text,
+                       optional=optional_text,
+                       synthetic_only=True)
+
+    @app.post("/supervisor/api/consent/start")
+    def consent_start():
+        v=payload({"fixture","checks","optional","language"})
+        with runtime.lock:
+            return jsonify(runtime.consent.start_consent(
+                v["fixture"],checks=v["checks"],optional=v["optional"],
+                language=v["language"],at=runtime.clock(),
+            ))
+
+    @app.post("/supervisor/api/consent/economics")
+    def consent_economics():
+        v=payload({"fixture"})
+        with runtime.lock:
+            return jsonify(runtime.consent.declare_economics_course(v["fixture"]))
+
+    @app.post("/supervisor/api/consent/screen")
+    def consent_screen():
+        v=payload({"fixture","answers"})
+        with runtime.lock:
+            return jsonify(runtime.consent.screen(
+                v["fixture"],answers=v["answers"],at=runtime.clock(),
+            ))
+
+    @app.post("/supervisor/api/consent/register")
+    def consent_register():
+        v=payload({"fixture","email","age","program"})
+        with runtime.lock:
+            result=runtime.consent.register(
+                v["fixture"],email=v["email"],age=v["age"],
+                program=v["program"],at=runtime.clock(),
+            )
+            runtime.roster[v["fixture"]]=runtime.consent.identities[v["fixture"]]
+            return jsonify(result)
+
+    @app.post("/supervisor/api/consent/withdraw")
+    def consent_withdraw():
+        v=payload({"fixture","delete","confirmed"})
+        if v["confirmed"] is not True:
+            raise SyntheticStudyError("explicit withdrawal confirmation required")
+        with runtime.lock:
+            outcome=runtime.consent.withdraw(
+                v["fixture"],delete=v["delete"],at=runtime.clock(),
+            )
+            runtime.roster.pop(v["fixture"],None)
+            runtime.pending.pop(v["fixture"],None)
+            return jsonify(outcome)
+
+    @app.post("/supervisor/api/consent/debrief")
+    def consent_debrief():
+        v=payload({"fixture"})
+        with runtime.lock:
+            return jsonify(runtime.consent.completed_debrief(v["fixture"]))
+
     @app.post("/supervisor/api/screening")
     def screening():
         v=payload({"fixture"})
@@ -154,6 +236,10 @@ def make_supervisor_fictional_app(
     def register():
         v=payload({"fixture","consent","econ_course","screening_answers"})
         with runtime.lock:
+            if not app.config["TESTING"]:
+                raise SyntheticStudyError(
+                    "single-checkbox legacy fictional API disabled; use staged consent"
+                )
             fixture=v["fixture"]
             if runtime.fake(fixture):
                 raise SyntheticStudyError("duplicate fictional registration")
@@ -190,7 +276,17 @@ def make_supervisor_fictional_app(
         with runtime.lock:
             pair=runtime.fake(v["fixture"])
             if not pair:
-                return jsonify(registered=False,synthetic_only=True)
+                fixture=v["fixture"]
+                if fixture in runtime.consent.closed:
+                    stage="excluded"
+                elif fixture in runtime.consent.drafts:
+                    draft=runtime.consent.drafts[fixture]
+                    stage=("registration" if draft["screening_answers"] is not None
+                           else "screening")
+                else:
+                    stage="information"
+                return jsonify(registered=False,consent_stage=stage,
+                               synthetic_only=True)
             ref,token=pair
             state=runtime.store.progress(ref,token)
             return jsonify(registered=True,phase=state["phase"],
