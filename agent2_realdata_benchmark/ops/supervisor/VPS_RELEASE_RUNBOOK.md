@@ -358,6 +358,23 @@ database in the backup directory. Encryption requires the Python
 (`python -m pip install cryptography`). It does **not** touch the study
 service's pinned dependencies, and has not been deployed to the VPS yet.
 
+**Isolated administrative encryption runtime (one-time prerequisite):**
+Never install `cryptography` in the participant-serving Gunicorn virtualenv.
+Before the maintenance window, provision a separately protected root-owned
+runtime, verify its installed version with the institution, and test the import:
+
+```bash
+sudo install -d -m 0755 -o root -g root /srv/ijcai-supervisor-backup
+sudo python3 -m venv /srv/ijcai-supervisor-backup/venv
+sudo /srv/ijcai-supervisor-backup/venv/bin/python -m pip install --disable-pip-version-check 'cryptography==50.0.2'
+sudo -u ijcai-supervisor /srv/ijcai-supervisor-backup/venv/bin/python -c 'from cryptography.hazmat.primitives.ciphers.aead import AESGCM'
+```
+
+The wrapper refuses missing/unreadable encryption dependencies, invalid
+backup-key access, or an unwritable private destination BEFORE stopping the
+study service. This isolated runtime must remain non-writable by the
+`ijcai-supervisor` account and should be patched independently under
+institutional operations policy. Do not store the encryption key in it.
 **Safer guarded wrapper (preferred for a manual maintenance window):**
 After installing a source revision containing `run_safe_encrypted_backup.sh`,
 use the existing service-user-readable mode-0600 32-byte backup key and a

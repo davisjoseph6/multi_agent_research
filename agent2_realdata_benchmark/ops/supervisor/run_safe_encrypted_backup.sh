@@ -7,7 +7,7 @@ set -Eeuo pipefail
 SERVICE=ijcai-supervisor-staging
 SERVICE_USER=ijcai-supervisor
 ROOT=/srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark
-PY=/srv/ijcai-supervisor-staging/venv/bin/python
+PY=/srv/ijcai-supervisor-backup/venv/bin/python
 STATE=/var/lib/ijcai-supervisor-staging
 
 [[ "$EUID" -eq 0 ]] || { echo "Root required" >&2; exit 2; }
@@ -18,12 +18,29 @@ DEST="$2"
 [[ -f "$KEY" && ! -L "$KEY" && ! -e "$DEST" && ! -L "$DEST" ]] || {
     echo "Existing key and NEW backup file path required" >&2; exit 2;
 }
-[[ -d "$ROOT" && -x "$PY" && -d "$STATE" ]] || {
+[[ -d "$ROOT" && -d "$STATE" ]] || {
     echo "Deployed staging code/SQLite state unavailable" >&2; exit 2;
+}
+[[ -x "$PY" ]] || {
+    echo "Isolated backup Python missing: provision separately before downtime" >&2; exit 2;
 }
 command -v flock >/dev/null
 command -v systemctl >/dev/null
 command -v runuser >/dev/null
+# Fail before stopping the quiz if the isolated administrative environment
+# cannot import authenticated encryption. Do not install libraries in the
+# participant Gunicorn venv during a maintenance window.
+runuser -u "$SERVICE_USER" -- "$PY" -c     'from cryptography.hazmat.primitives.ciphers.aead import AESGCM'
+runuser -u "$SERVICE_USER" -- test -r "$KEY" || {
+    echo "Service account cannot read the protected backup key" >&2; exit 2;
+}
+runuser -u "$SERVICE_USER" -- test -w "$(dirname "$DEST")" || {
+    echo "Service account cannot write to private backup directory" >&2; exit 2;
+}
+if runuser -u "$SERVICE_USER" -- test -w "$PY"; then
+    echo "Refusing service-user-writable administrative Python runtime" >&2
+    exit 2
+fi
 
 # Refuse concurrent paired snapshots.
 exec 9>/run/lock/ijcai-supervisor-paired-backup.lock
