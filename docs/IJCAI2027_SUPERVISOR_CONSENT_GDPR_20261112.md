@@ -63,3 +63,31 @@ The preview binds only to 127.0.0.1 and uses fictional aliases F1/F2/F3. Never o
 - The guide defines pseudonymized retention using the last-publication date, which is not yet known. A real retention scheduler must be configured and approved later.
 
 DO NOT MERGE OR DEPLOY PR #35 as a public study merely because tests pass. Human enrollment stays forbidden.
+
+## Fast browser recovery check (fake F1 only)
+
+The localhost preview now has a **Quick test: trigger Group A recovery (fresh F1 only)** button.
+It uses the real supervisor CSV forms, the existing BKT engine, normal SQLite
+answer transactions and the four prescribed recovery steps, without modifying
+the actual study protocol. It programmatically signs fictional test declarations,
+passes eligibility with 4/8, registers `quick-recovery-f1@example.test`,
+completes all 16 pretest items using supervisor Case 1 starting mastery, and
+answers C2 quiz items 01–03 incorrectly to trigger Rule 5b.
+
+Start with a **fresh server process** (the fixture intentionally refuses reused
+databases and previously registered F1). Click the quick-test button, then click
+Continue on the displayed **CONCEPT_SUMMARY**. For **DROP_2**, select one of
+the two displayed answers; the two-choice grading is real. Continue through
+**WORKED_EXAMPLE**, then answer the **SOCRATIC_HINT** re-attempt. The next
+regular quiz question should follow, and no recovery step counts toward the
+20-question session block. Wrong recovery answers can change the recovery
+outcome, so the exact final question may depend on your choices.
+
+This is **not a bypass of the live consent process**: the demo endpoint only
+accepts F1 on loopback in the isolated fictional launcher, uses `.test`
+contacts, rejects nonfresh state and never dispatches messages. Do not expose
+the localhost test server through the VPS, a tunnel or a public reverse proxy.
+
+Focused test: `python -m pytest -q tests/test_supervisor_20261112_recovery_quick_demo.py`.
+This test automatically selects correct answers on the two graded recovery
+steps and checks the expected supervisor Case 1 next item and event counts.
