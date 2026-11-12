@@ -140,6 +140,13 @@ def make_supervisor_fictional_app(
     def stop_page():
         return redirect("/?stop=1",code=302)
 
+    @app.get("/supervisor-copy.js")
+    def copy_script():
+        return send_file(
+            ROOT/"static/supervisor_fictional_copy.js",
+            mimetype="text/javascript",
+        )
+
     @app.get("/supervisor-fake.js")
     def script():
         return send_file(ROOT/"static/supervisor_fictional_web.js",
