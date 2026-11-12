@@ -802,7 +802,7 @@ class SupervisorSyntheticStore:
         return {"accepted": True, "session_completed": session,
                 "synthetic_only": True}
 
-    def open_next_session(self, ref: str, token: str, at: datetime):
+    def open_next_session(self, ref: str, token: str, at: datetime, *, staging_preview: bool = False):
         with self._tx() as db:
             self._authenticated(db, ref, token)
             state = self._state(db, ref)
@@ -816,8 +816,25 @@ class SupervisorSyntheticStore:
             ).fetchone()
             if not next_session or next_session["status"] != "scheduled":
                 raise SyntheticStudyError("next visit not scheduled")
-            if iso(at) < next_session["scheduled_for"]:
-                raise SyntheticStudyError("next session date has not arrived")
+            preview_early = iso(at) < next_session["scheduled_for"]
+            if preview_early:
+                if not (staging_preview is True and self.operational):
+                    raise SyntheticStudyError("next session date has not arrived")
+                # Only explicitly invited reserved fictional test identities
+                # may bypass the schedule in the STAGING reviewer route.
+                identity = db.execute(
+                    "SELECT email FROM pii.contacts WHERE learner_id=?",
+                    (ref,),
+                ).fetchone()
+                if (identity is None or not identity["email"].lower().endswith(".example")):
+                    raise SyntheticStudyError("review-only fictional contact required")
+                updated = db.execute(
+                    "UPDATE sessions SET scheduled_for=? "
+                    "WHERE learner_id=? AND session_no=? AND status='scheduled'",
+                    (iso(at), ref, next_n),
+                )
+                if updated.rowcount != 1:
+                    raise SyntheticStudyError("next visit changed during review")
             engine = SupervisorTraceEngine.restore(state["engine"])
             engine.new_session(next_n)
             state.update(
@@ -834,7 +851,8 @@ class SupervisorSyntheticStore:
                 "WHERE learner_id=? AND session_no=?",
                 (iso(at),ref,next_n),
             )
-        return {"session_started": next_n, "synthetic_only": True}
+        return {"session_started": next_n, "synthetic_only": True,
+                "staging_preview_advance": bool(preview_early)}
 
     def mark_missed(self, ref: str, token: str, *,
                     at: datetime, reschedule_for: datetime | None):
