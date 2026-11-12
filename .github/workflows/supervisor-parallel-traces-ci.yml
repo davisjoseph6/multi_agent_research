@@ -57,8 +57,9 @@ jobs:
           node-version: '22'
       - name: JavaScript syntax check for staged Socratic browser
         run: node --check src/prototype/static/supervisor_fictional_web.js
+          node --check src/prototype/static/supervisor_fictional_copy.js
       - name: Exactly compare all supervisor scenarios and bank constraints
-        run: python -m pytest -q tests/test_supervisor_20261111_traces.py tests/test_supervisor_20261111_store.py tests/test_supervisor_20261111_end_to_end_store.py tests/test_supervisor_20261111_reminders.py tests/test_supervisor_20261111_fictional_http.py tests/test_supervisor_20261111_neural.py tests/test_supervisor_20261111_model_comparison.py tests/test_supervisor_20261111_backup.py tests/test_supervisor_20261112_consent_gdpr.py tests/test_supervisor_20261112_consent_web.py tests/test_supervisor_20261112_gdpr_admin.py tests/test_supervisor_20261112_daily_operations.py tests/test_supervisor_20261112_recovery_quick_demo.py
+        run: python -m pytest -q tests/test_supervisor_20261111_traces.py tests/test_supervisor_20261111_store.py tests/test_supervisor_20261111_end_to_end_store.py tests/test_supervisor_20261111_reminders.py tests/test_supervisor_20261111_fictional_http.py tests/test_supervisor_20261111_neural.py tests/test_supervisor_20261111_model_comparison.py tests/test_supervisor_20261111_backup.py tests/test_supervisor_20261112_consent_gdpr.py tests/test_supervisor_20261112_consent_web.py tests/test_supervisor_20261112_gdpr_admin.py tests/test_supervisor_20261112_daily_operations.py tests/test_supervisor_20261112_recovery_quick_demo.py tests/test_supervisor_20261112_french_feedback.py
       - name: Create and validate versioned English/French Annex PDFs
         run: |
           python -m scripts.supervisor_consent_pdf
