@@ -1,0 +1,21 @@
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#14233a;background:#f4f7fb}
+*{box-sizing:border-box}body{margin:0;padding:1rem}main.portal{width:min(100%,820px);margin:0 auto;background:white;border:1px solid #dce4ee;border-radius:12px;padding:clamp(1rem,3vw,2rem);box-shadow:0 2px 14px #10263a15}
+h1{font-size:clamp(1.45rem,3vw,2rem);margin:0 0 0.3rem}h2{font-size:1.3rem;margin:1.2rem 0}h3{font-size:1.06rem}p,li{line-height:1.55}
+header,footer{border-bottom:1px solid #dce4ee;padding-bottom:1rem}footer{border-bottom:0;border-top:1px solid #dce4ee;margin-top:2rem;padding-top:1rem}
+section[hidden],fieldset[hidden],div[hidden],p[hidden],button[hidden]{display:none!important}
+label{display:block;padding:.5rem 0;line-height:1.5;cursor:pointer}
+label input[type=radio],label input[type=checkbox]{width:1.15rem;height:1.15rem;vertical-align:middle;margin-right:.75rem}
+button,input,select,textarea{font:inherit}
+button{margin:.4rem .4rem .4rem 0;padding:.65rem 1rem;border-radius:.45rem;border:1px solid #20559e;background:#225aa5;color:white;font-weight:600;cursor:pointer;min-height:2.75rem}
+button:hover{background:#174277}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid #f5af32;outline-offset:3px}
+button[disabled]{opacity:.45;cursor:not-allowed}input[type=number],select,textarea{max-width:100%;padding:.55rem;border:1px solid #667994;border-radius:.35rem}
+textarea{width:100%;min-height:6.5rem}fieldset{margin:1rem 0;padding:1rem;border:1px solid #b9c8da;border-radius:.55rem}legend{font-weight:700;padding:0 .5rem}
+#info-copy pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;line-height:1.55;background:#f2f6fb;border:1px solid #d5e1ec;padding:1rem;border-radius:.35rem}
+.warning{background:#fff5d6;border:2px solid #b28112;border-radius:.4rem;padding:.75rem}
+#error{color:#a3272b;font-weight:700}#notice{color:#175b36;font-weight:700}
+#question,#screen-prompt{font-size:1.1rem;line-height:1.6;font-weight:600}
+#progress{font-size:.9rem;color:#40546b}#previous-result{font-size:1.1rem;padding:1rem;border-radius:.5rem;border:2px solid;margin:1rem 0;font-weight:700}
+#previous-result.correct{color:#125a36;border-color:#239153;background:#e8f7ef}#previous-result.incorrect{color:#9b2024;border-color:#c34545;background:#ffeded}
+#previous-result-icon{font-size:1.4rem;vertical-align:middle}#teaching{background:#f4f8ff;padding:1rem;border:1px solid #b7cff1;border-radius:.5rem}
+#surveys label{display:flex;align-items:center;justify-content:space-between;gap:1rem;border-bottom:1px solid #e1e9f0}
+@media(max-width:480px){body{padding:0}main.portal{border:0;border-radius:0}button{width:100%}#surveys label{align-items:flex-start;flex-direction:column}}
