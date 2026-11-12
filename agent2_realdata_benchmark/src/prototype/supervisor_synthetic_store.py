@@ -81,7 +81,6 @@ class SupervisorSyntheticStore:
                 config_version TEXT NOT NULL REFERENCES config(config_version)
               );
               CREATE TABLE IF NOT EXISTS screening_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
                 score INTEGER NOT NULL CHECK(score BETWEEN 6 AND 8),
                 eligible INTEGER NOT NULL CHECK(eligible=0)
