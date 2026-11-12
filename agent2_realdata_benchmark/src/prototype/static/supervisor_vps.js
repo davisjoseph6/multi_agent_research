@@ -216,7 +216,7 @@
    // Trusted same-origin, version-controlled sheet: keep semantic headings,
    // paragraph spacing, bold words and links instead of printing raw Markdown.
    for(const element of content.children){
-     if(["H1","H2","H3","P","SECTION","UL","OL"].includes(element.tagName))
+     if(["H1","H2","H3","P","SECTION","UL","OL","PRE","A"].includes(element.tagName))
        $("info-copy").append(document.importNode(element,true));
    }
    const field=$("consent-required");field.replaceChildren();
@@ -447,17 +447,21 @@
      }else if(status.stage==="screened"){
        await programs();show("registration");
      }else if(registered){
-       phase=status.phase;
-       $("progress").textContent=t("progress",status.session,status.phase,status.index);
+       phase=status.phase;activeSession=status.session;quizIndex=status.index;
+       previous=null;feedback();
        if(status.phase==="DONE"){
-         previous=null;feedback();
+         surveySeen=false;
          const result=await api("debrief");
          $("debrief").textContent=result.text;show("finished");
+         await showCompletedSummary("finished-summary");
        }else{
-         if(!["QUIZ","SURVEY"].includes(status.phase))previous=null;
-         feedback();
-         renderItem(await api("item"));
+         if(status.phase!=="SURVEY")surveySeen=false;
+         const item=await api("item");
+         renderItem(item);
+         showProgress(status,item);
          show("learning");
+         if(status.phase==="WAITING_NEXT_SESSION")
+           await showCompletedSummary("session-summary");
        }
      }else show("entry");
    }catch(e){error(e.message);show("entry")}
@@ -496,7 +500,12 @@
    }catch(e){error(e.message)}
  });
  $("register").addEventListener("click",()=>{
-   act("register",{age:Number($("age").value),program:$("program").value});
+   const age=Number($("age").value);
+   if(!Number.isInteger(age)||age<18||age>99){
+     error(lang==="fr"?"Choisissez un âge entre 18 et 99.":"Select an age from 18 to 99.");
+     return;
+   }
+   act("register",{age,program:$("program").value});
  });
  $("language").addEventListener("change",async()=>{
    const desired=$("language").value;
@@ -511,15 +520,22 @@
      }
    }catch(e){error(e.message);$("language").value=lang}
  });
- function reply(choice,reflection=null){
-   return act("answer",{
-     render_id:current.render_id,
-     request_id:"submit_"+crypto.randomUUID().replaceAll("-",""),
-     question_id:current.question_id||null,
-     choice,reflection,
-   },resp=>{
-     previous=typeof resp.previous_correct==="boolean"?resp.previous_correct:null;
-   });
+ async function reply(choice,reflection=null){
+   if(busy)return;
+   busy=true;error("");notice("");
+   try{
+     const resp=await api("answer",{
+       render_id:current.render_id,
+       request_id:"submit_"+crypto.randomUUID().replaceAll("-",""),
+       question_id:current.question_id||null,
+       choice,reflection,
+     });
+     if(resp.feedback_phase==="QUIZ"&&typeof resp.previous_correct==="boolean"){
+       showAnswerFeedback(resp,choice);
+       busy=false;return;
+     }
+   }catch(e){busy=false;error(e.message);return}
+   busy=false;await refresh();
  }
  $("answer").addEventListener("click",()=>{
    try{
@@ -544,11 +560,19 @@
    // The main answer handler submits the two typed reflections alongside
    // the graded four-option re-attempt. No answer is revealed before then.
  });
- $("submit-survey").addEventListener("click",()=>{
-   const values=Array.from({length:6},(_,i)=>Number($("fatigue-"+i).value));
-   act("survey",{render_id:current.render_id,request_id:"survey_"+crypto.randomUUID().replaceAll("-",""),values},
-       ()=>{previous=null});
+ $("fatigue-next").addEventListener("click",()=>{
+   surveyStep++;
+   if(surveyStep>=6)return;
+   showSurveyQuestion();
  });
+ $("submit-survey").addEventListener("click",()=>{
+   if(surveyStep!==5)return;
+   act("survey",{render_id:current.render_id,
+       request_id:"survey_"+crypto.randomUUID().replaceAll("-"),
+       values:surveyValues.slice()},
+       ()=>{previous=null;surveySeen=false});
+ });
+ $("feedback-next").addEventListener("click",refresh);
  $("next-session").addEventListener("click",()=>act("next-session"));
  $("staging-next-session").addEventListener("click",()=>{
    if(!$("mode-warning").hidden)act("staging-next-session");
@@ -570,6 +594,11 @@
  $("withdraw-keep").addEventListener("click",()=>withdraw(false));
  $("withdraw-delete").addEventListener("click",()=>withdraw(true));
  async function initial(){
+   const logo=$("school-logo"),fallback=$("school-wordmark");
+   const loaded=()=>{logo.hidden=false;fallback.hidden=true};
+   logo.addEventListener("load",loaded);
+   logo.addEventListener("error",()=>{logo.hidden=true;fallback.hidden=false});
+   if(logo.complete&&logo.naturalWidth>0)loaded();
    updateLanguage();
    const params=new URLSearchParams(window.location.hash.slice(1));
    const token=params.get("invite");
