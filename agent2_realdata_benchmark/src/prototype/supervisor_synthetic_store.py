@@ -334,7 +334,10 @@ class SupervisorSyntheticStore:
     def register(self, *, contact_email: str,
                  econ_course: bool, screening_answers: dict[str, str],
                  consent_version: str, consent_given: bool,
-                 age: int | None, program: str, at: datetime) -> dict:
+                 age: int | None, program: str, at: datetime,
+                 consent_lang: str = "en",
+                 open_data_consent: bool = False,
+                 consent_at: datetime | None = None) -> dict:
         """Eligible fictional candidates alone consume the A/B/C rotation."""
         if (consent_given is not True or not isinstance(consent_version, str)
                 or not consent_version.strip()):
@@ -356,21 +359,37 @@ class SupervisorSyntheticStore:
             raise SyntheticStudyError("invalid fictional age")
         if not isinstance(program, str) or len(program) > 160:
             raise SyntheticStudyError("invalid fictional academic program")
+        if consent_lang not in ("en", "fr") or type(open_data_consent) is not bool:
+            raise SyntheticStudyError("explicit consent language and optional choice required")
+        if age is None or age > 99:
+            raise SyntheticStudyError("fictional age must be between 18 and 99")
+        if not isinstance(program, str) or not program.strip():
+            raise SyntheticStudyError("academic program required")
+        consent_clicked = iso(consent_at if consent_at is not None else at)
         now = iso(at)
         token = secrets.token_urlsafe(40)
         with self._tx() as db:
-            ordinal = db.execute("SELECT COUNT(*) FROM participants").fetchone()[0]
+            if db.execute(
+                "SELECT 1 FROM pii.contacts WHERE email=? COLLATE NOCASE",
+                (contact_email,),
+            ).fetchone():
+                raise SyntheticStudyError(
+                    "This email is already registered. Use the link sent to you by email."
+                )
+            ordinal = (db.execute("SELECT COUNT(*) FROM participants").fetchone()[0]
+                       + db.execute("SELECT COUNT(*) FROM deletion_log").fetchone()[0])
             ref = f"SYN_SUPERVISOR_P{ordinal + 1:03d}"
             group = GROUPS[ordinal % 3]
             db.execute(
                 """INSERT INTO participants(
                    learner_id,grp,registered_at,consent_version,consent_at,
+                   consent_lang,open_data_consent,
                    econ_course,screening_score,eligible,age,program,status,
                    missed_sessions,status_changed_at,config_version
-                 ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (ref, group, now, consent_version, now, int(econ_course),
-                 score, 1, age, program, "active", 0, now,
-                 "supervisor_20261111_v1"),
+                 ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (ref, group, now, consent_version, consent_clicked, consent_lang,
+                 int(open_data_consent), int(econ_course), score, 1, age,
+                 program, "active", 0, now, "supervisor_20261111_v1"),
             )
             db.execute(
                 "INSERT INTO pii.contacts(learner_id,email,token_hash,token_created_at)"
@@ -679,6 +698,10 @@ class SupervisorSyntheticStore:
                     "UPDATE sessions SET status='missed' "
                     "WHERE learner_id=? AND session_no=?",
                     (ref,n),
+                )
+                db.execute(
+                    "UPDATE pii.contacts SET token_hash=? WHERE learner_id=?",
+                    (hashlib.sha256(secrets.token_bytes(48)).hexdigest(), ref),
                 )
         return {"missed_count": misses,
                 "removed": misses >= 2, "synthetic_only": True}
