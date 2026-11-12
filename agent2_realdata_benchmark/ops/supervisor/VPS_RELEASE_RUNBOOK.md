@@ -14,6 +14,61 @@ The supervisor staging application listens **only** on
 `127.0.0.1:8788`, state is under `/var/lib/ijcai-supervisor-staging`,
 and Caddy proxies `/study/` under its existing Basic Auth.
 
+## Recovery: systemd status=200/CHDIR after first upload (12 Nov 2026)
+
+The first installer version used `cp -a "$SOURCE/." "$RELEASE/"`.
+Because the SSH upload directory was intentionally `0700`, GNU `cp -a`
+also gave the **destination release root** mode `0700`. The dedicated
+`ijcai-supervisor` service account cannot traverse it, so systemd failed
+**before importing Python** with `status=200/CHDIR`. Installing Flask and
+Gunicorn succeeded; this is neither an application traceback nor a sign that
+the operator-demo service is broken.
+
+**Preferred durable recovery:** Fetch the latest deployment-fix commit, use
+the upload procedure in §2 to archive its *full new SHA* into a fresh
+`/home/davis/ijcai_supervisor_upload_<sha>` directory, and run the new
+`install_staging.sh` using sudo. The patched installer normalizes **only**
+the deployed public-code release root to mode `0755`, checks directory
+accessibility as `ijcai-supervisor`, and explicitly restarts the systemd
+unit. It runs these checks even if a release directory already exists.
+The service state under `/var/lib/ijcai-supervisor-staging` remains `0700`,
+and secrets under `/etc/ijcai-supervisor-staging` remain group-restricted.
+There is no need to delete the old release, disable the existing demo or
+reset the SQLite databases.
+
+For read-only diagnosis after deployment:
+
+```bash
+sudo namei -l /srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark
+sudo systemctl status ijcai-supervisor-staging --no-pager
+sudo journalctl -u ijcai-supervisor-staging -n 35 --no-pager
+sudo ss -ltnp | grep 127.0.0.1:8788
+```
+
+If the older source has **already** been copied to the VPS and you need to
+repair it before updating, the following narrow recovery is safe as long as
+`current` resolves under the expected release directory:
+
+```bash
+target="$(readlink -f /srv/ijcai-supervisor-staging/current)"
+case "$target" in
+  /srv/ijcai-supervisor-staging/releases/*) ;;
+  *) echo "Unexpected release target: $target" >&2; exit 2 ;;
+esac
+sudo chmod 0755 "$target"
+sudo -u ijcai-supervisor test -x \
+  "$target/agent2_realdata_benchmark/scripts"
+sudo systemctl restart ijcai-supervisor-staging
+sudo systemctl is-active --quiet ijcai-supervisor-staging
+```
+
+That manual repair **does not finish public installation**: the original
+installer exited **before** inserting and validating the Caddy `/study/`
+reverse-proxy route. Re-run the **patched** installer to finish that step
+and inspect the unauthenticated HTTPS response as required in §3. Do **not**
+run `chmod -R 777`, relax `/var/lib` or `/etc` permissions, open port
+8788 externally, or remove Caddy Basic Auth.
+
 ## 1. Release acceptance on GitHub and WSL
 
 The supervisor workflow checks the exact 465 reference trace rows, core
