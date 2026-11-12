@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Adaptive learning study — participant portal</title>
+<link rel="stylesheet" href="/study/app.css">
+<script src="/study/app.js" defer></script>
+</head>
+<body>
+<main id="app" class="portal">
+<header>
+  <h1 id="site-title">Adaptive Learning Study</h1>
+  <p id="mode-warning" class="warning" role="status" {% if release_mode == 'live' %}hidden{% endif %}>TEST DEPLOYMENT — do not enter real participant information or use this link to recruit.</p>
+  <label for="language">Language / Langue</label>
+  <select id="language" aria-label="Language"><option value="en">English</option><option value="fr">Français</option></select>
+</header>
+
+<p id="error" role="alert" aria-live="assertive"></p>
+<p id="notice" role="status" aria-live="polite"></p>
+
+<section id="entry" hidden>
+  <h2>Invitation required / Invitation nécessaire</h2>
+  <p>Open your private invitation link. The invitation code must appear after <code>#invite=</code> in the link. Do not share this link.</p>
+</section>
+
+<section id="information" hidden>
+  <h2 id="info-title">Information and consent</h2>
+  <div id="info-copy"></div>
+  <p><a id="full-sheet" href="/study/info/en" target="_blank" rel="noopener noreferrer">Full participant information sheet</a></p>
+  <fieldset id="consent-required"><legend>Required declarations</legend></fieldset>
+  <fieldset id="consent-optional"><legend>Optional data-sharing choice</legend></fieldset>
+  <button type="button" id="start-consent">I agree and continue</button>
+  <button type="button" id="exclude-course">I previously took an economics course</button>
+</section>
+
+<section id="screening" hidden>
+  <h2 id="screen-title">Eligibility screening</h2>
+  <p id="screen-number"></p>
+  <p id="screen-prompt"></p>
+  <fieldset id="screen-options"><legend>Choose one answer</legend></fieldset>
+  <button type="button" id="screen-next">Next</button>
+  <p id="screen-explanation">No correctness feedback is provided for screening.</p>
+</section>
+
+<section id="registration" hidden>
+  <h2 id="reg-title">Registration</h2>
+  <p id="reg-info">Your invitation verified your email address. No name is requested.</p>
+  <label for="age" id="age-label">Age</label>
+  <input id="age" type="number" min="18" max="99" required>
+  <label for="program" id="program-label">Academic program</label>
+  <select id="program" required></select>
+  <button type="button" id="register">Register and start session 1</button>
+</section>
+
+<section id="learning" hidden>
+  <h2 id="phase">Current activity</h2>
+  <p id="progress"></p>
+  <div id="previous-result" role="status" aria-live="polite" hidden><span id="previous-result-icon"></span> <span id="previous-result-text"></span></div>
+  <p id="question"></p>
+  <section id="teaching" hidden>
+    <h3 id="teaching-title"></h3>
+    <div id="teaching-body"></div>
+  </section>
+  <fieldset id="choices" hidden><legend>Select one answer</legend></fieldset>
+  <div id="reflection" hidden>
+    <p id="guidance"></p>
+    <label for="reasoning" id="reasoning-label">Your own reasoning</label>
+    <textarea id="reasoning" maxlength="500" rows="3"></textarea>
+  </div>
+  <div id="surveys" hidden></div>
+  <button type="button" id="answer" hidden>Submit answer</button>
+  <button type="button" id="continue" hidden>Continue</button>
+  <button type="button" id="hint-next" hidden>Next question</button>
+  <button type="button" id="submit-survey" hidden>Submit six ratings</button>
+  <button type="button" id="next-session" hidden>Begin next scheduled session</button>
+  <button type="button" id="refresh">Refresh current activity</button>
+</section>
+
+<section id="finished" hidden>
+  <h2 id="finished-title">Study completed</h2>
+  <p id="debrief"></p>
+</section>
+
+<section id="excluded" hidden>
+  <h2>Not eligible / Non admissible</h2>
+  <p>Thank you for your interest. No study session has been started.</p>
+</section>
+
+<section id="stop" hidden>
+  <h2 id="stop-title">Stop participating / Arrêter la participation</h2>
+  <p id="stop-info">You may stop at any time. Choose whether to retain your pseudonymized responses or delete your data.</p>
+  <button type="button" id="withdraw-keep">Stop and retain answers</button>
+  <button type="button" id="withdraw-delete">Stop and erase data</button>
+  <button type="button" id="stop-cancel">Cancel</button>
+</section>
+<footer>
+  <button type="button" id="stop-open">Stop participating</button>
+  <p>This portal uses a private invitation. Questions about your rights or the study should be directed to the researcher identified on the approved information sheet.</p>
+</footer>
+</main>
+</body>
+</html>
