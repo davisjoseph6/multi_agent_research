@@ -19,6 +19,7 @@ import sqlite3
 
 from .supervisor_content import SupervisorBank
 from .supervisor_trace_engine import SupervisorTraceEngine, SESSION_BLOCKS
+from .supervisor_recovery_content import CONTENT_VERSION, recovery_resource
 
 GROUPS = ("A", "B", "C")
 FORMS = ("PRETEST", "QUIZ", "POSTTEST", "SURVEY",
@@ -479,13 +480,20 @@ class SupervisorSyntheticStore:
                     options = {k: options[k]
                                for k in "ABCD"
                                if k in (distractor, item.correct_answer)}
-                return dict(kind="question" if step["action"] == "QUESTION"
-                            else "recovery", action=step["action"],
-                            question_id=item.question_id,
-                            question_text=item.question_text,
-                            options=options, synthetic_only=True)
+                response = dict(kind="question" if step["action"] == "QUESTION"
+                                else "recovery", action=step["action"],
+                                question_id=item.question_id,
+                                question_text=item.question_text,
+                                options=options, synthetic_only=True)
+                if step["action"] == "SOCRATIC_HINT":
+                    response["resource"] = recovery_resource(
+                        step["concept"], "SOCRATIC_HINT",
+                        question_text=item.question_text,
+                    )
+                return response
             return dict(kind="recovery", action=step["action"],
                         content_status="REQUIRES_INDEPENDENT_REVIEW",
+                        resource=recovery_resource(step["concept"],step["action"]),
                         synthetic_only=True)
         return dict(kind=state["phase"].lower(), synthetic_only=True)
 
@@ -530,7 +538,8 @@ class SupervisorSyntheticStore:
 
     def answer_quiz(self, ref: str, token: str, *,
                     request_id: str, item_id: str | None, choice: str | None,
-                    shown_at: datetime, answered_at: datetime) -> dict:
+                    shown_at: datetime, answered_at: datetime,
+                    free_text: list[str] | None = None) -> dict:
         with self._tx() as db:
             self._authenticated(db, ref, token)
             state = self._state(db, ref)
@@ -543,6 +552,20 @@ class SupervisorSyntheticStore:
             concept = step["concept"]
             before, D_before = engine.mastery[concept], engine.degradation
             action = step["action"]
+            # Optional for old deterministic fixture calls. Browser Socratic
+            # re-attempts send two non-empty typed reflections, which are
+            # stored together in the existing free_text audit field.
+            if free_text is not None and (
+                action != "SOCRATIC_HINT" or type(free_text) is not list
+                or len(free_text) != 2 or any(
+                    type(s) is not str or not 1 <= len(s.strip()) <= 500
+                    for s in free_text
+                )
+            ):
+                raise SyntheticStudyError(
+                    "only a Socratic re-attempt accepts two brief reflections"
+                )
+            saved_reflection = dump([s.strip() for s in free_text]) if free_text is not None else None
             if action in ("QUESTION", "DROP_2", "SOCRATIC_HINT"):
                 if type(choice) is not str or choice not in "ABCD":
                     raise SyntheticStudyError("A/B/C/D answer required")
@@ -592,10 +615,11 @@ class SupervisorSyntheticStore:
                 recovery_attempt=completed_step.get("recovery_attempt", ""),
                 recovery_outcome=completed_step.get("recovery_outcome", ""),
                 content_id=(
-                    "UNREVIEWED_RESOURCE_" + action
-                    if action in ("CONCEPT_SUMMARY", "WORKED_EXAMPLE")
+                    f"{CONTENT_VERSION}_{concept}_{action}"
+                    if action in ("CONCEPT_SUMMARY", "WORKED_EXAMPLE", "SOCRATIC_HINT")
                     else None
                 ),
+                free_text=saved_reflection,
             )
         return {"accepted": True, "synthetic_only": True}
 
