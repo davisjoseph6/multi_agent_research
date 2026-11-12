@@ -231,6 +231,10 @@
      message("");
      const status=await call("status");
      if(!status.registered){
+       if(status.consent_lang){
+         currentLanguage=status.consent_lang;
+         applyLanguage();
+       }
        previousFeedback=null;renderPreviousFeedback();
        const stage=status.consent_stage||"information";
        if(stage==="excluded"){showSection("excluded-stage");}
