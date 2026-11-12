@@ -9,6 +9,10 @@ on:
       - 'docs/pilot_release_evidence/**'
       - 'docs/PILOT_RELEASE_ENGINEERING_MATRIX_20261109.md'
       - '.github/workflows/rct-hardening-ci.yml'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   rehearsal:
     runs-on: ubuntu-latest
