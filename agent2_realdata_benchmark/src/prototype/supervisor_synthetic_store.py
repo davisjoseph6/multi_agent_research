@@ -716,3 +716,84 @@ class SupervisorSyntheticStore:
                     (ref,),
                 )
             ]
+
+
+    def log_screening_exclusion(self, score: int, *, at: datetime) -> None:
+        """Anonymously record only an excluded 6..8 score and its time."""
+        if type(score) is not int or not 6 <= score <= 8:
+            raise SyntheticStudyError("only excluded screening results can be logged")
+        with self._tx() as db:
+            db.execute(
+                "INSERT INTO screening_log(timestamp,score,eligible) VALUES(?,?,0)",
+                (iso(at),score),
+            )
+
+    def withdraw(self, ref: str, token: str, *,
+                 delete: bool, at: datetime, channel: str = "website") -> dict:
+        """Atomic fictional erasure or stop/keep; no external mail delivery.
+
+        The confirmation address is for the isolated trusted preview worker
+        only. No real send is performed, and a real verified sender is a
+        separate deployment gate.
+        """
+        if type(delete) is not bool or channel not in ("website","email"):
+            raise SyntheticStudyError("explicit withdrawal and channel required")
+        with self._tx() as db:
+            self._authenticated(db,ref,token)
+            row=db.execute(
+                "SELECT email FROM pii.contacts WHERE learner_id=?",(ref,)
+            ).fetchone()
+            if row is None or not row["email"].lower().endswith(".test"):
+                raise SyntheticStudyError("only fictional contact confirmation allowed")
+            recipient=row["email"]
+            if delete:
+                db.execute("INSERT INTO erasure_authorization(one) VALUES(1)")
+                try:
+                    for name in ("state_history","events","surveys",
+                                 "learner_state","sessions"):
+                        db.execute(f"DELETE FROM {name} WHERE learner_id=?",(ref,))
+                    db.execute("DELETE FROM pii.contacts WHERE learner_id=?",(ref,))
+                    db.execute("DELETE FROM participants WHERE learner_id=?",(ref,))
+                finally:
+                    db.execute("DELETE FROM erasure_authorization")
+                db.execute(
+                    "INSERT INTO deletion_log(learner_id,deleted_at,channel) "
+                    "VALUES(?,?,?)",(ref,iso(at),channel),
+                )
+            else:
+                db.execute(
+                    "UPDATE participants SET status='withdrawn',"
+                    "status_changed_at=? WHERE learner_id=?",(iso(at),ref),
+                )
+                db.execute(
+                    "UPDATE pii.contacts SET token_hash=? WHERE learner_id=?",
+                    (hashlib.sha256(secrets.token_bytes(48)).hexdigest(),ref),
+                )
+        return {
+            "withdrawn":True, "data_deleted":delete,
+            "fictional_confirmation_recipient":recipient,
+            "real_email_sent":False,"synthetic_only":True,
+        }
+
+    def points_export(self) -> list[dict]:
+        """Operator-only local export; no participant-facing HTTP endpoint."""
+        with self._tx() as db:
+            rows=db.execute(
+                "SELECT c.email,p.status_changed_at "
+                "FROM participants p JOIN pii.contacts c "
+                "ON p.learner_id=c.learner_id "
+                "WHERE p.status='completed' ORDER BY p.learner_id",
+            ).fetchall()
+            return [
+                {"email":r["email"],"completed_at":r["status_changed_at"]}
+                for r in rows if r["email"].lower().endswith(".test")
+            ]
+
+    def close_collection(self) -> dict:
+        """Wipe fictional PII; separate backup purge must be verified."""
+        with self._tx() as db:
+            count=db.execute("SELECT COUNT(*) FROM pii.contacts").fetchone()[0]
+            db.execute("DELETE FROM pii.contacts")
+        return {"fictional_contacts_deleted":count,
+                "research_preserved":True,"backups_deleted":False,
+                "synthetic_only":True}
