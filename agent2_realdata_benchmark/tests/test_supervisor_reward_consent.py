@@ -79,7 +79,7 @@ def test_privately_scoped_consent_and_registration(tmp_path,email,expected_check
     assert page.status_code==200
     html=page.get_data(as_text=True)
     if expected_checks==5:
-        assert "v1.1" in html and "No AI points" in html
+        assert "v1.1" in html and "AI points are not offered" in html
         assert "150 AI points" not in html
     else:
         assert "v1.0" in html and "150 AI points" in html
