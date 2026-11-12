@@ -185,14 +185,16 @@
          throw new Error("Socratic text missing; refusing unhinted re-attempt");
        showSocraticPrompt();
      }else if(data.action==="DROP_2"){
-       $("question").textContent="DROP_2 — "+data.question_text;
+       $("question").textContent=(currentLanguage==="fr"?"QUESTION À DEUX CHOIX — ":"DROP_2 — ")+data.question_text;
        options($("options"),data.options,"current");buttons("answer");
      }else if(data.action==="CONCEPT_SUMMARY"||
               data.action==="WORKED_EXAMPLE"){
        if(!data.resource || !Array.isArray(data.resource.paragraphs) ||
           data.resource.paragraphs.length<2)
          throw new Error("Required teaching text is missing");
-       $("question").textContent=data.action.replaceAll("_"," ");
+       $("question").textContent=currentLanguage==="fr"
+         ? (data.action==="CONCEPT_SUMMARY"?"RÉSUMÉ DU CONCEPT":"EXEMPLE EXPLIQUÉ")
+         : data.action.replaceAll("_"," ");
        $("options").hidden=true;
        $("recovery-content").hidden=false;
        $("recovery-title").textContent=data.resource.title;
