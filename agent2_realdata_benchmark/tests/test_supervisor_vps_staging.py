@@ -1,0 +1,203 @@
+"""Security and durable-sessions acceptance for the separate /study/ VPS app.
+
+Never sends SMTP, never uses a real address, never authorizes human enrollment.
+Only reserved *.example identities are issued via an offline operation.
+"""
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+import re
+import pytest
+
+from src.prototype.supervisor_content import SupervisorBank
+from src.prototype.supervisor_operational_intake import OperationalIntake
+from src.prototype.supervisor_synthetic_store import (
+    SupervisorSyntheticStore, SyntheticStudyError,
+)
+from src.prototype.supervisor_vps_web import make_supervisor_vps_app
+
+BANK=Path(__file__).resolve().parents[1]/"data"/"supervisor_20261111"
+NOW=lambda:datetime.now(timezone.utc)
+BASE="http://127.0.0.1:8788"
+
+
+def stack(tmp_path):
+    store=SupervisorSyntheticStore(tmp_path,bank=SupervisorBank(BANK),
+                                   operational=True)
+    intake=OperationalIntake(store,programs=("Test student program",))
+    app=make_supervisor_vps_app(
+        intake,hostname="demo.selfhealing-edu.fr",proxy_mode=False,
+        release_mode="staging",
+    )
+    client=app.test_client()
+    def post(endpoint,value=None,*,origin=BASE,csrf=True,base=BASE):
+        headers={"Origin":origin,"Content-Type":"application/json"}
+        if csrf:headers["X-Study-Request"]="1"
+        return client.post("/study/api/"+endpoint,
+                           json=value if value is not None else {},
+                           headers=headers,base_url=base)
+    return store,intake,client,post
+
+
+def complete_intake(intake,store,token,*,at=None):
+    at=at or NOW()
+    intake.consent(token,checks=[True]*6,optional=False,language="en",at=at)
+    answers={
+        q.question_id:(q.correct_answer if i<4 else next(
+            k for k in "ABCD" if k!=q.correct_answer))
+        for i,q in enumerate(store.bank.forms["screening"])
+    }
+    assert intake.screening(token,answers=answers,at=at)["eligible"]
+    return intake.register(token,age=24,program="Test student program",at=at)
+
+
+def test_operational_mode_keeps_synthetic_databases_and_identity_separate(tmp_path):
+    synthetic=SupervisorSyntheticStore(tmp_path,bank=SupervisorBank(BANK))
+    operational=SupervisorSyntheticStore(tmp_path,bank=SupervisorBank(BANK),
+                                         operational=True)
+    assert synthetic.research!=operational.research
+    assert synthetic.contacts!=operational.contacts
+    assert synthetic.research.exists() and operational.research.exists()
+    with pytest.raises(SyntheticStudyError,match="test contacts"):
+        operational_issue=OperationalIntake(operational,programs=("Test student program",))
+        operational_issue.issue("someone@example.test",at=NOW(),allow_example=True)
+    with pytest.raises(SyntheticStudyError,match="reserved"):
+        operational_issue.issue("real@gmail.com",at=NOW(),allow_example=True)
+
+
+def test_human_release_never_enables_from_constructor_flag(tmp_path):
+    store,intake,_,_=stack(tmp_path)
+    with pytest.raises(ValueError,match="independently verified"):
+        make_supervisor_vps_app(
+            intake,hostname="demo.selfhealing-edu.fr",
+            proxy_mode=False,release_mode="live",
+        )
+
+
+def test_invitation_verification_and_csrf_host_isolation(tmp_path):
+    _,intake,client,post=stack(tmp_path)
+    token=intake.issue("test-f1@example.example",at=NOW(),allow_example=True)
+    denied=post("status")
+    assert denied.status_code==409
+    denied=post("exchange",{"token":token},origin="http://evil.invalid")
+    assert denied.status_code==403
+    denied=post("exchange",{"token":token},csrf=False)
+    assert denied.status_code==403
+    denied=post("exchange",{"token":token},base="http://evil.invalid:8788",
+                origin="http://evil.invalid:8788")
+    assert denied.status_code==403
+    response=post("exchange",{"token":token})
+    assert response.status_code==200,response.json
+    assert response.json["stage"]=="invited"
+    cookies="; ".join(response.headers.getlist("Set-Cookie"))
+    assert "HttpOnly" in cookies and "SameSite=Strict" in cookies
+    assert "Path=/study/" in cookies
+    assert token not in response.get_data(as_text=True)
+    assert post("status").json["stage"]=="invited"
+    assert client.get("/study/",base_url=BASE).status_code==200
+    assert client.get("/study/app.js",base_url=BASE).status_code==200
+    assert client.get("/study/app.css",base_url=BASE).status_code==200
+    assert client.get("/study/health",base_url=BASE).json["enrollment_authorized"] is False
+
+
+def test_registration_persistence_and_assessment_feedback_separation(tmp_path):
+    store,intake,_,post=stack(tmp_path)
+    token=intake.issue("test-f1@example.example",at=NOW(),allow_example=True)
+    assert post("exchange",{"token":token}).status_code==200
+    assert len(post("consent-copy",{"language":"fr"}).json["required"])==6
+    assert post("consent",{"checks":[True]*5+[False],
+                           "optional":False,"language":"fr"}).status_code==409
+    assert post("consent",{"checks":[True]*6,"optional":False,
+                           "language":"fr"}).status_code==200
+    screening=post("screening").json
+    assert len(screening["questions"])==8
+    assert screening["language"]=="fr"
+    answers={
+        q.question_id:(q.correct_answer if i<4 else next(
+            k for k in "ABCD" if k!=q.correct_answer))
+        for i,q in enumerate(store.bank.forms["screening"])
+    }
+    assert post("screen",{"answers":answers}).json["eligible"]
+    assert post("programs").json["programs"]==["Test student program"]
+    response=post("register",{"age":24,"program":"Test student program"})
+    assert response.status_code==200,response.json
+    assert response.json["phase"]=="PRETEST"
+    status=post("status").json
+    assert status["study_language"]=="fr"
+    assert "group" not in status and "learner_id" not in status
+    item=post("item").json
+    assert item["phase"]=="PRETEST"
+    answer=store.bank.forms["pretest"][0]
+    assert item["question_id"]==answer.question_id
+    response=post("answer",{
+        "render_id":item["render_id"],"question_id":item["question_id"],
+        "choice":answer.correct_answer,"reflection":None,
+        "request_id":"test_vps_first_pretest",
+    })
+    assert response.status_code==200,response.json
+    assert "previous_correct" not in response.json
+    assert post("answer",{
+        "render_id":item["render_id"],"question_id":item["question_id"],
+        "choice":answer.correct_answer,"reflection":None,
+        "request_id":"test_vps_first_pretest",
+    }).status_code==409
+    with store._tx() as db:
+        row=db.execute("SELECT display_language FROM events WHERE request_id=?",
+                       ("test_vps_first_pretest",)).fetchone()
+        assert row["display_language"]=="fr"
+        contact=db.execute("SELECT email FROM pii.contacts").fetchone()
+        assert contact["email"]=="test-f1@example.example"
+
+    # Recreate the WSGI application, as a production restart would do.
+    store2,intake2,client2,post2=stack(tmp_path)
+    assert post2("exchange",{"token":token}).status_code==200
+    continued=post2("item").json
+    assert continued["question_id"]==store.bank.forms["pretest"][1].question_id
+    assert continued["question_text"]!=store.bank.forms["pretest"][1].question_text
+    assert continued["render_id"]!=item["render_id"]
+
+
+def test_allocation_and_irreversible_erasure(tmp_path):
+    store,intake,_,post=stack(tmp_path)
+    ids=[]
+    for n in (1,2,3):
+        token=intake.issue(f"test-f{n}@example.example",
+                           at=NOW(),allow_example=True)
+        complete_intake(intake,store,token)
+        ids.append((token,intake.learner(token,at=NOW())))
+    with store._tx() as db:
+        arms=[db.execute("SELECT grp FROM participants WHERE learner_id=?",
+                         (ref,)).fetchone()["grp"] for _,ref in ids]
+    assert arms==["A","B","C"]
+    first,ref=ids[0]
+    post("exchange",{"token":first})
+    presented=post("item").json
+    assert presented["render_id"]
+    deleted=post("withdraw",{"delete":True})
+    assert deleted.status_code==200,deleted.json
+    assert deleted.json["data_deleted"]
+    assert post("status").status_code==409
+    with store._tx() as db:
+        assert db.execute("SELECT COUNT(*) FROM participants "
+                          "WHERE learner_id=?",(ref,)).fetchone()[0]==0
+        assert db.execute("SELECT COUNT(*) FROM pii.invitations "
+                          "WHERE learner_id=?",(ref,)).fetchone()[0]==0
+        assert db.execute("SELECT COUNT(*) FROM operational_rendered "
+                          "WHERE learner_id=?",(ref,)).fetchone()[0]==0
+        assert db.execute("SELECT COUNT(*) FROM deletion_log "
+                          "WHERE learner_id=?",(ref,)).fetchone()[0]==1
+
+
+def test_screening_exclusion_has_no_recruitment_pii(tmp_path):
+    store,intake,_,post=stack(tmp_path)
+    token=intake.issue("excluded@example.example",at=NOW(),allow_example=True)
+    assert post("exchange",{"token":token}).status_code==200
+    assert post("consent",{"checks":[True]*6,"optional":False,
+                           "language":"en"}).status_code==200
+    answers={q.question_id:q.correct_answer for q in store.bank.forms["screening"]}
+    response=post("screen",{"answers":answers})
+    assert response.status_code==200 and response.json["eligible"] is False
+    with store._tx() as db:
+        assert db.execute("SELECT COUNT(*) FROM pii.invitations").fetchone()[0]==0
+        assert db.execute("SELECT COUNT(*) FROM pii.contacts").fetchone()[0]==0
+        assert db.execute("SELECT COUNT(*) FROM screening_log").fetchone()[0]==1
+    assert post("status").status_code==409
