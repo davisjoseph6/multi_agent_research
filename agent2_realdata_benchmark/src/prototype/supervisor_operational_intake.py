@@ -79,6 +79,63 @@ class OperationalIntake:
             )
         return token
 
+    def rotate_registered_test(self, email: str, *, new_token: str,
+                               at: datetime) -> str:
+        """Rotate an existing registered .example fixture without losing progress.
+
+        Offline/staging administrative operation, never a participant route.
+        The caller writes the new capability into a protected file *before*
+        invoking this transaction. Existing cookies and shared invitation
+        URLs immediately become invalid after the successful commit.
+        """
+        if (type(email) is not str or not _ALLOWED.fullmatch(email)
+                or not email.lower().endswith(".example")):
+            raise SyntheticStudyError("staging rotation requires a reserved .example address")
+        new_hash = self.digest(new_token)
+        with self.store._tx() as db:
+            record = db.execute(
+                "SELECT token_hash,learner_id FROM pii.invitations "
+                "WHERE email=? COLLATE NOCASE AND state='registered'",
+                (email,),
+            ).fetchone()
+            if record is None or not record["learner_id"]:
+                raise SyntheticStudyError("registered fictional invitation required")
+            old_hash = record["token_hash"]
+            ref = record["learner_id"]
+            active = db.execute(
+                "SELECT status FROM participants WHERE learner_id=?",
+                (ref,),
+            ).fetchone()
+            contact = db.execute(
+                "SELECT token_hash FROM pii.contacts WHERE learner_id=? "
+                "AND email=? COLLATE NOCASE",
+                (ref, email),
+            ).fetchone()
+            if (active is None or active["status"] != "active"
+                    or contact is None or contact["token_hash"] != old_hash
+                    or new_hash == old_hash):
+                raise SyntheticStudyError("registered study identity not eligible for rotation")
+            if db.execute(
+                "SELECT 1 FROM pii.invitations WHERE token_hash=?",
+                (new_hash,),
+            ).fetchone():
+                raise SyntheticStudyError("replacement credential already exists")
+            changed = db.execute(
+                "UPDATE pii.contacts SET token_hash=?,token_created_at=? "
+                "WHERE learner_id=? AND token_hash=?",
+                (new_hash, iso(at), ref, old_hash),
+            )
+            if changed.rowcount != 1:
+                raise SyntheticStudyError("contact credential was changed concurrently")
+            changed = db.execute(
+                "UPDATE pii.invitations SET token_hash=? "
+                "WHERE learner_id=? AND token_hash=? AND state='registered'",
+                (new_hash, ref, old_hash),
+            )
+            if changed.rowcount != 1:
+                raise SyntheticStudyError("invitation credential was changed concurrently")
+        return ref
+
     def _record(self, db, token: str, *, at: datetime):
         row=db.execute("SELECT * FROM pii.invitations WHERE token_hash=?",
                        (self.digest(token),)).fetchone()
