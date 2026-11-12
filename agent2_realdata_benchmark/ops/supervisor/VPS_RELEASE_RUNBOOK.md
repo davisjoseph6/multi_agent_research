@@ -358,6 +358,24 @@ database in the backup directory. Encryption requires the Python
 (`python -m pip install cryptography`). It does **not** touch the study
 service's pinned dependencies, and has not been deployed to the VPS yet.
 
+**Safer guarded wrapper (preferred for a manual maintenance window):**
+After installing a source revision containing `run_safe_encrypted_backup.sh`,
+use the existing service-user-readable mode-0600 32-byte backup key and a
+new unique encrypted output in an existing private mode-0700 directory:
+
+```bash
+sudo bash /srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark/ops/supervisor/run_safe_encrypted_backup.sh \
+  /var/lib/ijcai-supervisor-backup/key.bin \
+  /var/lib/ijcai-supervisor-backup/backup-unique-YYYYMMDD.enc
+```
+
+The wrapper acquires a lock, requires the known staging service to be active,
+stops it, creates and verifies the encrypted paired snapshot, and uses an
+EXIT trap to restore service availability even if verification fails.
+It never provisions keys or copies encrypted backups offsite. Arrange a
+supervised quiet period beforehand. Independently confirm secure key custody,
+offsite replication and a true external-host restore drill before real data.
+
 For a controlled backup operation, the staff operator must first arrange
 a quiet period (pausing recruitment/session access), arrange institutionally
 approved secure backup-key custody and offsite storage, and create a new
