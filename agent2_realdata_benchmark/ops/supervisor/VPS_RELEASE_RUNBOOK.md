@@ -202,6 +202,119 @@ the correct procedure is to issue a new fictional invitation, creating a
 separate participant record. Use a new filename each time; existing files
 are never overwritten.
 
+## 4b. Independent researcher monitoring: private live BKT line chart
+
+The **researcher dashboard is not a participant page**. It uses a second,
+read-only Flask service, an independent researcher password, and a per-user
+encrypted SSH tunnel. It never attaches the contacts/PII database, returns
+only `STUDY_Pnnn` pseudonyms, and has GET-only endpoints. Its Y axis is
+estimated BKT mastery **probability**, not directly observed knowledge.
+Its X axis is successive *scored* quiz/recovery responses. All eight
+concepts C1..C8 are displayed as separate lines and fetched every 5 seconds.
+Researchers can view the assigned arm, session, and timestamps, but must
+not use these observations to change the randomized study treatment.
+
+After deploying a source commit containing this feature on the staging VPS,
+from the **remote SSH terminal**, opt in explicitly:
+
+```bash
+sudo bash /srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark/ops/supervisor/enable_researcher_dashboard.sh
+sudo systemctl status ijcai-supervisor-researcher --no-pager
+```
+
+The installer prompts twice for a separate researcher password, stores **only
+its salted PBKDF2-SHA256 hash** in a root-owned, service-readable `0640`
+environment file, starts the second service on **127.0.0.1:8790**, and
+asserts that an unauthenticated request gets **401 Unauthorized**. If a
+researcher credential is already configured, the installer refuses to
+overwrite it. No Caddy route is created and the participant invitation
+service on port 8788 is left untouched.
+
+From the authorized researcher's **local WSL terminal**, open a tunnel:
+
+```bash
+ssh -N -L 8790:127.0.0.1:8790 \
+  -i "$HOME/.ssh/ijcai_preview_ed25519" davis@31.70.172.140
+```
+
+Then browse `http://127.0.0.1:8790/admin/`, sign in with user
+`researcher` and the separate password, and select a pseudonymous student.
+The password does not come from Caddy, and there must **never** be an
+external `/admin/` Caddy route. SSH keys, research roles, and sharing the
+password with independent researchers still need institutional IAM review.
+
+Regression: `pytest -q tests/test_supervisor_research_monitor.py`;
+real-Chromium polling: `node scripts/supervisor_research_monitor_playwright.cjs`.
+
+## 4c. Domain-scoped AI points — versioned new consent
+
+The **verified invitation's private email domain**, not user input on the
+page, determines whether AI points apply. Every exact
+`@aivancity.education` address (case-insensitive) continues to see the
+sixth required declaration about 150 AI points, with unchanged `v1.0`
+text. All other email domains omit that declaration and see **five**
+required boxes, with a matching `v1.1-nonreward-DRAFT` information sheet
+and debrief. The optional independent data-sharing checkbox remains.
+
+The two consent versions are intentionally immutable. Existing recorded
+`v1.0` consent and its stored timestamp are not rewritten. The
+`v1.1` nonreward legal variant has been prepared in English and French,
+but the *specific revised Annex wording* must be approved and its
+bracketed contact/retention fields completed before enrollment. There
+is no automatic grant of 150 points to other email domains. This change
+is observational with respect to the A/B/C algorithm.
+
+Regression: `pytest -q tests/test_supervisor_reward_consent.py`.
+The original supervisor guide's fixed six-box rule is **superseded for
+non-school invitations only if** the corresponding amendment is approved.
+
+## 4d. Research-only neural evaluation after authorized sessions
+
+Source modules:
+`src/prototype/supervisor_operational_neural.py` and
+`scripts/supervisor_operational_neural_cli.py`. No data is sent to
+external inference APIs. The approved research analyst supplies:
+
+- A pseudonymized `supervisor_operational_study.sqlite3` database.
+- A **PI-signed** feature-contract JSON (schema
+  `SUPERVISOR_NN_FEATURE_CONTRACT_V1`) listing exactly the 20 concrete
+  features in the original document, with the real institutional data-use
+  reference, reviewer and timezone-aware approval date; its public key and
+  detached signature must be independently verified.
+- An isolated research Python environment with PyTorch (not the live
+  participant server). Optionally an exact event-aligned heldout DKT
+  probability CSV, `event_id,probability_correct`.
+- A new private report destination; individual event predictions and
+  participant contact details are never included in the result file.
+
+Example after authorized approval and real Session 1 completion:
+
+```bash
+python -m scripts.supervisor_operational_neural_cli \
+  --research-db /institution/private/supervisor_operational_study.sqlite3 \
+  --through-session 1 \
+  --feature-approval /institution/private/pi_feature_approval.json \
+  --signature /institution/private/pi_feature_approval.sig \
+  --public-key /institution/private/pi_official_pubkey.pem \
+  --epochs 8 \
+  --output /institution/private/nn_bkt_session1.json
+```
+
+Repeat `--through-session 2` for the approved update after Session 2.
+The evaluator uses BEFORE-question features, student-disjoint train/holdout
+splits, ROC AUC and Brier scoring for NN and BKT, optional DKT. It blocks
+insufficient subjects, single-class holdouts and mismatched DKT event IDs.
+No production participant policy is changed by this offline evaluation.
+**No scientific accuracy or intervention-improvement result can be claimed
+until enough consented real observations exist.**
+
+The original brief lists 20 concrete inputs but says `Input(21)` in
+another line. The implementation **does not invent a 21st feature**; if
+the supervisor truly approves 21, the feature list, vector, neural
+architecture, training and tests must be revised as a new version.
+Signatures are meaningful only if the public key is trusted and the PI's
+approval is independently verified.
+
 ## 5. Operations, security and known blockers
 
 - Caddy terminates HTTPS and preserves existing Basic Auth, which includes
