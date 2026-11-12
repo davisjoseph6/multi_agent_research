@@ -38,9 +38,10 @@ def reconcile(store: SupervisorSyntheticStore, *, at: datetime,
             if scheduled-timedelta(days=1) <= now < scheduled:
                 db.execute(
                     "INSERT OR IGNORE INTO pii.reminder_outbox "
-                    "(learner_id,session_no,kind,status,created_at) "
-                    "VALUES(?,?,'visit_reminder','pending',?)",
-                    (row["learner_id"],row["session_no"],iso(at)),
+                    "(learner_id,session_no,kind,scheduled_for,status,created_at) "
+                    "VALUES(?,?,'visit_reminder',?,'pending',?)",
+                    (row["learner_id"],row["session_no"],
+                     row["scheduled_for"],iso(at)),
                 )
             if now > scheduled+timedelta(hours=grace_hours):
                 count=row["missed_sessions"]+1
@@ -81,6 +82,7 @@ def reconcile(store: SupervisorSyntheticStore, *, at: datetime,
             "JOIN participants p ON p.learner_id=o.learner_id "
             "JOIN sessions s ON s.learner_id=o.learner_id "
             "AND s.session_no=o.session_no "
+            "AND s.scheduled_for=o.scheduled_for "
             "JOIN pii.contacts c ON c.learner_id=o.learner_id "
             "WHERE o.status='pending' AND p.status='active' "
             "AND s.status='scheduled' AND s.scheduled_for>? "
@@ -109,8 +111,9 @@ def reconcile(store: SupervisorSyntheticStore, *, at: datetime,
             with store._tx() as db:
                 db.execute(
                     "UPDATE pii.reminder_outbox SET attempts=attempts+1 "
-                    "WHERE learner_id=? AND session_no=? AND kind='visit_reminder'",
-                    (ref,row["session_no"]),
+                    "WHERE learner_id=? AND session_no=? "
+                    "AND kind='visit_reminder' AND scheduled_for=?",
+                    (ref,row["session_no"],row["scheduled_for"]),
                 )
             out["delivery_failures"]+=1
             continue
@@ -118,8 +121,9 @@ def reconcile(store: SupervisorSyntheticStore, *, at: datetime,
             db.execute(
                 "UPDATE pii.reminder_outbox SET status='sent',"
                 "sent_at=?,attempts=attempts+1 "
-                "WHERE learner_id=? AND session_no=? AND kind='visit_reminder'",
-                (iso(at),ref,row["session_no"]),
+                "WHERE learner_id=? AND session_no=? "
+                "AND kind='visit_reminder' AND scheduled_for=?",
+                (iso(at),ref,row["session_no"],row["scheduled_for"]),
             )
         out["reminders_sent"]+=1
         out["real_email_sent"]=True
