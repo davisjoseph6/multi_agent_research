@@ -16,7 +16,8 @@ import secrets
 from flask import Flask, jsonify, render_template, request, send_file
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from .supervisor_consent_texts import CONSENT_VERSION, required, STOP_PAGE, DEBRIEF
+from .supervisor_consent_texts import (CONSENT_VERSION, required, STOP_PAGE, DEBRIEF,
+                                       NONREWARD_DEBRIEF_EN, NONREWARD_DEBRIEF_FR)
 from .supervisor_i18n import localize_public
 from .supervisor_operational_intake import OperationalIntake
 from .supervisor_synthetic_store import SyntheticStudyError, iso
@@ -147,9 +148,12 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
     def info(language):
         if language not in ("en","fr"):
             raise SyntheticStudyError("unsupported information language")
-        path=ROOT.parents[1]/"content"/"consent"/(
-            f"info_sheet_{language}_v1.0.html"
-        )
+        # Consent information is invitation-dependent: never imply that a
+        # personal-email invite is eligible for aivancity-only AI points.
+        eligible=intake.reward_eligible(credential(),at=now())
+        filename=(f"info_sheet_{language}_v1.0.html" if eligible else
+                  f"info_sheet_{language}_v1.1_nonreward.html")
+        path=ROOT.parents[1]/"content"/"consent"/filename
         return send_file(path,mimetype="text/html")
 
     @app.post("/study/api/exchange")
@@ -176,12 +180,11 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         value=data("language")
         if value["language"] not in ("en","fr"):
             raise SyntheticStudyError("unsupported consent language")
-        statements, optional_text=required(value["language"])
-        return jsonify(
-            required=list(statements),
-            optional=optional_text,
-            version=CONSENT_VERSION,
-        )
+        # The invitation's private contact email is the sole authority for
+        # reward eligibility. The browser cannot send an email or a flag.
+        return jsonify(intake.consent_requirements(
+            credential(),language=value["language"],at=now(),
+        ))
 
     @app.post("/study/api/consent")
     def consent():
@@ -375,13 +378,18 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         progress=store.progress(ref,token)
         if progress["phase"]!="DONE":
             raise SyntheticStudyError("all sessions must be finished first")
+        rewarded=intake.reward_eligible(token,at=now())
         if progress["study_language"]=="fr":
-            text=("Merci d'avoir participé à cette étude. Trois parcours ont "
-                  "été comparés, sans révéler votre affectation pendant les "
-                  "séances. Pour vos droits et les résultats, consultez la "
-                  "notice d'information et contactez le responsable de l'étude.")
+            if rewarded:
+                text=("Merci d'avoir participé à cette étude. Trois parcours ont "
+                      "été comparés, sans révéler votre affectation pendant les "
+                      "séances. Vos 150 AI points nécessitent l'achèvement des "
+                      "trois séances. Pour vos droits et les résultats, consultez "
+                      "la notice d'information.")
+            else:
+                text=NONREWARD_DEBRIEF_FR
         else:
-            text=DEBRIEF
+            text=DEBRIEF if rewarded else NONREWARD_DEBRIEF_EN
         return jsonify(text=text)
 
     return app
