@@ -54,8 +54,8 @@ async function run(){
           document.querySelector("#info-title").textContent
           .includes("consentement"));
       }
-      assert.equal(await page.locator("#consent-required input.required").count(),6);
-      for(let i=0;i<6;i++){
+      assert.equal(await page.locator("#consent-required input.required").count(),5);
+      for(let i=0;i<5;i++){
         await page.locator("#consent-required input.required").nth(i).check();
       }
       const screeningPromise=page.waitForResponse(respond("screening"));
@@ -105,7 +105,7 @@ async function run(){
       assert.equal(item.kind,"survey");
       await page.locator("#submit-survey").waitFor({state:"visible"});
       assert.equal(await page.locator("#previous-result-icon").innerText(),"✓");
-      for(let i=0;i<6;i++)await page.locator("#fatigue-"+i).selectOption("4");
+      for(let i=0;i<5;i++)await page.locator("#fatigue-"+i).selectOption("4");
       nextItem=page.waitForResponse(respond("item"));
       await page.locator("#submit-survey").click();
       item=await (await nextItem).json();
