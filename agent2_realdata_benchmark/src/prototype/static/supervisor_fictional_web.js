@@ -5,9 +5,10 @@
  const fixture=$("fixture");
  let item=null,working=false,questions=[],screenIndex=0,screenAnswers={};
  let currentLanguage="en";
+ let hintIndex=0,hintResponses=[];
  const sections=["information","consent-stage","screening-stage","registration-stage",
    "excluded-stage","registered-stage","withdraw-stage","debrief-stage"];
- const quizButtons=["answer","continue","survey","advance"];
+ const quizButtons=["answer","continue","survey","advance","hint-next"];
  function message(text){$("feedback").textContent=text||""}
  function showSection(id){for(const s of sections)$(s).hidden=s!==id}
  function buttons(...visible){for(const b of quizButtons)$(b).hidden=!visible.includes(b)}
@@ -98,22 +99,66 @@
    options($("screening-choices"),q.options,"screening-current");
    $("screening-next").textContent=screenIndex===7?"Finish screening":"Next";
  }
+ function showSocraticPrompt(){
+   const resource=item.resource;
+   $("recovery-content").hidden=false;
+   $("options").hidden=true;
+   $("question").textContent="SOCRATIC_HINT — reflect before re-attempting";
+   $("recovery-title").textContent=resource.title;
+   $("recovery-paragraphs").replaceChildren();
+   const intro=document.createElement("p");
+   intro.textContent=resource.intro;
+   $("recovery-paragraphs").append(intro);
+   $("hint-guidance").hidden=false;
+   $("hint-guidance").textContent=
+     "Guiding question "+(hintIndex+1)+" of "+resource.prompts.length+
+     ": "+resource.prompts[hintIndex];
+   $("hint-label").hidden=false;
+   $("hint-reflection").hidden=false;
+   $("hint-reflection").value="";
+   $("hint-next").textContent=(hintIndex+1===resource.prompts.length)
+     ? "Show original question for re-attempt" : "Next guiding question";
+   buttons("hint-next");
+ }
  function showCurrent(data){
-   item=data;
+   item=data;hintIndex=0;hintResponses=[];
    $("question").textContent="";
-   $("options").replaceChildren();buttons();
+   $("options").replaceChildren();
+   $("options").hidden=false;
+   $("recovery-content").hidden=true;
+   $("recovery-paragraphs").replaceChildren();
+   $("hint-guidance").hidden=true;
+   $("hint-label").hidden=true;
+   $("hint-reflection").hidden=true;
+   buttons();
    if(data.kind==="question"){
      $("question").textContent=data.question_text;
      options($("options"),data.options,"current");buttons("answer");
    }else if(data.kind==="recovery"){
-     if(data.question_id){
-       $("question").textContent=data.action+" — "+data.question_text;
+     if(data.action==="SOCRATIC_HINT"){
+       if(!data.question_id||!data.resource ||
+          !Array.isArray(data.resource.prompts) ||
+          data.resource.prompts.length!==2)
+         throw new Error("Socratic text missing; refusing unhinted re-attempt");
+       showSocraticPrompt();
+     }else if(data.action==="DROP_2"){
+       $("question").textContent="DROP_2 — "+data.question_text;
        options($("options"),data.options,"current");buttons("answer");
-     }else{
-       $("question").textContent=data.action+
-         " — synthetic teaching resource; text requires academic review.";
+     }else if(data.action==="CONCEPT_SUMMARY"||
+              data.action==="WORKED_EXAMPLE"){
+       if(!data.resource || !Array.isArray(data.resource.paragraphs) ||
+          data.resource.paragraphs.length<2)
+         throw new Error("Required teaching text is missing");
+       $("question").textContent=data.action.replaceAll("_"," ");
+       $("recovery-content").hidden=false;
+       $("recovery-title").textContent=data.resource.title;
+       for(const paragraph of data.resource.paragraphs){
+         const p=document.createElement("p");
+         p.textContent=paragraph;
+         $("recovery-paragraphs").append(p);
+       }
        buttons("continue");
-     }
+     }else throw new Error("Unknown recovery action");
    }else if(data.kind==="survey"){
      $("question").textContent="Six provisional 1–7 fatigue responses. "+
        "Exact NASA-TLX wording requires supervisor approval.";
@@ -239,10 +284,39 @@
  $("withdraw-keep").addEventListener("click",()=>withdraw(false));
  $("withdraw-delete").addEventListener("click",()=>withdraw(true));
  $("withdraw-cancel").addEventListener("click",refresh);
+ $("hint-next").addEventListener("click",()=>{
+   if(!item || item.kind!=="recovery" || item.action!=="SOCRATIC_HINT")
+     return;
+   const response=$("hint-reflection").value.trim();
+   if(!response || response.length>500){
+     message("Please enter a brief reflection before continuing.");
+     return;
+   }
+   hintResponses.push(response);
+   message("");
+   if(hintIndex+1<item.resource.prompts.length){
+     hintIndex++;
+     showSocraticPrompt();
+   }else{
+     $("recovery-content").hidden=true;
+     $("question").textContent=
+       "Socratic re-attempt — original practice question: "+item.question_text;
+     $("options").hidden=false;
+     options($("options"),item.options,"current");
+     buttons("answer");
+   }
+ });
  $("answer").addEventListener("click",()=>{
-   try{act("answer",{question_id:item.question_id||null,
-     choice:selected("current"),request_id:requestId()})}
-   catch(e){message(e.message)}
+   try{
+     const data={question_id:item.question_id||null,
+                 choice:selected("current"),request_id:requestId()};
+     if(item.kind==="recovery"&&item.action==="SOCRATIC_HINT"){
+       if(hintResponses.length!==2)
+         throw new Error("Complete both Socratic reflection prompts first.");
+       data.reflection=hintResponses.slice();
+     }
+     act("answer",data);
+   }catch(e){message(e.message)}
  });
  $("continue").addEventListener("click",()=>{
    act("answer",{question_id:null,choice:null,request_id:requestId()})
