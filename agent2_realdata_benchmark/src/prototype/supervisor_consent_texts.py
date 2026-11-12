@@ -69,3 +69,49 @@ def required(lang: str):
     if lang == "fr":
         return FR_REQUIRED, FR_OPTIONAL
     raise ValueError("consent language must be en or fr")
+
+# Conditional reward policy is a NEW consent variant and must be reviewed
+# with its accompanying information sheet by the institutional authority.
+# Existing v1.0 consents and recorded legal wording are never rewritten.
+NONREWARD_CONSENT_VERSION = "v1.1-nonreward-DRAFT"
+
+
+def is_aivancity_recipient(email: str) -> bool:
+    """Exact email domain match, ignoring case; never trust an HTML flag."""
+    if type(email) is not str or email.count("@") != 1:
+        return False
+    local, domain = email.rsplit("@", 1)
+    return bool(local) and domain.casefold() == "aivancity.education"
+
+
+def required_for_recipient(language: str, email: str):
+    """Institutional incentive only for verified @aivancity.education invitees.
+
+    The entire fifth declaration is omitted for other invitation domains.
+    The research/data-processing declarations and the independent open-data
+    option remain unchanged. Legal review of this new variant is required.
+    """
+    statements, optional = required(language)
+    if is_aivancity_recipient(email):
+        return tuple(statements), optional, CONSENT_VERSION, True
+    return (tuple(text for i, text in enumerate(statements) if i != 4),
+            optional, NONREWARD_CONSENT_VERSION, False)
+
+
+NONREWARD_DEBRIEF_EN = (
+    "Thank you for taking part in this study. Three versions of the quiz "
+    "were compared: adaptive recovery, greedy weakest-concept selection, "
+    "and a fixed question sequence. Your version was assigned automatically "
+    "and not disclosed during the study to avoid influencing your answers. "
+    "No AI points apply to this invitation. To request study results or "
+    "exercise your rights, contact the responsible researcher listed in "
+    "the approved information sheet."
+)
+NONREWARD_DEBRIEF_FR = (
+    "Merci d'avoir participé à cette étude. Trois parcours ont été comparés : "
+    "récupération adaptative, sélection gloutonne du concept le moins maîtrisé "
+    "et séquence fixe. Votre parcours a été attribué automatiquement sans "
+    "vous être révélé pendant l'étude. Aucun AI point n'est attribué pour "
+    "cette invitation. Pour vos droits ou les résultats, contactez la personne "
+    "responsable indiquée dans la notice d'information approuvée."
+)
