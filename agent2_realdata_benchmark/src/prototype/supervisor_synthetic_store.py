@@ -968,6 +968,9 @@ class SupervisorSyntheticStore:
             if delete:
                 db.execute("INSERT INTO erasure_authorization(one) VALUES(1)")
                 try:
+                    if self.operational:
+                        db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
+                                   (ref,))
                     for name in ("state_history","events","surveys",
                                  "learner_state","sessions"):
                         db.execute(f"DELETE FROM {name} WHERE learner_id=?",(ref,))
