@@ -358,6 +358,18 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         ref,token=enrolled()
         return jsonify(store.open_next_session(ref,token,at=now()))
 
+    # Explicitly non-live reviewer convenience. The real participant
+    # endpoint above still enforces the supervisor's 3–5 day schedule.
+    # This route is NOT REGISTERED at all in live mode.
+    if release_mode == "staging":
+        @app.post("/study/api/staging-next-session")
+        def staging_next_session():
+            data()
+            ref, token = enrolled()
+            return jsonify(store.open_next_session(
+                ref, token, at=now(), staging_preview=True,
+            ))
+
     @app.post("/study/api/withdraw")
     def withdraw():
         value=data("delete")
