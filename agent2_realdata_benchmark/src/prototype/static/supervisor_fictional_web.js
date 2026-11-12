@@ -5,7 +5,39 @@
  const fixture=$("fixture");
  let item=null,working=false,questions=[],screenIndex=0,screenAnswers={};
  let currentLanguage="en";
- let hintIndex=0,hintResponses=[];
+ let hintIndex=0,hintResponses=[],previousFeedback=null;
+ const COPY=window.SupervisorCopy;
+ if(!COPY || !COPY.fr || !COPY.en)throw new Error("Bilingual copy is missing");
+ function t(key,...args){
+   const entry=COPY[currentLanguage][key];
+   if(entry===undefined)throw new Error("Missing translation: "+currentLanguage+"/"+key);
+   return typeof entry==="function"?entry(...args):entry;
+ }
+ function applyLanguage(){
+   document.documentElement.lang=currentLanguage;
+   document.title=t("page_title");
+   $("study-lang").value=currentLanguage;
+   $("info-lang").value=currentLanguage;
+   $("hint-reflection").lang=currentLanguage;
+   for(const element of document.querySelectorAll("[data-i18n]")){
+     element.textContent=t(element.dataset.i18n);
+   }
+   const legend=$("options").querySelector("legend");
+   if(legend)legend.textContent=t("answer_choice");
+   const screeningLegend=$("screening-choices").querySelector("legend");
+   if(screeningLegend)screeningLegend.textContent=t("answer_choice");
+ }
+ function renderPreviousFeedback(){
+   const panel=$("previous-result");
+   const valid=typeof previousFeedback==="boolean";
+   panel.hidden=!valid;
+   panel.classList.toggle("correct",valid&&previousFeedback);
+   panel.classList.toggle("incorrect",valid&&!previousFeedback);
+   $("previous-result-icon").textContent=!valid?"":previousFeedback?"✓":"✕";
+   $("previous-result-text").textContent=!valid?"":t(
+     previousFeedback?"previous_correct":"previous_incorrect"
+   );
+ }
  const sections=["information","consent-stage","screening-stage","registration-stage",
    "excluded-stage","registered-stage","withdraw-stage","debrief-stage"];
  const quizButtons=["answer","continue","survey","advance","hint-next"];
@@ -20,13 +52,24 @@
      body:JSON.stringify({fixture:fixture.value,...data}),
    });
    const body=await r.json();
-   if(!r.ok)throw new Error(body.error||"Private preview refused request");
+   if(!r.ok){
+      let error=body.error||t("server_failed");
+      if(currentLanguage==="fr"){
+        if(/already registered|duplicate/i.test(error))
+          error=t("server_duplicate");
+        else if(/eligible|excluded/i.test(error))
+          error=t("screening_ineligible");
+        else if(/required|missing|invalid|unsupported|refus|wrong|not due/i.test(error))
+          error=t("other_error");
+      }
+      throw new Error(error);
+    }
    return body;
  }
  function options(parent,choiceMap,name){
    parent.replaceChildren();
    const legend=document.createElement("legend");
-   legend.textContent="Select one answer";parent.append(legend);
+   legend.textContent=t("answer_choice");parent.append(legend);
    for(const [key,text] of Object.entries(choiceMap)){
      const label=document.createElement("label"),input=document.createElement("input");
      input.type="radio";input.name=name;input.value=key;
@@ -35,12 +78,13 @@
  }
  function selected(name){
    const input=document.querySelector('input[name="'+name+'"]:checked');
-   if(!input)throw new Error("Select an answer first.");
+   if(!input)throw new Error(t("choose_first"));
    return input.value;
  }
  async function renderInformation(){
    const lang=$("info-lang").value;
    currentLanguage=lang;
+   applyLanguage();
    $("footer-information").href="/content/consent/"+lang+"/info";
    $("french-link").href="/content/consent/fr/info";
    $("pdf-link").href="/content/consent/"+lang+"/pdf";
@@ -58,7 +102,7 @@
    const copy=await call("consent/copy",{language:lang});
    const required=$("consent-required");required.replaceChildren();
    const legend=document.createElement("legend");
-   legend.textContent=lang==="en"?"I confirm that:":"Je déclare :";
+   legend.textContent=t("required");
    required.append(legend);
    copy.required.forEach((text,i)=>{
      const label=document.createElement("label"),input=document.createElement("input");
@@ -69,8 +113,7 @@
    });
    const optional=$("consent-optional");optional.replaceChildren();
    const optLegend=document.createElement("legend");
-   optLegend.textContent=lang==="en"?"Optional (no effect on participation):":
-       "Facultatif (sans effet sur la participation) :";
+   optLegend.textContent=t("optional");
    optional.append(optLegend);
    const optLabel=document.createElement("label"),opt=document.createElement("input");
    opt.type="checkbox";opt.id="open-data-choice";opt.checked=false;
@@ -94,10 +137,10 @@
  function showScreening(){
    showSection("screening-stage");
    const q=questions[screenIndex];
-   $("screening-number").textContent="Question "+(screenIndex+1)+" of 8";
+   $("screening-number").textContent=t("question_count",screenIndex+1);
    $("screening-prompt").textContent=q.question_text;
    options($("screening-choices"),q.options,"screening-current");
-   $("screening-next").textContent=screenIndex===7?"Finish screening":"Next";
+   $("screening-next").textContent=screenIndex===7?t("finish_screening"):t("next");
  }
  function showSocraticPrompt(){
    const resource=item.resource;
