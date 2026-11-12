@@ -138,6 +138,7 @@ class SupervisorSyntheticStore:
                 answer_given TEXT,
                 is_correct INTEGER,
                 content_id TEXT,
+                display_language TEXT CHECK(display_language IN ('en','fr')),
                 free_text TEXT,
                 mastery_before REAL,
                 mastery_after REAL,
@@ -207,6 +208,17 @@ class SupervisorSyntheticStore:
             if "open_data_consent" not in participant_fields:
                 db.execute("ALTER TABLE participants ADD COLUMN open_data_consent "
                            "INTEGER NOT NULL DEFAULT 0")
+            if "study_language" not in participant_fields:
+                db.execute("ALTER TABLE participants ADD COLUMN study_language "
+                           "TEXT NOT NULL DEFAULT 'en' CHECK(study_language IN ('en','fr'))")
+            event_fields = {row["name"] for row in db.execute(
+                "PRAGMA table_info(events)"
+            )}
+            if "display_language" not in event_fields:
+                # Legacy event rows remain NULL (unknown): do not fabricate
+                # the language in which a historic question was displayed.
+                db.execute("ALTER TABLE events ADD COLUMN display_language "
+                           "TEXT CHECK(display_language IN ('en','fr'))")
             row = db.execute(
                 "SELECT files_json FROM config WHERE config_version=?",
                 ("supervisor_20261111_v1",),
@@ -312,6 +324,19 @@ class SupervisorSyntheticStore:
         ).fetchone()
         if current:
             raise SyntheticStudyError("duplicate request ID rejected")
+        language_row = db.execute(
+            "SELECT study_language FROM participants WHERE learner_id=?",
+            (ref,),
+        ).fetchone()
+        language = language_row["study_language"]
+        if language not in LANGUAGES:
+            raise SyntheticStudyError("unknown study display language")
+        # Content identifiers must distinguish what actually appeared in
+        # English or French when the participant changes languages midway.
+        if (language == "fr" and isinstance(content_id,str)
+                and content_id.startswith(CONTENT_VERSION + "_")
+                and not content_id.endswith("_fr")):
+            content_id += "_fr"
         db.execute(
             """UPDATE learner_state SET updated_at=?,session_no=?,step=?,
                step_index=?,pending_recovery=?,state_json=? WHERE learner_id=?""",
@@ -324,15 +349,15 @@ class SupervisorSyntheticStore:
                 learner_id,session_no,request_id,shown_at,answered_at,
                 response_time_ms,phase,block_index,mode,action_type,
                 question_id,concept_id,bloom_level,options_shown,answer_given,
-                is_correct,content_id,free_text,mastery_before,mastery_after,
+                is_correct,content_id,display_language,free_text,mastery_before,mastery_after,
                 D_before,D_after,bloom_after,rule_tags,trigger,
                 recovery_attempt,recovery_outcome
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (ref, state["session"], request_id, iso(shown_at),
              iso(answered_at), ms, phase, block_index, mode, action,
              question_id, concept, level, options_shown, choice,
              None if correct is None else int(correct),
-             content_id, free_text, before, after, D_before, D_after,
+             content_id, language, free_text, before, after, D_before, D_after,
              state["engine"]["bloom"][concept] if concept and state.get("engine") else None,
              rule_tags, trigger, recovery_attempt, recovery_outcome),
         )
