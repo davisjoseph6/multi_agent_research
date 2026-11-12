@@ -41,9 +41,19 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install standalone test framework
-        run: python -m pip install pytest==9.1.1 Flask==3.1.3
+        run: python -m pip install pytest==9.1.1 Flask==3.1.3 reportlab==4.4.9
       - name: Exactly compare all supervisor scenarios and bank constraints
         run: python -m pytest -q tests/test_supervisor_20261111_traces.py tests/test_supervisor_20261111_store.py tests/test_supervisor_20261111_end_to_end_store.py tests/test_supervisor_20261111_reminders.py tests/test_supervisor_20261111_fictional_http.py tests/test_supervisor_20261111_neural.py tests/test_supervisor_20261111_model_comparison.py tests/test_supervisor_20261111_backup.py tests/test_supervisor_20261112_consent_gdpr.py
+      - name: Create and validate versioned English/French Annex PDFs
+        run: |
+          python -m scripts.supervisor_consent_pdf
+          python - <<'PY'
+          from pathlib import Path
+          for lang in ('en','fr'):
+              p=Path('content/consent')/f'info_sheet_{lang}_v1.0.pdf'
+              assert p.read_bytes().startswith(b'%PDF-') and p.stat().st_size > 1500
+          print('Both versioned information sheet PDFs generated and verified.')
+          PY
       - name: Print unresolved neural feature contract (no torch needed)
         run: python -m scripts.supervisor_neural_rehearsal --feature-contract
       - name: Verify all canonical CSV files are present
