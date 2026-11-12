@@ -20,6 +20,7 @@ from typing import Callable
 from flask import Flask, jsonify, render_template, request, send_file, redirect
 
 from .supervisor_content import SupervisorBank
+from .supervisor_i18n import localize_public
 from .supervisor_consent_flow import SyntheticConsentFlow
 from .supervisor_consent_texts import CONSENT_VERSION, required, STOP_PAGE
 from .supervisor_synthetic_store import (
@@ -226,7 +227,25 @@ def make_supervisor_fictional_app(
     def consent_debrief():
         v=payload({"fixture"})
         with runtime.lock:
-            return jsonify(runtime.consent.completed_debrief(v["fixture"]))
+            result=runtime.consent.completed_debrief(v["fixture"])
+            ref,token=runtime.verified(v["fixture"])
+            language=runtime.store.progress(ref,token)["study_language"]
+            if language=="fr":
+                result["text"]=(
+                    "Merci d'avoir participé à cette étude ! Trois versions du "
+                    "quiz ont été utilisées. La première repérait les difficultés "
+                    "sur un concept et proposait un accompagnement. La deuxième "
+                    "choisissait toujours le concept le moins maîtrisé, sans aide. "
+                    "La troisième présentait les questions dans un ordre fixe, "
+                    "du plus facile au plus difficile. Votre version a été "
+                    "attribuée automatiquement et ne vous a pas été révélée "
+                    "pour ne pas influencer vos réponses. Vos 150 AI points "
+                    "seront crédités avant le [date]. Les résultats seront "
+                    "communiqués aux participants qui souhaitent les recevoir "
+                    "à la fin de l'étude. Pour toute question ou pour exercer "
+                    "vos droits : [email]."
+                )
+            return jsonify(result)
 
     @app.post("/supervisor/api/demo/prime-recovery")
     def demo_prime_recovery():
@@ -325,6 +344,17 @@ def make_supervisor_fictional_app(
                 human_enrollment_authorized=False,
             )
 
+    @app.post("/supervisor/api/language")
+    def set_language():
+        v=payload({"fixture","language"})
+        with runtime.lock:
+            ref,token=runtime.verified(v["fixture"])
+            runtime.store.set_study_language(ref,token,v["language"])
+            return jsonify(
+                language=v["language"],synthetic_only=True,
+                human_enrollment_authorized=False,
+            )
+
     @app.post("/supervisor/api/screening")
     def screening():
         v=payload({"fixture"})
@@ -336,9 +366,14 @@ def make_supervisor_fictional_app(
                 or runtime.consent.drafts[v["fixture"]]["screening_answers"] is not None
             ):
                 raise SyntheticStudyError("six-checkbox consent required before screening")
+            draft=runtime.consent.drafts.get(v["fixture"])
+            lang=draft["consent_lang"] if draft else "en"
             return jsonify(
-                kind="fictional_registration",
-                questions=[q.public() for q in runtime.store.bank.forms["screening"]],
+                kind="fictional_registration",language=lang,
+                questions=[
+                    localize_public(q.public(),language=lang)
+                    for q in runtime.store.bank.forms["screening"]
+                ],
                 synthetic_only=True,human_enrollment_authorized=False,
             )
 
@@ -408,6 +443,7 @@ def make_supervisor_fictional_app(
                            session=state["session"],index=state["index"],
                            consent_lang=consent["consent_lang"],
                            consent_version=consent["consent_version"],
+                           study_language=state["study_language"],
                            synthetic_only=True,
                            human_enrollment_authorized=False)
 
