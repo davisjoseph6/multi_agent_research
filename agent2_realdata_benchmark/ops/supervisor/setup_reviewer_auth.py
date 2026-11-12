@@ -40,7 +40,9 @@ def render(source: str, credential_hash: str) -> str:
         raise ValueError("study reviewer auth exists; use reviewed rotation instead")
     if source.count(FRONTEND) != 1 or source.count(STUDY) != 1:
         raise ValueError("expected a single original frontend/study matcher")
-    if source.count("basic_auth @frontend {") != 1 or source.count(PROXY) != 1:
+    if (source.count("basic_auth @frontend {") != 1 or
+            source.count(PROXY) != 1 or
+            source.count("reverse_proxy 127.0.0.1:8077 {") != 1):
         raise ValueError("unexpected proxy or operator auth configuration")
     match_frontend = re.search(
         r"(?m)^([ \t]*)@frontend not path /api/rct/\*[ \t]*$", source
