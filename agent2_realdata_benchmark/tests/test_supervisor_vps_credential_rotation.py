@@ -29,7 +29,7 @@ def fixture(tmp_path):
     store = SupervisorSyntheticStore(tmp_path, bank=SupervisorBank(BANK), operational=True)
     intake = OperationalIntake(store, programs=("Test student program",))
     old = intake.issue("staging-fixture@example.example", at=NOW(), allow_example=True)
-    intake.consent(old, checks=[True] * 6, optional=False, language="fr", at=NOW())
+    intake.consent(old, checks=[True] * 5, optional=False, language="fr", at=NOW())
     screening = {
         q.question_id: (q.correct_answer if n < 4 else
                         next(a for a in "ABCD" if a != q.correct_answer))
