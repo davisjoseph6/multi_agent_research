@@ -248,7 +248,10 @@
                      ? "consent-stage" : "information");
        }
      }else{
-       if(status.phase!=="QUIZ")previousFeedback=null;
+       // The final graded quiz answer leads directly to SURVEY in sessions
+       // 1/2. Keep its ✓/✕ visible on that next page, then clear it once
+       // a survey is actually submitted or the participant changes phase.
+       if(status.phase!=="QUIZ"&&status.phase!=="SURVEY")previousFeedback=null;
        currentLanguage=status.study_language||"en";
        applyLanguage();
        $("footer-information").href="/content/consent/"+currentLanguage+"/info";
