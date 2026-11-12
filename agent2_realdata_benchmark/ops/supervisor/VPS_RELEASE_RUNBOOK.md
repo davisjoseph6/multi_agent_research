@@ -158,6 +158,50 @@ issue. The test address is intentionally non-deliverable. A TEST participant
 may now complete the actual VPS-served consent, screening and first session
 under that invite; the database survives application and VPS restarts.
 
+## 4a. Replace a disclosed fictional invitation without deleting study progress
+
+If a full `#invite=` URL was pasted into a chat or document, treat that
+invitation as potentially disclosed even though the site also requires Caddy
+authentication. The *registered* participant's invitation is also their
+HttpOnly-cookie credential: deleting only the invitation text file does **not**
+invalidate the link or existing cookies. Do not share the link again.
+
+The **offline-only** `--rotate-registered-test` command replaces the
+registered `.example` credential in both private tables inside one
+transaction. It preserves the participant reference, arm, consent, every
+response, the ongoing quiz and the scheduled future sessions. The prior
+link and all browser cookies become invalid. It creates a fresh mode-0600
+output file first; a failed output preflight cannot lock out the learner.
+Human identities cannot use this staging command.
+
+After upgrading the VPS to the commit containing this change, run:
+
+```bash
+ssh -tt -i "$HOME/.ssh/ijcai_preview_ed25519" davis@31.70.172.140
+sudo -u ijcai-supervisor bash -c '
+  set -a
+  source /etc/ijcai-supervisor-staging/staging.env
+  set +a
+  cd /srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark
+  /srv/ijcai-supervisor-staging/venv/bin/python -m scripts.supervisor_vps_admin \
+    --rotate-registered-test researcher@example.example \
+    --output /var/lib/ijcai-supervisor-staging/invite-rotated-01.txt
+'
+sudo cat /var/lib/ijcai-supervisor-staging/invite-rotated-01.txt
+```
+
+Read the new link only on your trusted workstation; never paste it into
+a chat or code repository. Open it in a *new private browser window*,
+pass Caddy Basic Auth, and verify `WAITING_NEXT_SESSION` and the unchanged
+next-session date. The old invitation must now fail; do not test or print
+the old secret URL unnecessarily. Old tabs are expected to show
+"invitation not found" until reauthenticated with the new link.
+
+If the original participant withdrew or was erased, **do not use rotation**:
+the correct procedure is to issue a new fictional invitation, creating a
+separate participant record. Use a new filename each time; existing files
+are never overwritten.
+
 ## 5. Operations, security and known blockers
 
 - Caddy terminates HTTPS and preserves existing Basic Auth, which includes
