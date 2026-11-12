@@ -118,3 +118,16 @@ def test_even_a_valid_signature_cannot_approve_an_unfilled_annex(tmp_path):
     sign(secret,manifest,signature)
     with pytest.raises(ValueError,match="unfilled placeholders"):
         verify_signed_content_approval(root,manifest,signature,public,COMMIT)
+
+
+def test_review_inventory_is_pending_and_cannot_self_authorize(tmp_path):
+    from scripts.supervisor_content_approval_template import build_inventory
+    root,_,_,_,_,_=prepared(tmp_path)
+    inventory=build_inventory(root,COMMIT)
+    assert inventory["decision"]=="pending"
+    assert inventory["approved_at"] is None
+    assert inventory["reviewer"]==""
+    assert not inventory["blocking_issues"]
+    assert len(inventory["files_sha256"])==len(FILES)
+    with pytest.raises(ValueError,match="full exact commit"):
+        build_inventory(root,"short")
