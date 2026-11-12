@@ -110,3 +110,5 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Run a real browser through the four Group A recovery screens
         run: node scripts/supervisor_browser_playwright.cjs
+      - name: Full A/B/C end-to-end 3-session English/French Chromium journey
+        run: node scripts/supervisor_three_arm_browser_playwright.cjs
