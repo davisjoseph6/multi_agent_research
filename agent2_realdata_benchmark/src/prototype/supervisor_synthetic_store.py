@@ -90,6 +90,10 @@ class SupervisorSyntheticStore:
                 deleted_at TEXT NOT NULL,
                 channel TEXT NOT NULL CHECK(channel IN ('website','email'))
               );
+              CREATE TABLE IF NOT EXISTS collection_status (
+                one INTEGER PRIMARY KEY CHECK(one=1),
+                closed_at TEXT
+              );
               CREATE TABLE IF NOT EXISTS erasure_authorization (
                 one INTEGER PRIMARY KEY CHECK(one=1)
               );
@@ -187,6 +191,9 @@ class SupervisorSyntheticStore:
                 reminders_sent TEXT NOT NULL DEFAULT '[]'
               );
             """)
+            db.execute(
+                "INSERT OR IGNORE INTO collection_status(one,closed_at) VALUES(1,NULL)"
+            )
             participant_fields = {row["name"] for row in db.execute(
                 "PRAGMA table_info(participants)"
             )}
@@ -369,6 +376,10 @@ class SupervisorSyntheticStore:
         now = iso(at)
         token = secrets.token_urlsafe(40)
         with self._tx() as db:
+            if db.execute(
+                "SELECT closed_at FROM collection_status WHERE one=1"
+            ).fetchone()["closed_at"] is not None:
+                raise SyntheticStudyError("data collection is closed")
             if db.execute(
                 "SELECT 1 FROM pii.contacts WHERE email=? COLLATE NOCASE",
                 (contact_email,),
@@ -723,6 +734,10 @@ class SupervisorSyntheticStore:
         if type(score) is not int or not 6 <= score <= 8:
             raise SyntheticStudyError("only excluded screening results can be logged")
         with self._tx() as db:
+            if db.execute(
+                "SELECT closed_at FROM collection_status WHERE one=1"
+            ).fetchone()["closed_at"] is not None:
+                raise SyntheticStudyError("data collection is closed")
             db.execute(
                 "INSERT INTO screening_log(timestamp,score,eligible) VALUES(?,?,0)",
                 (iso(at),score),
@@ -841,8 +856,17 @@ class SupervisorSyntheticStore:
     def close_collection(self) -> dict:
         """Wipe fictional PII; separate backup purge must be verified."""
         with self._tx() as db:
+            row=db.execute(
+                "SELECT closed_at FROM collection_status WHERE one=1"
+            ).fetchone()
+            if row["closed_at"] is not None:
+                raise SyntheticStudyError("data collection already closed")
             count=db.execute("SELECT COUNT(*) FROM pii.contacts").fetchone()[0]
             db.execute("DELETE FROM pii.contacts")
+            db.execute(
+                "UPDATE collection_status SET closed_at=? WHERE one=1",
+                (datetime.now(timezone.utc).isoformat(),),
+            )
         return {"fictional_contacts_deleted":count,
                 "research_preserved":True,"backups_deleted":False,
                 "synthetic_only":True}
