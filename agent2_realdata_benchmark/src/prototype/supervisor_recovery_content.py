@@ -223,15 +223,25 @@ _CONTENT = {
 
 
 def recovery_resource(concept: str, action: str, *,
-                      question_text: str | None = None) -> dict:
+                      question_text: str | None = None,
+                      language: str = "en") -> dict:
     """Return instructional *draft* material without grading information."""
     if concept not in _CONTENT:
         raise ValueError("unsupported concept")
     if action not in ("CONCEPT_SUMMARY", "WORKED_EXAMPLE", "SOCRATIC_HINT"):
         raise ValueError("no teaching content for this action")
-    source = _CONTENT[concept]
+    if language not in ("en", "fr"):
+        raise ValueError("unsupported recovery language")
+    if language == "fr":
+        from .supervisor_fr_resources import FR_RESOURCES
+        source = FR_RESOURCES[concept]
+    else:
+        source = _CONTENT[concept]
     result = {
-        "content_id": f"{CONTENT_VERSION}_{concept}_{action}",
+        "content_id": f"{CONTENT_VERSION}_{concept}_{action}" + (
+            "_fr" if language == "fr" else ""
+        ),
+        "language": language,
         "version": CONTENT_VERSION,
         "review_status": REVIEW_STATUS,
         "concept": concept,
@@ -241,8 +251,15 @@ def recovery_resource(concept: str, action: str, *,
         if not isinstance(question_text, str) or not question_text.strip():
             raise ValueError("original practice-question stem required")
         result.update({
-            "title": "Socratic guidance before re-attempt",
+            "title": ("Guidage socratique avant une nouvelle tentative"
+                      if language == "fr"
+                      else "Socratic guidance before re-attempt"),
             "intro": (
+                "Expliquez votre raisonnement avec vos propres mots. La "
+                "question à choix multiples originale apparaîtra après "
+                "les deux questions de réflexion. Aucune indication "
+                "de la bonne réponse n'est encore donnée."
+                if language == "fr" else
                 "Write your reasoning in your own words. The original "
                 "multiple-choice question will appear only after both "
                 "guiding questions. No correctness feedback is provided yet."
@@ -253,8 +270,13 @@ def recovery_resource(concept: str, action: str, *,
     else:
         result.update({
             "title": (
-                f"Concept summary: {source['name']}" if action == "CONCEPT_SUMMARY"
-                else f"Worked example: {source['name']}"
+                ((f"Résumé du concept : {source['name']}"
+                  if language == "fr" else
+                  f"Concept summary: {source['name']}")
+                 if action == "CONCEPT_SUMMARY" else
+                 (f"Exemple expliqué : {source['name']}"
+                  if language == "fr" else
+                  f"Worked example: {source['name']}"))
             ),
             "paragraphs": list(source["summary"] if action == "CONCEPT_SUMMARY"
                                else source["example"]),
