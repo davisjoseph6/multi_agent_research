@@ -92,6 +92,10 @@ def main():
     group=parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--issue",metavar="EMAIL")
     group.add_argument("--counts",action="store_true")
+    group.add_argument("--withdraw-verified-ref",metavar="STUDY_PNNN")
+    parser.add_argument("--withdraw-mode",choices=("keep","delete"))
+    parser.add_argument("--verification-record",type=Path,
+                        help="absolute private JSON evidence reviewed by authorized staff")
     parser.add_argument("--output",type=Path,
                         help="absolute, new mode-0600 file containing secret link")
     parser.add_argument("--send",action="store_true",
@@ -108,6 +112,33 @@ def main():
         print(json.dumps(dict(mode=mode,participant_counts=counts,
                               unclaimed_invitations=invitations,
                               no_personal_details=True),indent=2))
+        return
+    if args.withdraw_verified_ref:
+        evidence=args.verification_record
+        if not args.withdraw_mode or evidence is None:
+            parser.error("withdrawal mode and identity-verification record required")
+        if not evidence.is_absolute() or not evidence.is_file() or evidence.is_symlink():
+            parser.error("existing private identity-verification record required")
+        record=json.loads(evidence.read_text(encoding="utf-8"))
+        if (type(record) is not dict or record.get("identity_verified") is not True
+                or record.get("channel")!="email"
+                or not isinstance(record.get("reviewer"),str)
+                or len(record["reviewer"].strip())<3
+                or not isinstance(record.get("institutional_ticket"),str)
+                or not record["institutional_ticket"].strip()):
+            parser.error("independent staff verification record incomplete")
+        result=intake.store.offline_admin_withdraw(
+            args.withdraw_verified_ref,
+            delete=(args.withdraw_mode=="delete"),
+            at=datetime.now(timezone.utc),channel="email",
+        )
+        print(json.dumps({
+            "withdrawn":result["withdrawn"],
+            "data_deleted":result["data_deleted"],
+            "channel":"verified_offline_email",
+            "email_sent":False,
+            "identity_authority_verified_by_software":False,
+        },indent=2))
         return
     if args.send and mode!="live":
         parser.error("--send is disabled for all staging deployments")
