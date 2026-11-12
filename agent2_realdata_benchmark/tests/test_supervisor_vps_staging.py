@@ -225,3 +225,71 @@ def test_offline_verified_withdrawal_and_collection_close_gate(tmp_path):
             "SELECT COUNT(*) FROM deletion_log WHERE learner_id=?",(ref,)
         ).fetchone()[0]==1
     assert store.close_collection()["research_preserved"]
+
+
+def test_supervisor_staging_review_advances_only_fictional_waiting_visits(tmp_path):
+    """Reviewers can test visits 2/3 tonight without weakening live scheduling."""
+    import json
+    from src.prototype.supervisor_trace_engine import SupervisorTraceEngine, CONCEPT_IDS
+
+    store, intake, _, post = stack(tmp_path)
+    token = intake.issue("review-case@example.example",
+                         at=NOW(), allow_example=True)
+    complete_intake(intake, store, token)
+    ref = intake.learner(token, at=NOW())
+    assert post("exchange", {"token": token}).status_code == 200
+
+    # Never skip consent, screening, pretest, or an active quiz.
+    assert post("staging-next-session").status_code == 409
+
+    # The normal study endpoint must still reject early entry.
+    with store._tx() as db:
+        row = db.execute("SELECT state_json FROM learner_state "
+                         "WHERE learner_id=?", (ref,)).fetchone()
+        state = json.loads(row["state_json"])
+        state["phase"] = "WAITING_NEXT_SESSION"
+        state["session"] = 1
+        engine = SupervisorTraceEngine("A", dict.fromkeys(CONCEPT_IDS, .5))
+        # Fabricate a completed test block, never bypass that invariant.
+        engine.question_in_session = 20
+        state["engine"] = engine.snapshot()
+        db.execute("UPDATE learner_state SET step='WAITING_NEXT_SESSION',"
+                   "step_index=0,state_json=? WHERE learner_id=?",
+                   (json.dumps(state), ref))
+        scheduled = db.execute(
+            "SELECT scheduled_for FROM sessions "
+            "WHERE learner_id=? AND session_no=2", (ref,)
+        ).fetchone()[0]
+
+    assert scheduled > NOW().isoformat()
+    assert post("next-session").status_code == 409
+    started = post("staging-next-session")
+    assert started.status_code == 200, started.json
+    assert started.json["session_started"] == 2
+    assert started.json["staging_preview_advance"] is True
+    assert post("status").json["session"] == 2
+    assert post("staging-next-session").status_code == 409
+
+    with store._tx() as db:
+        session = db.execute("SELECT scheduled_for,status FROM sessions "
+                             "WHERE learner_id=? AND session_no=2",
+                             (ref,)).fetchone()
+        assert session["status"] == "in_progress"
+        assert session["scheduled_for"] <= NOW().isoformat()
+        contact = db.execute("SELECT email FROM pii.contacts "
+                             "WHERE learner_id=?", (ref,)).fetchone()
+        assert contact["email"] == "review-case@example.example"
+
+
+def test_live_api_does_not_register_staging_review_route(tmp_path):
+    store, intake, _, _ = stack(tmp_path)
+    # Constructor release flag is a unit-test fixture, not release evidence.
+    live_app = make_supervisor_vps_app(
+        intake, hostname="demo.selfhealing-edu.fr", proxy_mode=False,
+        release_mode="live", release_authorized=True,
+    )
+    client = live_app.test_client()
+    denied = client.post("/study/api/staging-next-session", json={},
+                         base_url=BASE,
+                         headers={"Origin": BASE, "X-Study-Request": "1"})
+    assert denied.status_code == 404

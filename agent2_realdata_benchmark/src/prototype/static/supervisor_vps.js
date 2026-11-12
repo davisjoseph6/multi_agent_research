@@ -15,6 +15,7 @@
    reasoning:"Your own reasoning",answer:"Submit answer",continue:"Continue",
    hintNext:"Next guiding question",survey:"Submit six ratings",
    nextSession:"Begin next scheduled session",refresh:"Refresh current activity",
+   testNextSession:"TEST ONLY — start next session now",
    completed:"Study completed",stop:"Stop participating",
    stopInfo:"You may stop at any time. Choose whether to retain your pseudonymized responses or delete your data.",
    keep:"Stop and retain answers",erase:"Stop and erase data",cancel:"Cancel",
@@ -46,6 +47,7 @@
    reasoning:"Votre raisonnement",answer:"Valider la réponse",continue:"Continuer",
    hintNext:"Question guidée suivante",survey:"Envoyer les six évaluations",
    nextSession:"Commencer la prochaine séance prévue",refresh:"Actualiser l'activité",
+   testNextSession:"TEST UNIQUEMENT — commencer la séance suivante maintenant",
    completed:"Étude terminée",stop:"Arrêter la participation",
    stopInfo:"Vous pouvez arrêter à tout moment. Choisissez de conserver vos réponses pseudonymisées ou de supprimer vos données.",
    keep:"Arrêter en conservant les réponses",erase:"Arrêter et supprimer les données",
@@ -80,7 +82,7 @@
                    "learning","finished","excluded","stop"])$(p).hidden=p!==id;
  }
  function visibility(...ids){
-   for(const id of ["answer","continue","hint-next","submit-survey","next-session"])
+   for(const id of ["answer","continue","hint-next","submit-survey","next-session","staging-next-session"])
      $(id).hidden=!ids.includes(id);
  }
  async function api(route,body={}){
@@ -114,6 +116,7 @@
    $("continue").textContent=t("continue");
    $("submit-survey").textContent=t("survey");
    $("next-session").textContent=t("nextSession");
+   $("staging-next-session").textContent=t("testNextSession");
    $("refresh").textContent=t("refresh");
    $("finished-title").textContent=t("completed");
    $("stop-title").textContent=t("stop");
@@ -261,7 +264,7 @@
      visibility("submit-survey");
    }else if(data.kind==="waiting_next_session"){
      $("question").textContent=t("waiting",data.scheduled_for);
-     visibility("next-session");
+     visibility($("mode-warning").hidden?"next-session":"staging-next-session");
    }else if(data.kind==="done"){
      $("question").textContent=t("completed");
    }else throw Error("Unexpected stage "+data.kind);
@@ -385,6 +388,9 @@
        ()=>{previous=null});
  });
  $("next-session").addEventListener("click",()=>act("next-session"));
+ $("staging-next-session").addEventListener("click",()=>{
+   if(!$("mode-warning").hidden)act("staging-next-session");
+ });
  $("refresh").addEventListener("click",refresh);
  $("stop-open").addEventListener("click",()=>{if(registered)show("stop")});
  $("stop-cancel").addEventListener("click",refresh);
