@@ -11,8 +11,14 @@
 <body>
 <main id="app" class="portal">
 <header>
+  <div class="brand" aria-label="aivancity">
+    <img id="school-logo" src="/study/logo.png" alt="aivancity logo" hidden>
+    <span id="school-wordmark" class="brand-wordmark">aivancity</span>
+  </div>
   <h1 id="site-title">Adaptive Learning Study</h1>
   <p id="mode-warning" class="warning" role="status" {% if release_mode == 'live' %}hidden{% endif %}>TEST DEPLOYMENT — do not enter real participant information or use this link to recruit.</p>
+  <p id="study-roadmap" class="study-note">Three parts: eligibility, learning quiz and fatigue questionnaire. Pre- and post-tests are part of the study.</p>
+  <p id="ai-rule" class="study-rule">Please answer independently. Do not use generative AI tools to solve the questions.</p>
   <label for="language">Language / Langue</label>
   <select id="language" aria-label="Language"><option value="en">English</option><option value="fr">Français</option></select>
 </header>
@@ -38,6 +44,7 @@
 <section id="screening" hidden>
   <h2 id="screen-title">Eligibility screening</h2>
   <p id="screen-number"></p>
+  <progress id="screen-meter" max="8" value="1" aria-label="Screening progress"></progress>
   <p id="screen-prompt"></p>
   <fieldset id="screen-options"><legend>Choose one answer</legend></fieldset>
   <button type="button" id="screen-next">Next</button>
@@ -48,15 +55,19 @@
   <h2 id="reg-title">Registration</h2>
   <p id="reg-info">Your invitation verified your email address. No name is requested.</p>
   <label for="age" id="age-label">Age</label>
-  <input id="age" type="number" min="18" max="99" required>
+  <select id="age" required><option value="">Choose an age (18–99)</option></select>
+  <p id="age-info" class="hint">Only adults may participate. Ages outside 18–99 are not accepted by this form.</p>
   <label for="program" id="program-label">Academic program</label>
   <select id="program" required></select>
+  <p id="program-info" class="hint">Academic program is recorded to describe the study sample; it does not determine your assigned group.</p>
   <button type="button" id="register">Register and start session 1</button>
 </section>
 
 <section id="learning" hidden>
   <h2 id="phase">Current activity</h2>
   <p id="progress"></p>
+  <progress id="phase-meter" max="20" value="0" aria-label="Current section progress"></progress>
+  <p id="phase-intro" class="study-note" role="status"></p>
   <div id="previous-result" role="status" aria-live="polite" hidden><span id="previous-result-icon"></span> <span id="previous-result-text"></span></div>
   <p id="question"></p>
   <section id="teaching" hidden>
@@ -69,19 +80,28 @@
     <label for="reasoning" id="reasoning-label">Your own reasoning</label>
     <textarea id="reasoning" maxlength="500" rows="3"></textarea>
   </div>
+  <section id="answer-feedback" class="feedback" aria-live="polite" hidden>
+    <h3 id="feedback-title"></h3>
+    <p id="feedback-answer"></p>
+    <p id="feedback-explanation"></p>
+  </section>
   <div id="surveys" hidden></div>
+  <button type="button" id="feedback-next" hidden>Next</button>
+  <button type="button" id="fatigue-next" hidden>Next fatigue question</button>
   <button type="button" id="answer" hidden>Submit answer</button>
   <button type="button" id="continue" hidden>Continue</button>
   <button type="button" id="hint-next" hidden>Next question</button>
   <button type="button" id="submit-survey" hidden>Submit six ratings</button>
   <button type="button" id="next-session" hidden>Begin next scheduled session</button>
   <button type="button" id="staging-next-session" hidden>TEST ONLY — start next session now</button>
+  <section id="session-summary" class="study-note" aria-live="polite" hidden></section>
   <button type="button" id="refresh">Refresh current activity</button>
 </section>
 
 <section id="finished" hidden>
   <h2 id="finished-title">Study completed</h2>
   <p id="debrief"></p>
+  <section id="finished-summary" class="study-note" aria-live="polite"></section>
 </section>
 
 <section id="excluded" hidden>
