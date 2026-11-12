@@ -621,7 +621,12 @@ class SupervisorSyntheticStore:
                 ),
                 free_text=saved_reflection,
             )
-        return {"accepted": True, "synthetic_only": True}
+        # Practice and graded recovery only: reveal correctness AFTER the
+        # response is committed, without exposing any question answer key.
+        # Independent pretest/posttest and screening remain feedback-blind.
+        return {"accepted": True, "synthetic_only": True,
+                "previous_correct": correct if correct is not None else None,
+                "feedback_phase": "QUIZ"}
 
     def submit_survey(self, ref: str, token: str, *,
                       values: tuple[int, int, int, int, int, int],
