@@ -129,7 +129,7 @@
                    "learning","finished","excluded","stop"])$(p).hidden=p!==id;
  }
  function visibility(...ids){
-   for(const id of ["answer","continue","hint-next","submit-survey","next-session","staging-next-session"])
+   for(const id of ["answer","continue","hint-next","submit-survey","next-session","staging-next-session","feedback-next","fatigue-next"])
      $(id).hidden=!ids.includes(id);
  }
  async function api(route,body={}){
@@ -147,6 +147,12 @@
    document.documentElement.lang=lang;
    document.title=t("site");
    $("site-title").textContent=t("site");
+   $("study-roadmap").textContent=t("roadmap");
+   $("ai-rule").textContent=t("aiRule");
+   $("age-info").textContent=t("ageInfo");
+   $("program-info").textContent=t("programInfo");
+   $("feedback-next").textContent=t("feedbackNext");
+   $("fatigue-next").textContent=t("fatigueNext");
    $("info-title").textContent=t("info");
    $("start-consent").textContent=t("begin");
    $("exclude-course").textContent=t("course");
@@ -204,12 +210,15 @@
    const r=await fetch("/study/info/"+lang,{cache:"no-store"});
    if(!r.ok)throw Error("Information sheet unavailable");
    const page=new DOMParser().parseFromString(await r.text(),"text/html");
-   const content=page.querySelector("article pre, main pre, pre");
-   if(!content)throw Error("Approved information sheet is missing");
+   const content=page.querySelector("main");
+   if(!content)throw Error("Information sheet is missing");
    $("info-copy").replaceChildren();
-   const pre=document.createElement("pre");
-   pre.textContent=content.textContent;
-   $("info-copy").append(pre);
+   // Trusted same-origin, version-controlled sheet: keep semantic headings,
+   // paragraph spacing, bold words and links instead of printing raw Markdown.
+   for(const element of content.children){
+     if(["H1","H2","H3","P","SECTION","UL","OL"].includes(element.tagName))
+       $("info-copy").append(document.importNode(element,true));
+   }
    const field=$("consent-required");field.replaceChildren();
    const legend=document.createElement("legend");
    legend.textContent=t("required");field.append(legend);
@@ -236,11 +245,20 @@
    show("screening");
    const q=screening[screenIndex];
    $("screen-number").textContent=t("questionNumber",screenIndex+1);
+   $("screen-meter").value=screenIndex+1;
    $("screen-prompt").textContent=q.question_text;
    selectChoices($("screen-options"),q.options,"screen-choice");
    $("screen-next").textContent=screenIndex===7?t("finish"):t("next");
  }
  async function programs(){
+   const ages=$("age");ages.replaceChildren();
+   const prompt=document.createElement("option");prompt.value="";
+   prompt.textContent=lang==="fr"?"Choisissez un âge (18–99)":"Choose an age (18–99)";
+   ages.append(prompt);
+   for(let n=18;n<=99;n++){
+     const option=document.createElement("option");
+     option.value=String(n);option.textContent=String(n);ages.append(option);
+   }
    const resp=await api("programs");
    const selection=$("program");selection.replaceChildren();
    for(const v of resp.programs){
