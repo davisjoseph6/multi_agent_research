@@ -252,6 +252,22 @@
    act("survey",{values,request_id:requestId()});
  });
  $("advance").addEventListener("click",()=>act("advance-fictional-clock"));
+ $("quick-recovery").addEventListener("click",async()=>{
+   if(working)return;
+   fixture.value="F1";
+   working=true;
+   try{
+     message("");
+     const outcome=await call("demo/prime-recovery");
+     if(!outcome.prepared||outcome.next_action!=="CONCEPT_SUMMARY")
+       throw new Error("Recovery preparation did not complete");
+     $("registered-message").textContent=
+       "Fictional Group A: three incorrect C2 questions triggered Rule 5b. "+
+       "Next: Concept Summary → DROP_2 → Worked Example → Socratic Hint.";
+   }catch(e){message(e.message);working=false;return}
+   working=false;
+   await refresh();
+ });
  $("load").addEventListener("click",refresh);
  fixture.addEventListener("change",refresh);
  refresh();
