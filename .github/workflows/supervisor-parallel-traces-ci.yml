@@ -139,3 +139,5 @@ jobs:
         run: node scripts/supervisor_three_arm_browser_playwright.cjs
       - name: Operational /study/ real-browser A/B/C onboarding and session-one acceptance
         run: node scripts/supervisor_vps_browser_playwright.cjs
+      - name: Researcher-only live BKT dashboard in real Chromium
+        run: node scripts/supervisor_research_monitor_playwright.cjs
