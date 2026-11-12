@@ -222,11 +222,12 @@ class SupervisorSyntheticStore:
                         learner_id TEXT NOT NULL,
                         session_no INTEGER NOT NULL,
                         kind TEXT NOT NULL CHECK(kind IN ('visit_reminder')),
+                        scheduled_for TEXT NOT NULL,
                         status TEXT NOT NULL CHECK(status IN ('pending','sent')),
                         attempts INTEGER NOT NULL DEFAULT 0,
                         created_at TEXT NOT NULL,
                         sent_at TEXT,
-                        PRIMARY KEY(learner_id,session_no,kind)
+                        PRIMARY KEY(learner_id,session_no,kind,scheduled_for)
                     )
                 """)
                 db.execute("""
