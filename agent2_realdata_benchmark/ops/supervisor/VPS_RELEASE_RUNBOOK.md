@@ -129,6 +129,39 @@ After entering your *existing* operator credentials in your browser, the
 `https://demo.selfhealing-edu.fr/study/` page should load. Do not remove
 the existing Basic Auth layer for staging.
 
+## 3a. Dedicated reviewer Basic Auth without sharing operator access
+
+The initial Caddy Basic Auth may grant access to the unrelated operator
+demonstration as well as `/study/`. Do **not** share the operator credentials
+with the supervisor. After deploying the current code to staging, run on VPS:
+
+```bash
+sudo python3 /srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark/ops/supervisor/setup_reviewer_auth.py
+```
+
+This tool requires the exact known Caddy layout, prompts invisibly for a
+NEW 20+-character study reviewer password, and hashes it with Caddy bcrypt
+via stdin (no plaintext command-line arguments). It separates the frontend
+operator matcher from `/study` and `/study/*`, adding a dedicated reviewer
+Basic Auth identity `studyreviewer` only to the study path. It validates and
+reloads Caddy, then checks the following real HTTPS responses:
+
+- Unauthenticated `/study/` — HTTP 401.
+- `studyreviewer` credentials on `/study/` — HTTP 200.
+- The same reviewer credentials at `/` — HTTP 401 (operator demo denied).
+
+On failure it restores the original Caddyfile from a private backup and
+reloads, leaving the study database, operator password, and 8077 unit alone.
+The command refuses to modify unfamiliar Caddy configurations rather than
+guessing. Review the intended access-policy change with the VPS operator.
+
+Send the username and the newly chosen STUDY-ONLY password privately and
+separately from the three already-issued fictional invitations. The groups
+are assigned on eligible registration by A/B/C rotation; invite URLs do
+not predetermine groups. Do not send SSH access or the unrelated researcher
+dashboard password. Revoke reviewer access after the review as authorized.
+Human recruitment and SMTP remain disabled.
+
 ## 4. Generate one restricted staging invitation, offline
 
 Run this **on the VPS**, as the dedicated service user:
