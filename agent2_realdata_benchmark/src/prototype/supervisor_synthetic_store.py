@@ -208,6 +208,16 @@ class SupervisorSyntheticStore:
                 # Invitations, including email addresses, remain in the
                 # attached private contacts database, not research events.
                 db.execute("""
+                    CREATE TABLE IF NOT EXISTS operational_rendered(
+                        learner_id TEXT PRIMARY KEY REFERENCES participants(learner_id),
+                        render_id TEXT NOT NULL UNIQUE,
+                        phase TEXT NOT NULL,
+                        action TEXT,
+                        question_id TEXT,
+                        rendered_at TEXT NOT NULL
+                    )
+                """)
+                db.execute("""
                     CREATE TABLE IF NOT EXISTS pii.invitations(
                         token_hash TEXT PRIMARY KEY,
                         email TEXT NOT NULL COLLATE NOCASE UNIQUE,
