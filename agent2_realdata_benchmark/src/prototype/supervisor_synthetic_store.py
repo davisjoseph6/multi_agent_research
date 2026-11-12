@@ -953,6 +953,8 @@ class SupervisorSyntheticStore:
                 if self.operational:
                     db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
                                (ref,))
+                    db.execute("DELETE FROM pii.reminder_outbox WHERE learner_id=?",
+                               (ref,))
                     db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
                                (ref,))
                 db.execute(
