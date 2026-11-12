@@ -18,6 +18,7 @@ import secrets
 import sqlite3
 
 from .supervisor_content import SupervisorBank
+from .supervisor_i18n import LANGUAGES, localize_public, validate_french_bank
 from .supervisor_trace_engine import SupervisorTraceEngine, SESSION_BLOCKS
 from .supervisor_recovery_content import CONTENT_VERSION, recovery_resource
 
@@ -50,6 +51,7 @@ class SupervisorSyntheticStore:
         if not isinstance(bank, SupervisorBank):
             raise TypeError("supervisor bank is required")
         self.bank = bank
+        validate_french_bank(bank)  # missing translation fails closed
         self.research = self.folder / "supervisor_fictional_study.sqlite3"
         self.contacts = self.folder / "supervisor_fictional_contacts.sqlite3"
         if self.research.is_symlink() or self.contacts.is_symlink():
@@ -70,6 +72,7 @@ class SupervisorSyntheticStore:
                 consent_version TEXT NOT NULL,
                 consent_at TEXT NOT NULL,
                 consent_lang TEXT NOT NULL DEFAULT 'en',
+                study_language TEXT NOT NULL DEFAULT 'en' CHECK(study_language IN ('en','fr')),
                 open_data_consent INTEGER NOT NULL DEFAULT 0,
                 econ_course INTEGER NOT NULL,
                 screening_score INTEGER NOT NULL,
@@ -395,12 +398,12 @@ class SupervisorSyntheticStore:
             db.execute(
                 """INSERT INTO participants(
                    learner_id,grp,registered_at,consent_version,consent_at,
-                   consent_lang,open_data_consent,
+                   consent_lang,study_language,open_data_consent,
                    econ_course,screening_score,eligible,age,program,status,
                    missed_sessions,status_changed_at,config_version
-                 ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                 ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (ref, group, now, consent_version, consent_clicked, consent_lang,
-                 int(open_data_consent), int(econ_course), score, 1, age,
+                 consent_lang, int(open_data_consent), int(econ_course), score, 1, age,
                  program, "active", 0, now, "supervisor_20261111_v1"),
             )
             db.execute(
@@ -446,13 +449,29 @@ class SupervisorSyntheticStore:
                 "fictional_private_token": token,
                 "synthetic_only": True}
 
+    def set_study_language(self, ref: str, token: str, language: str) -> None:
+        """Persist display language without altering signed consent language."""
+        if language not in LANGUAGES:
+            raise SyntheticStudyError("language must be en or fr")
+        with self._tx() as db:
+            self._authenticated(db, ref, token)
+            db.execute(
+                "UPDATE participants SET study_language=? WHERE learner_id=?",
+                (language, ref),
+            )
+
     def progress(self, ref: str, token: str) -> dict:
         with self._tx() as db:
             self._authenticated(db, ref, token)
             state = self._state(db, ref)
+            participant = db.execute(
+                "SELECT study_language FROM participants WHERE learner_id=?",
+                (ref,),
+            ).fetchone()
         return {
             "phase": state["phase"], "session": state["session"],
-            "index": state["index"], "synthetic_only": True,
+            "index": state["index"], "study_language": participant["study_language"],
+            "synthetic_only": True,
             "human_enrollment_authorized": False,
         }
 
@@ -461,11 +480,17 @@ class SupervisorSyntheticStore:
         with self._tx() as db:
             self._authenticated(db, ref, token)
             state = self._state(db, ref)
+            participant = db.execute(
+                "SELECT study_language FROM participants WHERE learner_id=?",
+                (ref,),
+            ).fetchone()
+            language = participant["study_language"]
         if state["phase"] in ("PRETEST", "POSTTEST"):
             form = state["phase"].lower()
             item = self.bank.forms[form][state["index"]]
             return dict(kind="question", phase=state["phase"],
-                        **item.public(), synthetic_only=True)
+                        **localize_public(item.public(), language=language),
+                        synthetic_only=True)
         if state["phase"] == "QUIZ":
             engine = SupervisorTraceEngine.restore(state["engine"])
             step = engine.next_action()
@@ -473,7 +498,8 @@ class SupervisorSyntheticStore:
                 return dict(kind="block_complete", synthetic_only=True)
             if step["qid"] != "—":
                 item = self.bank.get(step["qid"], form="practice")
-                options = item.public()["options"]
+                public = localize_public(item.public(), language=language)
+                options = public["options"]
                 if step["action"] == "DROP_2":
                     distractor = next(k for k in "ABCD"
                                       if k != item.correct_answer)
@@ -483,17 +509,21 @@ class SupervisorSyntheticStore:
                 response = dict(kind="question" if step["action"] == "QUESTION"
                                 else "recovery", action=step["action"],
                                 question_id=item.question_id,
-                                question_text=item.question_text,
-                                options=options, synthetic_only=True)
+                                question_text=public["question_text"],
+                                options=options, language=language,
+                                synthetic_only=True)
                 if step["action"] == "SOCRATIC_HINT":
                     response["resource"] = recovery_resource(
                         step["concept"], "SOCRATIC_HINT",
-                        question_text=item.question_text,
+                        question_text=public["question_text"],
+                        language=language,
                     )
                 return response
             return dict(kind="recovery", action=step["action"],
                         content_status="REQUIRES_INDEPENDENT_REVIEW",
-                        resource=recovery_resource(step["concept"],step["action"]),
+                        resource=recovery_resource(
+                            step["concept"],step["action"],language=language,
+                        ), language=language,
                         synthetic_only=True)
         return dict(kind=state["phase"].lower(), synthetic_only=True)
 
