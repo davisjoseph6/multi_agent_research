@@ -1053,6 +1053,14 @@ class SupervisorSyntheticStore:
             ).fetchone()
             if row["closed_at"] is not None:
                 raise SyntheticStudyError("data collection already closed")
+            if self.operational:
+                active=db.execute(
+                    "SELECT COUNT(*) FROM participants WHERE status='active'"
+                ).fetchone()[0]
+                if active:
+                    raise SyntheticStudyError(
+                        "cannot purge operational contacts while learners remain active"
+                    )
             count=db.execute("SELECT COUNT(*) FROM pii.contacts").fetchone()[0]
             db.execute("DELETE FROM pii.contacts")
             if self.operational:
