@@ -68,6 +68,8 @@ class SupervisorSyntheticStore:
                 registered_at TEXT NOT NULL,
                 consent_version TEXT NOT NULL,
                 consent_at TEXT NOT NULL,
+                consent_lang TEXT NOT NULL DEFAULT 'en',
+                open_data_consent INTEGER NOT NULL DEFAULT 0,
                 econ_course INTEGER NOT NULL,
                 screening_score INTEGER NOT NULL,
                 eligible INTEGER NOT NULL CHECK(eligible=1),
@@ -77,6 +79,20 @@ class SupervisorSyntheticStore:
                 missed_sessions INTEGER NOT NULL DEFAULT 0,
                 status_changed_at TEXT NOT NULL,
                 config_version TEXT NOT NULL REFERENCES config(config_version)
+              );
+              CREATE TABLE IF NOT EXISTS screening_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                score INTEGER NOT NULL CHECK(score BETWEEN 6 AND 8),
+                eligible INTEGER NOT NULL CHECK(eligible=0)
+              );
+              CREATE TABLE IF NOT EXISTS deletion_log (
+                learner_id TEXT NOT NULL,
+                deleted_at TEXT NOT NULL,
+                channel TEXT NOT NULL CHECK(channel IN ('website','email'))
+              );
+              CREATE TABLE IF NOT EXISTS erasure_authorization (
+                one INTEGER PRIMARY KEY CHECK(one=1)
               );
               CREATE TABLE IF NOT EXISTS sessions (
                 learner_id TEXT NOT NULL REFERENCES participants(learner_id),
@@ -148,18 +164,20 @@ class SupervisorSyntheticStore:
                 BEFORE UPDATE ON events BEGIN
                   SELECT RAISE(ABORT,'events append-only');
                 END;
-              CREATE TRIGGER IF NOT EXISTS no_event_delete
-                BEFORE DELETE ON events BEGIN
-                  SELECT RAISE(ABORT,'events append-only');
-                END;
+              DROP TRIGGER IF EXISTS no_event_delete;
+              CREATE TRIGGER no_event_delete
+                BEFORE DELETE ON events
+                WHEN NOT EXISTS(SELECT one FROM erasure_authorization)
+                BEGIN SELECT RAISE(ABORT,'events append-only'); END;
               CREATE TRIGGER IF NOT EXISTS no_history_update
                 BEFORE UPDATE ON state_history BEGIN
                   SELECT RAISE(ABORT,'history append-only');
                 END;
-              CREATE TRIGGER IF NOT EXISTS no_history_delete
-                BEFORE DELETE ON state_history BEGIN
-                  SELECT RAISE(ABORT,'history append-only');
-                END;
+              DROP TRIGGER IF EXISTS no_history_delete;
+              CREATE TRIGGER no_history_delete
+                BEFORE DELETE ON state_history
+                WHEN NOT EXISTS(SELECT one FROM erasure_authorization)
+                BEGIN SELECT RAISE(ABORT,'history append-only'); END;
             """)
             db.executescript("""
               CREATE TABLE IF NOT EXISTS pii.contacts (
@@ -170,6 +188,15 @@ class SupervisorSyntheticStore:
                 reminders_sent TEXT NOT NULL DEFAULT '[]'
               );
             """)
+            participant_fields = {row["name"] for row in db.execute(
+                "PRAGMA table_info(participants)"
+            )}
+            if "consent_lang" not in participant_fields:
+                db.execute("ALTER TABLE participants ADD COLUMN consent_lang "
+                           "TEXT NOT NULL DEFAULT 'en'")
+            if "open_data_consent" not in participant_fields:
+                db.execute("ALTER TABLE participants ADD COLUMN open_data_consent "
+                           "INTEGER NOT NULL DEFAULT 0")
             row = db.execute(
                 "SELECT files_json FROM config WHERE config_version=?",
                 ("supervisor_20261111_v1",),
