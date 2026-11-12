@@ -472,6 +472,12 @@ def make_supervisor_fictional_app(
             else:
                 if v["question_id"]!=current.get("question_id"):
                     raise SyntheticStudyError("wrong quiz or recovery question")
+                if (current.get("action") == "SOCRATIC_HINT"
+                        and fixture in runtime.consent.identities
+                        and "reflection" not in v):
+                    raise SyntheticStudyError(
+                        "complete both Socratic reflections before the re-attempt"
+                    )
                 result=runtime.store.answer_quiz(
                     ref,token,request_id=v["request_id"],
                     item_id=v["question_id"],choice=v["choice"],
