@@ -15,7 +15,7 @@ import subprocess
 from src.prototype.pilot_release_evidence_gate import inspect_evidence_index
 from src.prototype.supervisor_content import SupervisorBank
 from src.prototype.supervisor_operational_intake import OperationalIntake
-from src.prototype.supervisor_recovery_content import CONTENT_VERSION, REVIEW_STATUS
+from src.prototype.supervisor_content_approval import verify_signed_content_approval
 from src.prototype.supervisor_synthetic_store import SupervisorSyntheticStore
 from src.prototype.supervisor_vps_web import make_supervisor_vps_app
 
@@ -47,10 +47,20 @@ def _release_verified(commit: str) -> bool:
     )
     if verified.returncode:
         raise RuntimeError("institutional release signature verification failed")
-    if "draft" in CONTENT_VERSION.lower() or "DRAFT" in REVIEW_STATUS:
-        raise RuntimeError(
-            "instructional recovery materials still explicitly unreviewed"
-        )
+    # A source file may still carry its historical DRAFT label. Never simply
+    # flip a code flag: require a distinct institutional signature attesting
+    # to the exact deployed recovery text, both language banks and BOTH
+    # immutable consent versions. An index alone cannot enable live mode.
+    content_manifest=os.environ.get("SUPERVISOR_CONTENT_APPROVAL")
+    content_signature=os.environ.get("SUPERVISOR_CONTENT_SIGNATURE")
+    if not content_manifest or not content_signature:
+        raise RuntimeError("separately signed PI content approval required")
+    approval=verify_signed_content_approval(
+        ROOT,Path(content_manifest),Path(content_signature),
+        Path(public_key),commit,
+    )
+    if not approval["content_approved"]:
+        raise RuntimeError("content review is not approved")
     return True
 
 
@@ -72,6 +82,12 @@ def make_wsgi_app():
             ["git","rev-parse","HEAD"],cwd=ROOT.parent,
             capture_output=True,text=True,timeout=5,check=True,
         ).stdout.strip()
+        status=subprocess.run(
+            ["git","status","--porcelain"],cwd=ROOT.parent,
+            capture_output=True,text=True,timeout=10,check=True,
+        ).stdout.strip()
+        if status:
+            raise RuntimeError("live checkout must be clean and reproducible")
     else:
         # A reviewed staging archive can be deployed without its .git tree.
         # Live remains restricted to an exact signed Git commit checkout.
