@@ -272,7 +272,7 @@
    try{
      const status=await api("status");
      registered=status.stage==="participant";
-     if(status.study_language||status.language){
+     if(status.stage!=="invited"&&(status.study_language||status.language)){
        lang=status.study_language||status.language;updateLanguage();
      }
      if(status.stage==="invited"){
@@ -311,15 +311,23 @@
    const checks=[...$("consent-required").querySelectorAll("input.required")].map(x=>x.checked);
    act("consent",{checks,optional:$("optional-choice").checked,language:lang});
  });
- $("exclude-course").addEventListener("click",()=>{
-   act("course-exclusion",{},()=>{show("excluded")});
+ $("exclude-course").addEventListener("click",async()=>{
+   try{
+     await api("course-exclusion");
+     registered=false;show("excluded");notice(t("confirmed"));error("");
+   }catch(e){error(e.message)}
  });
  $("screen-next").addEventListener("click",async()=>{
    try{
      const q=screening[screenIndex];
      answers[q.question_id]=selected("screen-choice");
      if(screenIndex<7){screenIndex++;drawScreen();return}
-     await act("screen",{answers},r=>{if(!r.eligible)show("excluded")});
+     const result=await api("screen",{answers});
+     if(!result.eligible){
+       show("excluded");notice(t("confirmed"));
+     }else{
+       await refresh();
+     }
    }catch(e){error(e.message)}
  });
  $("register").addEventListener("click",()=>{
@@ -349,7 +357,12 @@
    });
  }
  $("answer").addEventListener("click",()=>{
-   try{reply(selected("answer-choice"))}catch(e){error(e.message)}
+   try{
+     const reflection=current?.action==="SOCRATIC_HINT"?reflections:null;
+     if(current?.action==="SOCRATIC_HINT"&&reflection?.length!==2)
+       throw Error(t("reasonMissing"));
+     reply(selected("answer-choice"),reflection);
+   }catch(e){error(e.message)}
  });
  $("continue").addEventListener("click",()=>reply(null));
  $("hint-next").addEventListener("click",()=>{
@@ -363,12 +376,8 @@
    $("question").textContent=t("reattempt")+" "+current.question_text;
    selectChoices($("choices"),current.options,"answer-choice");
    $("choices").hidden=false;visibility("answer");
-   $("answer").onclick=null;
-   // Avoid modifying callback identity; reply() takes the two reflections.
-   $("answer").dataset.socratic="1";
- });
- $("answer").addEventListener("click",()=>{
-   // The normal answer listener uses this flag to submit both reflections.
+   // The main answer handler submits the two typed reflections alongside
+   // the graded four-option re-attempt. No answer is revealed before then.
  });
  $("submit-survey").addEventListener("click",()=>{
    const values=Array.from({length:6},(_,i)=>Number($("fatigue-"+i).value));
@@ -382,9 +391,13 @@
  const withdraw=deleteData=>{
    if(!window.confirm(lang==="fr"?"Confirmer l'arrêt de la participation ?":
                      "Confirm that you want to stop participating?"))return;
-   act("withdraw",{delete:deleteData},()=>{
-     previous=null;show("excluded");notice(t("confirmed"));
-   });
+   (async()=>{
+     try{
+       await api("withdraw",{delete:deleteData});
+       registered=false;previous=null;feedback();
+       show("excluded");notice(t("confirmed"));error("");
+     }catch(e){error(e.message)}
+   })();
  };
  $("withdraw-keep").addEventListener("click",()=>withdraw(false));
  $("withdraw-delete").addEventListener("click",()=>withdraw(true));
