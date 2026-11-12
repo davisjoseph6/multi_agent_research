@@ -28,7 +28,10 @@ ID_PATTERN=re.compile(r"[A-Za-z0-9_-]{8,100}\Z")
 
 def make_supervisor_vps_app(intake: OperationalIntake, *,
                             hostname: str, proxy_mode: bool,
-                            release_mode: str = "staging") -> Flask:
+                            release_mode: str = "staging",
+                            release_authorized: bool = False) -> Flask:
+    if release_mode == "live" and release_authorized is not True:
+        raise ValueError("live enrollment requires independently verified release")
     if release_mode not in ("staging","live"):
         raise ValueError("release mode must be staging or live")
     if not isinstance(intake,OperationalIntake):
