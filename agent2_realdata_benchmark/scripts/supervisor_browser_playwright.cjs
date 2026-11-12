@@ -107,7 +107,7 @@ async function check() {
     console.log("Socratic prompt 1 -> prompt 2 -> original 4-option re-attempt.");
     console.log("All data were synthetic and kept on localhost.");
   } catch(error) {
-    throw new Error(`${error.message}\nPython errors: ${serverErrors.slice(-2000)}`);
+    throw new Error(`${error.stack||error.message}\nPython errors: ${serverErrors.slice(-2000)}`);
   } finally {
     if(browser)await browser.close();
     proc.kill("SIGTERM");
