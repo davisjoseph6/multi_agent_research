@@ -131,7 +131,7 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
 
     @app.get("/study/app.css")
     def css():
-        return send_file(ROOT/"static"/"supervisor_fictional_web.css",
+        return send_file(ROOT/"static"/"supervisor_vps.css",
                          mimetype="text/css")
 
     @app.get("/study/health")
