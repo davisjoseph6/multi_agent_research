@@ -204,6 +204,23 @@ class SupervisorSyntheticStore:
                 reminders_sent TEXT NOT NULL DEFAULT '[]'
               );
             """)
+            if self.operational:
+                # Invitations, including email addresses, remain in the
+                # attached private contacts database, not research events.
+                db.execute("""
+                    CREATE TABLE IF NOT EXISTS pii.invitations(
+                        token_hash TEXT PRIMARY KEY,
+                        email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                        expires_at TEXT NOT NULL,
+                        state TEXT NOT NULL CHECK(state IN
+                            ('invited','consented','screened','registered')),
+                        consent_lang TEXT,
+                        consent_at TEXT,
+                        optional INTEGER,
+                        answers_json TEXT,
+                        learner_id TEXT
+                    )
+                """)
             db.execute(
                 "INSERT OR IGNORE INTO collection_status(one,closed_at) VALUES(1,NULL)"
             )
@@ -434,6 +451,19 @@ class SupervisorSyntheticStore:
                 raise SyntheticStudyError(
                     "This email is already registered. Use the link sent to you by email."
                 )
+            if self.operational:
+                invitation = db.execute(
+                    "SELECT * FROM pii.invitations WHERE token_hash=?",
+                    (hashlib.sha256(token.encode()).hexdigest(),),
+                ).fetchone()
+                if (not invitation or invitation["state"] != "screened"
+                        or invitation["email"].casefold() != contact_email.casefold()
+                        or invitation["consent_lang"] != consent_lang
+                        or invitation["consent_at"] != consent_clicked
+                        or invitation["optional"] != int(open_data_consent)
+                        or invitation["answers_json"] != dump(screening_answers)
+                        or invitation["expires_at"] < now):
+                    raise SyntheticStudyError("invitation or consent is not verified")
             ordinal = (db.execute("SELECT COUNT(*) FROM participants").fetchone()[0]
                        + db.execute("SELECT COUNT(*) FROM deletion_log").fetchone()[0])
             prefix = "STUDY_P" if self.operational else "SYN_SUPERVISOR_P"
@@ -456,6 +486,12 @@ class SupervisorSyntheticStore:
                 (ref, contact_email,
                  hashlib.sha256(token.encode()).hexdigest(), now),
             )
+            if self.operational:
+                db.execute(
+                    "UPDATE pii.invitations SET state='registered', learner_id=? "
+                    "WHERE token_hash=?",
+                    (ref,hashlib.sha256(token.encode()).hexdigest()),
+                )
             for i, offset in enumerate((0, 4, 8), 1):
                 db.execute(
                     "INSERT INTO sessions(learner_id,session_no,scheduled_for,"
@@ -868,6 +904,9 @@ class SupervisorSyntheticStore:
             if delete:
                 db.execute("INSERT INTO erasure_authorization(one) VALUES(1)")
                 try:
+                    if self.operational:
+                        db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
+                                   (ref,))
                     for name in ("state_history","events","surveys",
                                  "learner_state","sessions"):
                         db.execute(f"DELETE FROM {name} WHERE learner_id=?",(ref,))
@@ -935,6 +974,9 @@ class SupervisorSyntheticStore:
                     "UPDATE participants SET status='withdrawn',status_changed_at=? "
                     "WHERE learner_id=?",(iso(at),ref),
                 )
+                if self.operational:
+                    db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
+                               (ref,))
                 db.execute(
                     "UPDATE pii.contacts SET token_hash=? WHERE learner_id=?",
                     (hashlib.sha256(secrets.token_bytes(48)).hexdigest(),ref),
@@ -954,7 +996,7 @@ class SupervisorSyntheticStore:
             ).fetchall()
             return [
                 {"email":r["email"],"completed_at":r["status_changed_at"]}
-                for r in rows if r["email"].lower().endswith(".test")
+                for r in rows if self.operational or r["email"].lower().endswith(".test")
             ]
 
     def close_collection(self) -> dict:
@@ -967,6 +1009,8 @@ class SupervisorSyntheticStore:
                 raise SyntheticStudyError("data collection already closed")
             count=db.execute("SELECT COUNT(*) FROM pii.contacts").fetchone()[0]
             db.execute("DELETE FROM pii.contacts")
+            if self.operational:
+                db.execute("DELETE FROM pii.invitations")
             db.execute(
                 "UPDATE collection_status SET closed_at=? WHERE one=1",
                 (datetime.now(timezone.utc).isoformat(),),
