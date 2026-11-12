@@ -17,7 +17,7 @@ import secrets
 import time
 from typing import Callable
 
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import Flask, jsonify, render_template, request, send_file, redirect
 
 from .supervisor_content import SupervisorBank
 from .supervisor_consent_flow import SyntheticConsentFlow
@@ -131,6 +131,14 @@ def make_supervisor_fictional_app(
         return render_template("supervisor_fictional_web.html",
                                preview_nonce=nonce)
 
+    @app.get("/supervisor/consent")
+    def consent_form_page():
+        return redirect("/?consent=1",code=302)
+
+    @app.get("/supervisor/stop")
+    def stop_page():
+        return redirect("/?stop=1",code=302)
+
     @app.get("/supervisor-fake.js")
     def script():
         return send_file(ROOT/"static/supervisor_fictional_web.js",
@@ -226,6 +234,11 @@ def make_supervisor_fictional_app(
         with runtime.lock:
             if runtime.fake(v["fixture"]):
                 raise SyntheticStudyError("already registered fake fixture")
+            if not app.config["TESTING"] and (
+                v["fixture"] not in runtime.consent.drafts
+                or runtime.consent.drafts[v["fixture"]]["screening_answers"] is not None
+            ):
+                raise SyntheticStudyError("six-checkbox consent required before screening")
             return jsonify(
                 kind="fictional_registration",
                 questions=[q.public() for q in runtime.store.bank.forms["screening"]],
@@ -289,8 +302,15 @@ def make_supervisor_fictional_app(
                                synthetic_only=True)
             ref,token=pair
             state=runtime.store.progress(ref,token)
+            with runtime.store._tx() as db:
+                consent=db.execute(
+                    "SELECT consent_lang,consent_version FROM participants "
+                    "WHERE learner_id=?",(ref,),
+                ).fetchone()
             return jsonify(registered=True,phase=state["phase"],
                            session=state["session"],index=state["index"],
+                           consent_lang=consent["consent_lang"],
+                           consent_version=consent["consent_version"],
                            synthetic_only=True,
                            human_enrollment_authorized=False)
 
