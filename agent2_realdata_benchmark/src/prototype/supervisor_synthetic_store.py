@@ -969,10 +969,10 @@ class SupervisorSyntheticStore:
 
     def offline_admin_withdraw(self, ref: str, *, delete: bool,
                                at: datetime, channel: str = "email") -> dict:
-        """Operator-only fictional withdrawal without a recoverable token.
+        """Offline request after independently verified owner identity.
 
-        Must be called ONLY from a local private 0700 CLI, never over HTTP.
-        It is not a real authorization mechanism or identity verification.
+        Staff must separately verify the sender and record institutional
+        authorization. Never expose this method as a public HTTP route.
         """
         self._ref(ref)
         if type(delete) is not bool or channel != "email":
@@ -981,7 +981,8 @@ class SupervisorSyntheticStore:
             row=db.execute(
                 "SELECT email FROM pii.contacts WHERE learner_id=?",(ref,)
             ).fetchone()
-            if row is None or not row["email"].lower().endswith(".test"):
+            if row is None or (not self.operational and
+                               not row["email"].lower().endswith(".test")):
                 raise SyntheticStudyError("fictional contact record required")
             recipient=row["email"]
             status=db.execute(
@@ -993,6 +994,10 @@ class SupervisorSyntheticStore:
                 db.execute("INSERT INTO erasure_authorization(one) VALUES(1)")
                 try:
                     if self.operational:
+                        db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
+                                   (ref,))
+                        db.execute("DELETE FROM pii.reminder_outbox WHERE learner_id=?",
+                                   (ref,))
                         db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
                                    (ref,))
                     for name in ("state_history","events","surveys",
@@ -1013,6 +1018,10 @@ class SupervisorSyntheticStore:
                 )
                 if self.operational:
                     db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
+                               (ref,))
+                    db.execute("DELETE FROM pii.reminder_outbox WHERE learner_id=?",
+                               (ref,))
+                    db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
                                (ref,))
                 db.execute(
                     "UPDATE pii.contacts SET token_hash=? WHERE learner_id=?",
