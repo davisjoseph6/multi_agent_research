@@ -153,6 +153,12 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         eligible=intake.reward_eligible(credential(),at=now())
         filename=(f"info_sheet_{language}_v1.0.html" if eligible else
                   f"info_sheet_{language}_v1.1_nonreward.html")
+        # Never rewrite the immutable prior v1.1 document for participants
+        # who have already recorded consent. Staging displays the professor's
+        # dated, formatted review candidate. Live requires a separately
+        # approved/versioned consent migration before using that candidate.
+        if release_mode=="staging" and not eligible:
+            filename="info_sheet_"+language+"_v1.1_nonreward_20261113_review.html" if language=="en" else filename
         path=ROOT.parents[1]/"content"/"consent"/filename
         return send_file(path,mimetype="text/html")
 
