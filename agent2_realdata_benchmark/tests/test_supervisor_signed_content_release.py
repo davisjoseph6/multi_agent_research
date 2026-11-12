@@ -106,3 +106,15 @@ def test_real_staging_remains_disabled_without_evidence(monkeypatch):
     monkeypatch.delenv("SUPERVISOR_CONTENT_APPROVAL",raising=False)
     with pytest.raises(RuntimeError,match="institutional evidence"):
         _release_verified(COMMIT)
+
+
+def test_even_a_valid_signature_cannot_approve_an_unfilled_annex(tmp_path):
+    root,manifest,signature,secret,public,payload=prepared(tmp_path)
+    name="content/consent/info_sheet_en_v1.0.html"
+    file=root/name
+    file.write_text("The contact is [email].",encoding="utf-8")
+    payload["files_sha256"][name]=sha256(file.read_bytes()).hexdigest()
+    manifest.write_text(json.dumps(payload,sort_keys=True),encoding="utf-8")
+    sign(secret,manifest,signature)
+    with pytest.raises(ValueError,match="unfilled placeholders"):
+        verify_signed_content_approval(root,manifest,signature,public,COMMIT)
