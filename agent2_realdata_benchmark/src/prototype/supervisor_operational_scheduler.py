@@ -28,8 +28,10 @@ def reconcile(store: SupervisorSyntheticStore, *, at: datetime,
         rows=db.execute(
             "SELECT s.learner_id,s.session_no,s.scheduled_for,p.missed_sessions "
             "FROM sessions s JOIN participants p USING(learner_id) "
+            "JOIN learner_state ls USING(learner_id) "
             "WHERE s.status='scheduled' AND p.status='active' "
-            "AND s.session_no IN (2,3)"
+            "AND ls.step='WAITING_NEXT_SESSION' "
+            "AND ls.session_no=s.session_no-1 AND s.session_no IN (2,3)"
         ).fetchall()
         for row in rows:
             scheduled=datetime.fromisoformat(row["scheduled_for"])
