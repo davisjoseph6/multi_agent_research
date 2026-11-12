@@ -80,7 +80,7 @@ def verify_signed_content_approval(root: Path, index: Path, signature: Path,
         if relative.endswith(".html"):
             # A signed index must never certify an Annex that still tells
             # prospective participants [email], [date], [host], etc.
-            if re.search(r"\\[[^\\[\\]\\r\\n]{2,100}\\]", content.decode("utf-8")):
+            if re.search(r"\[[^\[\]\r\n]{2,100}\]", content.decode("utf-8")):
                 raise ValueError("approved information sheet contains unfilled placeholders")
         h=sha256(content).hexdigest()
         if not compare_digest(h,digest):
