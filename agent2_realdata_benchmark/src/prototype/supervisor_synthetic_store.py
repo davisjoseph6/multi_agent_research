@@ -917,6 +917,8 @@ class SupervisorSyntheticStore:
                     if self.operational:
                         db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
                                    (ref,))
+                        db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
+                                   (ref,))
                     for name in ("state_history","events","surveys",
                                  "learner_state","sessions"):
                         db.execute(f"DELETE FROM {name} WHERE learner_id=?",(ref,))
@@ -933,6 +935,11 @@ class SupervisorSyntheticStore:
                     "UPDATE participants SET status='withdrawn',"
                     "status_changed_at=? WHERE learner_id=?",(iso(at),ref),
                 )
+                if self.operational:
+                    db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
+                               (ref,))
+                    db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
+                               (ref,))
                 db.execute(
                     "UPDATE pii.contacts SET token_hash=? WHERE learner_id=?",
                     (hashlib.sha256(secrets.token_bytes(48)).hexdigest(),ref),
