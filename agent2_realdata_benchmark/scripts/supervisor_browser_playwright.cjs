@@ -101,6 +101,34 @@ async function check() {
       document.querySelector("#question").textContent !== "" &&
       !document.querySelector("#question").textContent.includes("Socratic re-attempt"));
     assert.match(await page.locator("#progress").innerText(),/Session 1\/3 — QUIZ/);
+    // The graded Socratic re-attempt was answered correctly. On the NEXT
+    // question, show an accessible green ✓ with a correctness message.
+    await page.locator("#previous-result").waitFor({state:"visible"});
+    assert.match(await page.locator("#previous-result").getAttribute("class"),/correct/);
+    assert.equal(await page.locator("#previous-result-icon").innerText(),"✓");
+    assert.match(await page.locator("#previous-result-text").innerText(),
+                 /Previous answer was correct/);
+
+    // Switch the *same registered* fictional learner to French; preserve
+    // the exact question and grading key while translating all visible text.
+    await page.locator("#study-lang").selectOption("fr");
+    await page.waitForFunction(()=>
+      document.documentElement.lang==="fr" &&
+      document.querySelector("#question").textContent.includes("cadrage"));
+    assert.match(await page.locator("#progress").innerText(),/Séance 1\/3/);
+    assert.match(await page.locator("#previous-result-text").innerText(),
+                 /réponse précédente était correcte/);
+    assert.match(await page.locator("#options").innerText(),/Kahneman/);
+
+    // The first next regular item is QZ_C5_L1_01 (correct option D).
+    // Submitting A is wrong and the following page must show a red ✕.
+    await page.locator('#options input[value="A"]').check();
+    await page.locator("#answer").click();
+    await page.waitForFunction(()=>
+      document.querySelector("#previous-result-text").textContent
+        .includes("incorrecte"));
+    assert.equal(await page.locator("#previous-result-icon").innerText(),"✕");
+    assert.match(await page.locator("#previous-result").getAttribute("class"),/incorrect/);
     assert.deepEqual(pageErrors,[]);
     console.log("PASS Chromium Group A full recovery:");
     console.log("summary visible -> DROP_2 2 options -> worked example visible ->");
