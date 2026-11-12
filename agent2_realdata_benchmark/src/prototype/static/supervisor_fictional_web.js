@@ -149,9 +149,12 @@
          showSection("registration-stage");
        }else{
          await renderInformation();
-         showSection("information");
+         showSection(new URLSearchParams(window.location.search).has("consent")
+                     ? "consent-stage" : "information");
        }
      }else{
+       currentLanguage=status.consent_lang||"en";
+       $("footer-information").href="/content/consent/"+currentLanguage+"/info";
        $("progress").textContent="Fictional "+fixture.value+" — Session "+
           status.session+"/3 — "+status.phase+" — step "+status.index;
        if(status.phase==="DONE"){
@@ -159,7 +162,8 @@
          $("debrief").textContent=deb.text;
          showSection("debrief-stage");
        }else{
-         showSection("registered-stage");
+         showSection(new URLSearchParams(window.location.search).has("stop")
+                     ? "withdraw-stage" : "registered-stage");
          showCurrent(await call("item"));
        }
      }
