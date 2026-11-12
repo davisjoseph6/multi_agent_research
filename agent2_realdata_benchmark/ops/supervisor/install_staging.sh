@@ -54,7 +54,7 @@ SUPERVISOR_VPS_MODE=staging
 SUPERVISOR_VPS_ROOT=${STATE}
 SUPERVISOR_VPS_HOST=${HOST}
 SUPERVISOR_VPS_COMMIT=${SHA}
-SUPERVISOR_PROGRAMS=Synthetic classroom demonstration
+SUPERVISOR_PROGRAMS="Synthetic classroom demonstration"
 ENV
 chown root:ijcai-supervisor "$ENV_FILE"
 chmod 0640 "$ENV_FILE"
