@@ -126,3 +126,24 @@ def test_end_collection_needs_export_and_closed_learners_then_removes_contact_ba
         assert db.execute("SELECT COUNT(*) FROM pii.contacts").fetchone()[0]==0
         assert db.execute("SELECT COUNT(*) FROM participants").fetchone()[0]==1
         assert db.execute("SELECT COUNT(*) FROM events").fetchone()[0]==8
+
+
+
+def test_irreversible_collection_close_blocks_registration_and_anonymous_screening(store):
+    identity=enroll(store)
+    result=store.close_collection()
+    assert result["fictional_contacts_deleted"]==1
+    reopened=SupervisorSyntheticStore(store.folder,bank=SupervisorBank(DATA))
+    with pytest.raises(SyntheticStudyError,match="collection is closed"):
+        enroll(reopened,email="new@example.test")
+    with pytest.raises(SyntheticStudyError,match="collection is closed"):
+        reopened.log_screening_exclusion(6,at=NOW)
+    with pytest.raises(SyntheticStudyError,match="already closed"):
+        reopened.close_collection()
+    with reopened._tx() as db:
+        assert db.execute(
+            "SELECT COUNT(*) FROM pii.contacts"
+        ).fetchone()[0]==0
+        assert db.execute(
+            "SELECT COUNT(*) FROM participants"
+        ).fetchone()[0]==1
