@@ -234,6 +234,7 @@ class SupervisorSyntheticStore:
         db.execute("PRAGMA foreign_keys=ON")
         db.execute("PRAGMA busy_timeout=15000")
         db.execute("ATTACH DATABASE ? AS pii", (str(self.contacts),))
+        db.execute("PRAGMA pii.secure_delete=ON")
         db.execute("BEGIN IMMEDIATE")
         try:
             yield db
@@ -774,6 +775,55 @@ class SupervisorSyntheticStore:
             "fictional_confirmation_recipient":recipient,
             "real_email_sent":False,"synthetic_only":True,
         }
+
+    def offline_admin_withdraw(self, ref: str, *, delete: bool,
+                               at: datetime, channel: str = "email") -> dict:
+        """Operator-only fictional withdrawal without a recoverable token.
+
+        Must be called ONLY from a local private 0700 CLI, never over HTTP.
+        It is not a real authorization mechanism or identity verification.
+        """
+        self._ref(ref)
+        if type(delete) is not bool or channel != "email":
+            raise SyntheticStudyError("offline email-forwarded withdrawal required")
+        with self._tx() as db:
+            row=db.execute(
+                "SELECT email FROM pii.contacts WHERE learner_id=?",(ref,)
+            ).fetchone()
+            if row is None or not row["email"].lower().endswith(".test"):
+                raise SyntheticStudyError("fictional contact record required")
+            recipient=row["email"]
+            status=db.execute(
+                "SELECT status FROM participants WHERE learner_id=?",(ref,)
+            ).fetchone()
+            if status is None or status["status"] in ("withdrawn","removed"):
+                raise SyntheticStudyError("already inactive")
+            if delete:
+                db.execute("INSERT INTO erasure_authorization(one) VALUES(1)")
+                try:
+                    for name in ("state_history","events","surveys",
+                                 "learner_state","sessions"):
+                        db.execute(f"DELETE FROM {name} WHERE learner_id=?",(ref,))
+                    db.execute("DELETE FROM pii.contacts WHERE learner_id=?",(ref,))
+                    db.execute("DELETE FROM participants WHERE learner_id=?",(ref,))
+                finally:
+                    db.execute("DELETE FROM erasure_authorization")
+                db.execute(
+                    "INSERT INTO deletion_log(learner_id,deleted_at,channel) "
+                    "VALUES(?,?,?)",(ref,iso(at),channel),
+                )
+            else:
+                db.execute(
+                    "UPDATE participants SET status='withdrawn',status_changed_at=? "
+                    "WHERE learner_id=?",(iso(at),ref),
+                )
+                db.execute(
+                    "UPDATE pii.contacts SET token_hash=? WHERE learner_id=?",
+                    (hashlib.sha256(secrets.token_bytes(48)).hexdigest(),ref),
+                )
+        return {"withdrawn":True,"data_deleted":delete,
+                "fictional_confirmation_recipient":recipient,
+                "real_email_sent":False,"synthetic_only":True}
 
     def points_export(self) -> list[dict]:
         """Operator-only local export; no participant-facing HTTP endpoint."""
