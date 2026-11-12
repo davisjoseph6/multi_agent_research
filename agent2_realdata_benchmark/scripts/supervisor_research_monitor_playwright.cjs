@@ -45,6 +45,7 @@ async function main(){
 
     await page.locator("#concept").selectOption("C1");
     await page.waitForFunction(()=>
+      document.querySelector("#legend").children.length===1 &&
       document.querySelector("#legend").textContent.includes("C1"),null,
       {timeout:10000});
     const src=await page.locator("#legend").innerText();
