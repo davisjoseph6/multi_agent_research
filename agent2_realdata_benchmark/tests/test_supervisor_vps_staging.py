@@ -40,7 +40,7 @@ def stack(tmp_path):
 
 def complete_intake(intake,store,token,*,at=None):
     at=at or NOW()
-    intake.consent(token,checks=[True]*6,optional=False,language="en",at=at)
+    intake.consent(token,checks=[True]*5,optional=False,language="en",at=at)
     answers={
         q.question_id:(q.correct_answer if i<4 else next(
             k for k in "ABCD" if k!=q.correct_answer))
@@ -103,10 +103,10 @@ def test_registration_persistence_and_assessment_feedback_separation(tmp_path):
     store,intake,_,post=stack(tmp_path)
     token=intake.issue("test-f1@example.example",at=NOW(),allow_example=True)
     assert post("exchange",{"token":token}).status_code==200
-    assert len(post("consent-copy",{"language":"fr"}).json["required"])==6
-    assert post("consent",{"checks":[True]*5+[False],
+    assert len(post("consent-copy",{"language":"fr"}).json["required"])==5
+    assert post("consent",{"checks":[True]*4+[False],
                            "optional":False,"language":"fr"}).status_code==409
-    assert post("consent",{"checks":[True]*6,"optional":False,
+    assert post("consent",{"checks":[True]*5,"optional":False,
                            "language":"fr"}).status_code==200
     screening=post("screening").json
     assert len(screening["questions"])==8
@@ -191,7 +191,7 @@ def test_screening_exclusion_has_no_recruitment_pii(tmp_path):
     store,intake,_,post=stack(tmp_path)
     token=intake.issue("excluded@example.example",at=NOW(),allow_example=True)
     assert post("exchange",{"token":token}).status_code==200
-    assert post("consent",{"checks":[True]*6,"optional":False,
+    assert post("consent",{"checks":[True]*5,"optional":False,
                            "language":"en"}).status_code==200
     answers={q.question_id:q.correct_answer for q in store.bank.forms["screening"]}
     response=post("screen",{"answers":answers})
