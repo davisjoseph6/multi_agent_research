@@ -17,7 +17,7 @@ def setup(tmp_path):
                                    operational=True)
     intake=OperationalIntake(store,programs=("Test student program",))
     token=intake.issue("test-reminder@example.example",at=T,allow_example=True)
-    intake.consent(token,checks=[True]*6,optional=False,language="fr",at=T)
+    intake.consent(token,checks=[True]*5,optional=False,language="fr",at=T)
     answers={
         q.question_id:(q.correct_answer if i<4 else next(
             key for key in "ABCD" if key!=q.correct_answer))
