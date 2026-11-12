@@ -44,7 +44,14 @@ class SyntheticStudyError(ValueError):
 class SupervisorSyntheticStore:
     """Bank-pinned, synthetic-only participant state and append-only audit log."""
 
-    def __init__(self, folder: str | Path, *, bank: SupervisorBank):
+    def __init__(self, folder: str | Path, *, bank: SupervisorBank,
+                 operational: bool = False):
+        # Default is the original, strictly fictional, reference-harness
+        # behavior. The separately gated VPS service may opt into a
+        # real-contact-capable storage schema; no API is enabled by this flag.
+        if type(operational) is not bool:
+            raise SyntheticStudyError("explicit operational boolean required")
+        self.operational = operational
         self.folder = Path(folder)
         if not self.folder.is_dir() or self.folder.is_symlink():
             raise SyntheticStudyError("existing nonsymlink private directory required")
@@ -52,8 +59,9 @@ class SupervisorSyntheticStore:
             raise TypeError("supervisor bank is required")
         self.bank = bank
         validate_french_bank(bank)  # missing translation fails closed
-        self.research = self.folder / "supervisor_fictional_study.sqlite3"
-        self.contacts = self.folder / "supervisor_fictional_contacts.sqlite3"
+        prefix = "supervisor_operational" if self.operational else "supervisor_fictional"
+        self.research = self.folder / f"{prefix}_study.sqlite3"
+        self.contacts = self.folder / f"{prefix}_contacts.sqlite3"
         if self.research.is_symlink() or self.contacts.is_symlink():
             raise SyntheticStudyError("symlinked databases refused")
         with self._tx() as db:
@@ -267,11 +275,11 @@ class SupervisorSyntheticStore:
         finally:
             db.close()
 
-    @staticmethod
-    def _ref(ref: str):
-        if (not isinstance(ref, str) or
-                not re.fullmatch(r"SYN_SUPERVISOR_P\d{3,8}", ref)):
-            raise SyntheticStudyError("fictional learner reference required")
+    def _ref(self, ref: str):
+        prefix = "STUDY_P" if self.operational else "SYN_SUPERVISOR_P"
+        if (not isinstance(ref, str) or not re.fullmatch(
+                re.escape(prefix) + r"\d{3,8}", ref)):
+            raise SyntheticStudyError("learner reference is invalid")
 
     def _authenticated(self, db, ref: str, token: str):
         self._ref(ref)
@@ -373,7 +381,8 @@ class SupervisorSyntheticStore:
                  age: int | None, program: str, at: datetime,
                  consent_lang: str = "en",
                  open_data_consent: bool = False,
-                 consent_at: datetime | None = None) -> dict:
+                 consent_at: datetime | None = None,
+                 invitation_token: str | None = None) -> dict:
         """Eligible fictional candidates alone consume the A/B/C rotation."""
         if (consent_given is not True or not isinstance(consent_version, str)
                 or not consent_version.strip()):
@@ -385,11 +394,20 @@ class SupervisorSyntheticStore:
         if not eligible:
             return {"eligible": False, "screening_score": score,
                     "group_assigned": False, "synthetic_only": True}
-        if (not isinstance(contact_email, str)
-                or not re.fullmatch(
-                    r"[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.test",
-                    contact_email, flags=re.IGNORECASE)):
-            raise SyntheticStudyError("only invented .test email accounts permitted")
+        if not isinstance(contact_email, str) or not re.fullmatch(
+                r"[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}",
+                contact_email, flags=re.IGNORECASE,
+        ) or len(contact_email) > 254:
+            raise SyntheticStudyError("invalid contact email")
+        if self.operational:
+            if contact_email.lower().endswith(".test"):
+                raise SyntheticStudyError("operational intake cannot use test email")
+            if (not isinstance(invitation_token,str) or len(invitation_token)<40
+                    or len(invitation_token)>256 or not re.fullmatch(
+                        r"[A-Za-z0-9_-]+",invitation_token)):
+                raise SyntheticStudyError("verified invitation token required")
+        elif not contact_email.lower().endswith(".test") or invitation_token is not None:
+            raise SyntheticStudyError("only invented .test contacts in fictional mode")
         if age is not None and (
                 type(age) is not int or not 18 <= age <= 120):
             raise SyntheticStudyError("invalid fictional age")
@@ -403,7 +421,7 @@ class SupervisorSyntheticStore:
             raise SyntheticStudyError("academic program required")
         consent_clicked = iso(consent_at if consent_at is not None else at)
         now = iso(at)
-        token = secrets.token_urlsafe(40)
+        token = invitation_token if self.operational else secrets.token_urlsafe(40)
         with self._tx() as db:
             if db.execute(
                 "SELECT closed_at FROM collection_status WHERE one=1"
@@ -418,7 +436,8 @@ class SupervisorSyntheticStore:
                 )
             ordinal = (db.execute("SELECT COUNT(*) FROM participants").fetchone()[0]
                        + db.execute("SELECT COUNT(*) FROM deletion_log").fetchone()[0])
-            ref = f"SYN_SUPERVISOR_P{ordinal + 1:03d}"
+            prefix = "STUDY_P" if self.operational else "SYN_SUPERVISOR_P"
+            ref = f"{prefix}{ordinal + 1:03d}"
             group = GROUPS[ordinal % 3]
             db.execute(
                 """INSERT INTO participants(
@@ -842,7 +861,8 @@ class SupervisorSyntheticStore:
             row=db.execute(
                 "SELECT email FROM pii.contacts WHERE learner_id=?",(ref,)
             ).fetchone()
-            if row is None or not row["email"].lower().endswith(".test"):
+            if row is None or (not self.operational and
+                               not row["email"].lower().endswith(".test")):
                 raise SyntheticStudyError("only fictional contact confirmation allowed")
             recipient=row["email"]
             if delete:
