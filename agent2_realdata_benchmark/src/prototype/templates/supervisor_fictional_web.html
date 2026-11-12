@@ -64,10 +64,19 @@
 <section aria-labelledby="phase-title">
 <h2 id="phase-title">Current step</h2>
 <p id="question"></p>
+<div id="recovery-content" hidden>
+  <p class="warning" id="recovery-review-status">Fictional instructional draft — requires supervisor review.</p>
+  <h3 id="recovery-title"></h3>
+  <div id="recovery-paragraphs"></div>
+  <p id="hint-guidance" hidden></p>
+  <label for="hint-reflection" id="hint-label" hidden>Your reasoning (before seeing the answer choices)</label>
+  <textarea id="hint-reflection" rows="3" maxlength="500" hidden></textarea>
+</div>
 <fieldset id="options"><legend>Choose one answer</legend></fieldset>
 <div class="actions">
 <button type="button" id="answer" hidden>Submit</button>
 <button type="button" id="continue" hidden>Continue recovery</button>
+<button type="button" id="hint-next" hidden>Next Socratic hint</button>
 <button type="button" id="survey" hidden>Submit fatigue survey</button>
 <button type="button" id="advance" hidden>Advance 4 fictional days</button>
 </div>
