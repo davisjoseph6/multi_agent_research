@@ -87,9 +87,7 @@ def test_monitor_does_not_expose_data_without_independent_auth(tmp_path):
     assert client.post("/admin/api/participants",headers=auth(),
                        base_url=BASE).status_code==405
     assert client.get("/admin/api/mastery/not-valid",headers=auth(),
-                      base_url=BASE).status_code==400 or client.get(
-                      "/admin/api/mastery/not-valid",headers=auth(),
-                      base_url=BASE).status_code==500
+                      base_url=BASE).status_code==404
 
 
 def test_live_mastery_curve_and_participants_are_pseudonymous_and_read_only(tmp_path):
@@ -127,9 +125,10 @@ def test_monitor_rejects_other_database_and_never_attaches_contacts(tmp_path):
     with pytest.raises(ValueError,match="research-only"):
         make_monitor_app(study.parent / "missing.sqlite3",
                          admin_password_hash=password_hash(SECRET))
+    link=tmp_path/"study_link.sqlite3"
+    link.symlink_to(study)
     with pytest.raises(ValueError,match="research-only"):
-        make_monitor_app(study.with_name("fake").symlink_to(study),
-                         admin_password_hash=password_hash(SECRET))
+        make_monitor_app(link,admin_password_hash=password_hash(SECRET))
 
 
 def test_researcher_js_and_service_remain_off_public_caddy_route(tmp_path):
