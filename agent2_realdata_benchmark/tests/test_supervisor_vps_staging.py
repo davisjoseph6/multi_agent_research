@@ -249,9 +249,10 @@ def test_supervisor_staging_review_advances_only_fictional_waiting_visits(tmp_pa
         state = json.loads(row["state_json"])
         state["phase"] = "WAITING_NEXT_SESSION"
         state["session"] = 1
-        state["engine"] = SupervisorTraceEngine(
-            "A", dict.fromkeys(CONCEPT_IDS, .5)
-        ).snapshot()
+        engine = SupervisorTraceEngine("A", dict.fromkeys(CONCEPT_IDS, .5))
+        # Fabricate a completed test block, never bypass that invariant.
+        engine.question_in_session = 20
+        state["engine"] = engine.snapshot()
         db.execute("UPDATE learner_state SET step='WAITING_NEXT_SESSION',"
                    "step_index=0,state_json=? WHERE learner_id=?",
                    (json.dumps(state), ref))
