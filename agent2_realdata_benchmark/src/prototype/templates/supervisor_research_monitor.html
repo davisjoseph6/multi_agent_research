@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Research monitoring — BKT mastery</title>
+<link rel="stylesheet" href="/admin/app.css">
+<script defer src="/admin/app.js"></script>
+</head>
+<body>
+<main>
+<header>
+<h1>Research monitoring — estimated BKT mastery</h1>
+<p>Authorized researchers only · Read-only · Pseudonymous · Live polling every 5 seconds</p>
+<p id="notice" role="status" aria-live="polite"></p>
+</header>
+<section class="controls" aria-label="Dashboard selectors">
+<label for="student">Study participant</label>
+<select id="student"><option value="">Select a pseudonymous participant</option></select>
+<label for="concept">Concept</label>
+<select id="concept"><option value="all">All 8 concepts</option></select>
+<button id="refresh" type="button">Refresh now</button>
+</section>
+<section id="summary" aria-live="polite"><p>Select a participant to inspect estimated BKT progress.</p></section>
+<section>
+<h2>Mastery progression</h2>
+<p class="footnote">X = successive scored quiz/recovery responses across the three visits; Y = estimated BKT mastery probability, from 0 to 1. This is not a direct measure of knowledge.</p>
+<svg id="chart" role="img" aria-label="BKT mastery by question response" viewBox="0 0 940 390" preserveAspectRatio="xMidYMid meet"></svg>
+<div id="legend" aria-label="Concept line colors"></div>
+</section>
+<section>
+<h2>Accessible event history</h2>
+<div class="scroll">
+<table id="events"><thead><tr>
+<th scope="col">Response #</th><th scope="col">Session</th>
+<th scope="col">Event</th><th scope="col">Concept</th>
+<th scope="col">Time (UTC)</th><th scope="col">Mastery values C1–C8</th>
+</tr></thead><tbody></tbody></table>
+</div>
+</section>
+<footer>Research observer only. Do not intervene in an individual's randomized learning pathway based on these charts. The participant portal is entirely separate.</footer>
+</main>
+</body></html>
