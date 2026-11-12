@@ -154,8 +154,8 @@
    $("recovery-paragraphs").append(intro);
    $("hint-guidance").hidden=false;
    $("hint-guidance").textContent=
-     "Guiding question "+(hintIndex+1)+" of "+resource.prompts.length+
-     ": "+resource.prompts[hintIndex];
+     t("guiding_question",hintIndex+1,resource.prompts.length)+
+     resource.prompts[hintIndex];
    $("hint-label").hidden=false;
    $("hint-reflection").hidden=false;
    $("hint-reflection").value="";
@@ -229,6 +229,7 @@
      message("");
      const status=await call("status");
      if(!status.registered){
+       previousFeedback=null;renderPreviousFeedback();
        const stage=status.consent_stage||"information";
        if(stage==="excluded"){showSection("excluded-stage");}
        else if(stage==="screening"){
@@ -241,6 +242,7 @@
                      ? "consent-stage" : "information");
        }
      }else{
+       if(status.phase!=="QUIZ")previousFeedback=null;
        currentLanguage=status.study_language||"en";
        applyLanguage();
        $("footer-information").href="/content/consent/"+currentLanguage+"/info";
@@ -253,6 +255,7 @@
          showSection(new URLSearchParams(window.location.search).has("stop")
                      ? "withdraw-stage" : "registered-stage");
          showCurrent(await call("item"));
+         renderPreviousFeedback();
        }
      }
    }catch(e){message(e.message);buttons()}finally{working=false}
@@ -262,12 +265,39 @@
    try{
      message("");
      const outcome=await call(action,data);
+     if(action==="answer"){
+       previousFeedback=typeof outcome.previous_correct==="boolean"
+         ? outcome.previous_correct : null;
+     }else{
+       previousFeedback=null;
+     }
      if(action==="consent/register"&&outcome.message){
        $("registered-message").textContent=t("register_done");
      }
    }catch(e){message(e.message);working=false;return}
    working=false;await refresh();
  }
+ $("study-lang").addEventListener("change",async()=>{
+   const chosen=$("study-lang").value;
+   if(chosen!=="en"&&chosen!=="fr")return;
+   try{
+     const status=await call("status");
+     if(status.registered){
+       await call("language",{language:chosen});
+       currentLanguage=chosen;
+       applyLanguage();
+       await refresh();
+     }else if((status.consent_stage||"information")==="information"){
+       $("info-lang").value=chosen;
+       await renderInformation();
+     }else{
+       $("study-lang").value=currentLanguage;
+       message(currentLanguage==="fr"
+         ? "Pour changer la langue de consentement, recommencez avec une nouvelle simulation."
+         : "Complete registration before switching the quiz language.");
+     }
+   }catch(e){message(e.message);$("study-lang").value=currentLanguage}
+ });
  $("continue-info").addEventListener("click",()=>showSection("consent-stage"));
  $("info-lang").addEventListener("change",async()=>{
    try{await renderInformation()}catch(e){message(e.message)}
@@ -376,7 +406,9 @@
    working=true;
    try{
      message("");
+     const desired=currentLanguage;
      const outcome=await call("demo/prime-recovery");
+     if(desired==="fr")await call("language",{language:"fr"});
      if(!outcome.prepared||outcome.next_action!=="CONCEPT_SUMMARY")
        throw new Error("Recovery preparation did not complete");
      $("registered-message").textContent=
