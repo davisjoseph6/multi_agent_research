@@ -144,6 +144,9 @@ def main():
         parser.error("--send is disabled for all staging deployments")
     if args.output is None:
         parser.error("--output is required for an invitation")
+    if (not args.output.is_absolute() or args.output.exists()
+            or args.output.is_symlink() or not args.output.parent.is_dir()):
+        parser.error("a new absolute private invitation output file is required")
     host=os.environ["SUPERVISOR_VPS_HOST"]
     if not host or "/" in host or ":" in host:
         parser.error("canonical host is required")
