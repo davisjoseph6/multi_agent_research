@@ -17,4 +17,8 @@ def test_wrapper_never_leaves_study_stopped_on_backup_error():
     assert '--verify --key-file "$KEY"' in text
     assert '--encrypted-file "$DEST"' in text
     assert 'flock -n 9' in text
+    assert 'PY=/srv/ijcai-supervisor-backup/venv/bin/python' in text
+    assert 'PY=/srv/ijcai-supervisor-staging/venv/bin/python' not in text
+    assert 'from cryptography.hazmat.primitives.ciphers.aead import AESGCM' in text
+    assert 'Service account cannot read the protected backup key' in text
     assert 'NOT VERIFIED: offsite storage' in text
