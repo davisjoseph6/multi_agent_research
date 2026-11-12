@@ -67,10 +67,18 @@ def make_wsgi_app():
     commit=os.environ.get("SUPERVISOR_VPS_COMMIT","")
     if not commit or len(commit)!=40:
         raise RuntimeError("full deployed commit SHA must be pinned")
-    local=subprocess.run(
-        ["git","rev-parse","HEAD"],cwd=ROOT.parent,
-        capture_output=True,text=True,timeout=5,check=True,
-    ).stdout.strip()
+    if mode=="live":
+        local=subprocess.run(
+            ["git","rev-parse","HEAD"],cwd=ROOT.parent,
+            capture_output=True,text=True,timeout=5,check=True,
+        ).stdout.strip()
+    else:
+        # A reviewed staging archive can be deployed without its .git tree.
+        # Live remains restricted to an exact signed Git commit checkout.
+        revision=ROOT.parent/".supervisor-source-revision"
+        if not revision.is_file() or revision.is_symlink():
+            raise RuntimeError("staging artifact revision must be pinned")
+        local=revision.read_text(encoding="utf-8").strip()
     if local!=commit:
         raise RuntimeError("deployed source does not match pinned commit")
     programs=tuple(v.strip() for v in os.environ.get(
