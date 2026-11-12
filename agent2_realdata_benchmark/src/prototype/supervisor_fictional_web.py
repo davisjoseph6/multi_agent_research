@@ -435,7 +435,12 @@ def make_supervisor_fictional_app(
 
     @app.post("/supervisor/api/answer")
     def answer():
-        v=payload({"fixture","question_id","choice","request_id"})
+        expected={"fixture","question_id","choice","request_id"}
+        raw=request.get_json(silent=True)
+        if type(raw) is dict and "reflection" in raw:
+            v=payload(expected | {"reflection"})
+        else:
+            v=payload(expected)
         with runtime.lock:
             fixture=v["fixture"]
             ref,token=runtime.verified(fixture)
@@ -455,6 +460,8 @@ def make_supervisor_fictional_app(
                 raise SyntheticStudyError("request ID required")
             at=runtime.clock()
             if state["phase"] in ("PRETEST","POSTTEST"):
+                if "reflection" in v:
+                    raise SyntheticStudyError("assessment responses contain no recovery reflections")
                 if v["question_id"]!=current["question_id"]:
                     raise SyntheticStudyError("wrong assessment question")
                 result=runtime.store.answer_assessment(
@@ -469,6 +476,7 @@ def make_supervisor_fictional_app(
                     ref,token,request_id=v["request_id"],
                     item_id=v["question_id"],choice=v["choice"],
                     shown_at=prior[1],answered_at=at,
+                    free_text=v.get("reflection"),
                 )
             runtime.pending.pop(fixture,None)
             return jsonify(result)
