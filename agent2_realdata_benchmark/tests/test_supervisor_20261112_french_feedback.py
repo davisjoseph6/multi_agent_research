@@ -248,3 +248,122 @@ def test_static_bilingual_ui_and_feedback_contract(tmp_path):
     assert "La réponse précédente était incorrecte" in copy
     assert "renderPreviousFeedback" in code
     assert 'call("language",{language:chosen})' in code
+
+
+def test_each_arm_retains_the_last_quiz_feedback_when_entering_survey(tmp_path):
+    """All 20 graded quiz answers, including the last, return correctness."""
+    runtime,_,post=harness(tmp_path)
+    for fixture in ("F1","F2","F3"):
+        fake_enroll(runtime,fixture)
+        finish_pretest(runtime,fixture)
+    for fixture in ("F1","F2","F3"):
+        ref,token=runtime.roster[fixture]
+        final_response=None
+        for number in range(20):
+            current=runtime.store.next_item(ref,token)
+            assert current["kind"]=="question" and current["action"]=="QUESTION"
+            correct=runtime.store.bank.get(
+                current["question_id"],form="practice"
+            ).correct_answer
+            instant=runtime.clock()
+            final_response=runtime.store.answer_quiz(
+                ref,token,request_id=f"final_{fixture}_{number:02d}",
+                item_id=current["question_id"],choice=correct,
+                shown_at=instant,answered_at=instant+timedelta(milliseconds=2),
+            )
+            assert final_response["previous_correct"] is True
+        assert runtime.store.progress(ref,token)["phase"]=="SURVEY"
+        assert final_response["feedback_phase"]=="QUIZ"
+        # The browser must retain the final result while showing the survey.
+
+
+def test_events_pin_each_display_language_after_mid_session_switch(tmp_path):
+    runtime,_,post=harness(tmp_path)
+    fake_enroll(runtime,"F1")
+    finish_pretest(runtime,"F1")
+    ref,token=runtime.roster["F1"]
+    assert post("language",{"language":"fr"}).status_code==200
+    current=post("item").json
+    assert current["language"]=="fr"
+    correct=runtime.store.bank.get(current["question_id"],form="practice").correct_answer
+    result=post("answer",{
+        "question_id":current["question_id"],"choice":correct,
+        "request_id":"lang_event_fr_001",
+    })
+    assert result.status_code==200,result.json
+
+    assert post("language",{"language":"en"}).status_code==200
+    next_question=post("item").json
+    assert next_question["language"]=="en"
+    correct=runtime.store.bank.get(
+        next_question["question_id"],form="practice"
+    ).correct_answer
+    result=post("answer",{
+        "question_id":next_question["question_id"],"choice":correct,
+        "request_id":"lang_event_en_001",
+    })
+    assert result.status_code==200,result.json
+
+    with runtime.store._tx() as db:
+        events=db.execute(
+            "SELECT request_id,display_language FROM events "
+            "WHERE request_id IN ('lang_event_fr_001','lang_event_en_001')"
+            " ORDER BY event_id",
+        ).fetchall()
+        participant=db.execute(
+            "SELECT consent_lang,study_language FROM participants "
+            "WHERE learner_id=?",(ref,)
+        ).fetchone()
+    assert [(e["request_id"],e["display_language"]) for e in events]==[
+        ("lang_event_fr_001","fr"),("lang_event_en_001","en")
+    ]
+    assert participant["study_language"]=="en"  # mutable, not event history
+
+
+def test_french_recovery_event_content_id_matches_displayed_version(tmp_path):
+    runtime,_,post=harness(tmp_path)
+    assert post("demo/prime-recovery").status_code==200
+    assert post("language",{"language":"fr"}).status_code==200
+    text=post("item").json
+    assert text["action"]=="CONCEPT_SUMMARY"
+    assert text["resource"]["content_id"].endswith("_fr")
+    assert post("answer",{
+        "question_id":None,"choice":None,
+        "request_id":"french_content_version_01",
+    }).status_code==200
+    with runtime.store._tx() as db:
+        row=db.execute(
+            "SELECT content_id,display_language FROM events "
+            "WHERE request_id='french_content_version_01'"
+        ).fetchone()
+    assert row["content_id"]==text["resource"]["content_id"]
+    assert row["display_language"]=="fr"
+
+
+def test_legacy_fictional_database_migrates_without_fabricating_event_locale(tmp_path):
+    """An older SQLite data layout must still be readable by admin tools."""
+    import sqlite3
+    from src.prototype.supervisor_synthetic_store import SupervisorSyntheticStore
+    runtime,_,_=harness(tmp_path)
+    fake_enroll(runtime,"F1")
+    finish_pretest(runtime,"F1")
+    db=sqlite3.connect(runtime.store.research)
+    db.execute("ALTER TABLE participants DROP COLUMN study_language")
+    db.execute("ALTER TABLE events DROP COLUMN display_language")
+    db.commit()
+    db.close()
+
+    restored=SupervisorSyntheticStore(tmp_path,bank=SupervisorBank(DATA))
+    with restored._tx() as db:
+        participant_columns={r["name"] for r in db.execute(
+            "PRAGMA table_info(participants)"
+        )}
+        event_columns={r["name"] for r in db.execute("PRAGMA table_info(events)")}
+        old_languages=db.execute(
+            "SELECT DISTINCT display_language FROM events"
+        ).fetchall()
+    assert "study_language" in participant_columns
+    assert "display_language" in event_columns
+    assert old_languages and all(r["display_language"] is None for r in old_languages)
+    ref,token=runtime.roster["F1"]
+    assert restored.progress(ref,token)["study_language"]=="en"
