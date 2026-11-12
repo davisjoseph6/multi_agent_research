@@ -150,6 +150,7 @@
           data.resource.paragraphs.length<2)
          throw new Error("Required teaching text is missing");
        $("question").textContent=data.action.replaceAll("_"," ");
+       $("options").hidden=true;
        $("recovery-content").hidden=false;
        $("recovery-title").textContent=data.resource.title;
        for(const paragraph of data.resource.paragraphs){
