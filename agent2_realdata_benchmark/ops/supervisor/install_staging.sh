@@ -44,6 +44,29 @@ else
     chmod -R go-w "$RELEASE"
 fi
 
+# cp -a "$SOURCE/." "$RELEASE/" preserves the source directory's mode on
+# the destination itself. The SSH upload is deliberately 0700, but the
+# dedicated service user needs to traverse this public-code release folder.
+# Repair this mode even on re-runs after a previous failed deployment.
+# Never relax permissions on the private databases or /etc environment file.
+chmod 0755 "$RELEASE"
+
+command -v runuser >/dev/null || { echo "runuser required for service-user preflight"; exit 2; }
+for executable_dir in "$PREFIX" "$PREFIX/releases" "$RELEASE" \
+    "$RELEASE/agent2_realdata_benchmark" \
+    "$RELEASE/agent2_realdata_benchmark/scripts"; do
+    if ! runuser -u ijcai-supervisor -- test -x "$executable_dir"; then
+        echo "Service user cannot enter directory: $executable_dir" >&2
+        ls -ld "$executable_dir" >&2 || true
+        exit 2
+    fi
+done
+if ! runuser -u ijcai-supervisor -- \
+    test -r "$RELEASE/agent2_realdata_benchmark/scripts/supervisor_vps_wsgi.py"; then
+    echo "Service user cannot read the WSGI entrypoint" >&2
+    exit 2
+fi
+
 python3 -m venv "${PREFIX}/venv"
 "${PREFIX}/venv/bin/python" -m pip install --disable-pip-version-check \
     Flask==3.1.3 gunicorn==23.0.0
@@ -88,7 +111,10 @@ LockPersonality=true
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl enable --now "${SERVICE}"
+systemctl enable "${SERVICE}"
+# enable --now need not restart an existing unit after an upgrade.
+# Explicit restart also recovers a previously failed 200/CHDIR unit.
+systemctl restart "${SERVICE}"
 sleep 2
 systemctl is-active --quiet "${SERVICE}" || {
     journalctl -u "${SERVICE}" -n 35 --no-pager; exit 2;
