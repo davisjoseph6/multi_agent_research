@@ -280,8 +280,39 @@
    $("hint-next").textContent=hintIndex===1?t("reveal"):t("hintNext");
    visibility("hint-next");
  }
+ function showSurveyQuestion(){
+   const item=t("fatigueQuestions")[surveyStep];
+   const panel=$("surveys");panel.replaceChildren();panel.hidden=false;
+   const heading=document.createElement("h3");
+   heading.textContent=t("fatigueCount",surveyStep+1);
+   const question=document.createElement("p");question.textContent=item[0];
+   const control=document.createElement("div");control.className="scale";
+   const low=document.createElement("span"),high=document.createElement("span");
+   low.textContent="1 — "+item[1];high.textContent="7 — "+item[2];
+   const input=document.createElement("input");
+   input.type="range";input.min="1";input.max="7";input.step="1";
+   input.value=String(surveyValues[surveyStep]);
+   input.id="fatigue-"+surveyStep;
+   input.setAttribute("aria-label",item[0]);
+   const output=document.createElement("output");
+   output.htmlFor=input.id;
+   output.textContent=String(surveyValues[surveyStep]);
+   input.addEventListener("input",()=>{
+     surveyValues[surveyStep]=Number(input.value);
+     output.textContent=input.value;
+   });
+   control.append(low,input,high,output);
+   panel.append(heading,question,control);
+   $("progress").textContent=t("fatigueCount",surveyStep+1);
+   $("phase-meter").hidden=false;$("phase-meter").max=6;
+   $("phase-meter").value=surveyStep+1;
+   $("phase-intro").textContent=t("surveyIntro");
+   visibility(surveyStep===5?"submit-survey":"fatigue-next");
+ }
  function renderItem(data){
    current=data;hintIndex=0;reflections=[];
+   $("answer-feedback").hidden=true;
+   $("session-summary").hidden=true;
    $("question").textContent="";
    $("teaching").hidden=true;$("reflection").hidden=true;
    $("choices").hidden=true;$("surveys").hidden=true;
@@ -314,25 +345,91 @@
        visibility("continue");
      }else throw Error("Unknown recovery stage");
    }else if(data.kind==="survey"){
-     $("question").textContent=t("fatigue");
-     $("surveys").replaceChildren();$("surveys").hidden=false;
-     for(let i=0;i<6;i++){
-       const label=document.createElement("label");
-       label.textContent=t("surveyItem",i+1);
-       const input=document.createElement("select");input.id="fatigue-"+i;
-       for(let k=1;k<=7;k++){
-         const opt=document.createElement("option");
-         opt.value=String(k);opt.textContent=String(k);input.append(opt);
-       }
-       label.append(input);$("surveys").append(label);
+     if(!surveySeen){
+       surveySeen=true;surveyStep=0;surveyValues=Array(6).fill(4);
      }
-     visibility("submit-survey");
+     showSurveyQuestion();
    }else if(data.kind==="waiting_next_session"){
      $("question").textContent=t("waiting",data.scheduled_for);
      visibility($("mode-warning").hidden?"next-session":"staging-next-session");
    }else if(data.kind==="done"){
      $("question").textContent=t("completed");
    }else throw Error("Unexpected stage "+data.kind);
+ }
+ function showProgress(status,data){
+   if(data.kind==="survey")return;
+   const meter=$("phase-meter"),tip=$("phase-intro");
+   meter.hidden=false;
+   if(status.phase==="PRETEST" || status.phase==="POSTTEST" ||
+      status.phase==="QUIZ"){
+     const total=status.phase==="QUIZ"?(status.session===3?15:20):16;
+     meter.max=total;
+     meter.value=Math.min(total,status.index+1);
+     if(data.kind==="recovery"){
+       // Recovery happens BETWEEN ordinary quiz questions, not as a new Q.
+       $("progress").textContent=lang==="fr"?
+         "Séance "+status.session+"/3 — aide pédagogique (sans numéro)":
+         "Session "+status.session+"/3 — learning support (unnumbered)";
+       meter.hidden=true;
+     }else{
+       $("progress").textContent=lang==="fr"?
+         "Séance "+status.session+"/3 — question "+(status.index+1)+" sur "+total:
+         "Session "+status.session+"/3 — Question "+(status.index+1)+" of "+total;
+     }
+     tip.textContent=t(status.phase==="PRETEST"?"preIntro":
+                       status.phase==="POSTTEST"?"postIntro":"quizIntro");
+   }else{
+     meter.hidden=true;
+     $("progress").textContent=lang==="fr"?
+       "Séance "+status.session+"/3 terminée":
+       "Session "+status.session+"/3 completed";
+     tip.textContent=lang==="fr"?
+       "Le questionnaire est terminé. Résultats du quiz ci-dessous.":
+       "The questionnaire is complete. Quiz results appear below.";
+   }
+ }
+ function showAnswerFeedback(resp,chosen){
+   if(!["A","B","C","D"].includes(resp.correct_choice))
+     throw Error("Server did not return authorized post-answer feedback");
+   const panel=$("answer-feedback");panel.hidden=false;
+   panel.className="feedback "+(resp.previous_correct?"correct":"incorrect");
+   $("feedback-title").textContent=resp.previous_correct?
+     (lang==="fr"?"Bonne réponse":"Correct"):
+     (lang==="fr"?"Réponse incorrecte":"Incorrect");
+   const answerText=current.options[resp.correct_choice];
+   $("feedback-answer").textContent=t("correctAnswer")+": "+
+     resp.correct_choice+". "+(answerText||"");
+   $("feedback-explanation").textContent=t(resp.explanation_language===lang?
+     "why":"explanationEnglish")+": "+(resp.explanation||"");
+   for(const label of $("choices").querySelectorAll("label")){
+     const input=label.querySelector("input");
+     if(!input)continue;
+     input.disabled=true;
+     if(input.value===resp.correct_choice)label.classList.add("correct-option");
+     else if(input.value===chosen&&!resp.previous_correct)
+       label.classList.add("incorrect-option");
+   }
+   $("previous-result").hidden=true;
+   visibility("feedback-next");
+   panel.scrollIntoView({behavior:"smooth",block:"nearest"});
+ }
+ async function showCompletedSummary(id){
+   const node=$(id);node.replaceChildren();
+   const results=await api("session-summary");
+   if(!results.sessions?.length){node.hidden=true;return}
+   node.hidden=false;
+   for(const row of results.sessions){
+     const section=document.createElement("section");
+     const h=document.createElement("h3");h.textContent=t("sessionSummary",row.session);
+     const score=document.createElement("p");
+     score.textContent=t("correctCount",row.quiz_correct,row.quiz_questions)+
+       " ("+row.quiz_percentage+"%)";
+     const answered=document.createElement("p");
+     answered.textContent=t("timeAnswer",row.question_answer_seconds);
+     const elapsed=document.createElement("p");
+     elapsed.textContent=t("timeElapsed",row.elapsed_seconds);
+     section.append(h,score,answered,elapsed);node.append(section);
+   }
  }
  async function refresh(){
    if(busy)return;
