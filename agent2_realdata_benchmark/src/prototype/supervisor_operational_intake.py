@@ -15,7 +15,7 @@ from hashlib import sha256
 import re
 import secrets
 
-from .supervisor_consent_texts import CONSENT_VERSION
+from .supervisor_consent_texts import CONSENT_VERSION, required_for_recipient
 from .supervisor_synthetic_store import (
     SupervisorSyntheticStore, SyntheticStudyError, dump, iso,
 )
@@ -161,23 +161,43 @@ class OperationalIntake:
                             ).fetchone()[0])
             return dict(stage=state,language=row["consent_lang"] or "en")
 
+    def consent_requirements(self, token: str, *, language: str,
+                             at: datetime) -> dict:
+        with self.store._tx() as db:
+            row=self._record(db,token,at=at)
+            statements, optional, version, eligible = required_for_recipient(
+                language, row["email"]
+            )
+            return dict(required=list(statements), optional=optional,
+                        version=version, ai_points_eligible=eligible,
+                        no_email_exposed=True)
+
+    def reward_eligible(self, token: str, *, at: datetime) -> bool:
+        with self.store._tx() as db:
+            row=self._record(db,token,at=at)
+            return required_for_recipient("en",row["email"])[3]
+
     def consent(self, token: str, *, checks: list[bool], optional: bool,
                 language: str, at: datetime) -> dict:
-        if (type(checks) is not list or len(checks)!=6
-                or any(type(x) is not bool for x in checks)
+        if (type(checks) is not list or any(type(x) is not bool for x in checks)
                 or not all(checks) or type(optional) is not bool
                 or language not in ("en","fr")):
-            raise SyntheticStudyError("six required declarations and optional choice")
+            raise SyntheticStudyError("all required declarations and optional choice")
         with self.store._tx() as db:
             row=self._record(db,token,at=at)
             if row["state"] != "invited":
                 raise SyntheticStudyError("consent is not the next stage")
+            statements, _, version, _ = required_for_recipient(
+                language,row["email"]
+            )
+            if len(checks)!=len(statements):
+                raise SyntheticStudyError("required declaration count mismatch")
             db.execute(
                 "UPDATE pii.invitations SET state='consented',consent_lang=?,"
                 "consent_at=?,optional=? WHERE token_hash=?",
                 (language,iso(at),int(optional),self.digest(token)),
             )
-        return dict(stage="screening",consent_version=CONSENT_VERSION)
+        return dict(stage="screening",consent_version=version)
 
     def screening(self, token: str, *, answers: dict[str,str],
                   at: datetime) -> dict:
@@ -229,10 +249,11 @@ class OperationalIntake:
                        optional=bool(row["optional"]),
                        consent_at=datetime.fromisoformat(row["consent_at"]),
                        answers=__import__("json").loads(row["answers_json"]))
+        version=required_for_recipient(saved["language"],saved["email"])[2]
         result=self.store.register(
             contact_email=saved["email"],econ_course=False,
             screening_answers=saved["answers"],
-            consent_version=CONSENT_VERSION,consent_given=True,
+            consent_version=version,consent_given=True,
             age=age,program=program,at=at,
             consent_lang=saved["language"],
             open_data_consent=saved["optional"],
