@@ -76,7 +76,13 @@ def verify_signed_content_approval(root: Path, index: Path, signature: Path,
         if (not f.is_file() or f.is_symlink()
             or not isinstance(digest,str) or not SHA.fullmatch(digest)):
             raise ValueError("missing or malformed approved instructional file")
-        h=sha256(f.read_bytes()).hexdigest()
+        content=f.read_bytes()
+        if relative.endswith(".html"):
+            # A signed index must never certify an Annex that still tells
+            # prospective participants [email], [date], [host], etc.
+            if re.search(r"\\[[^\\[\\]\\r\\n]{2,100}\\]", content.decode("utf-8")):
+                raise ValueError("approved information sheet contains unfilled placeholders")
+        h=sha256(content).hexdigest()
         if not compare_digest(h,digest):
             raise ValueError("deployed content differs from signed approval")
     return {
