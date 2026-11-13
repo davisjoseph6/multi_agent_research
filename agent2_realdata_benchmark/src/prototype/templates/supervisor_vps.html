@@ -17,7 +17,7 @@
   </div>
   <h1 id="site-title">Adaptive Learning Study</h1>
   <p id="mode-warning" class="warning" role="status" {% if release_mode == 'live' %}hidden{% endif %}>TEST DEPLOYMENT — do not enter real participant information or use this link to recruit.</p>
-  <p id="study-roadmap" class="study-note">Each session has four parts: pre-test, learning quiz, post-test and fatigue questionnaire. Eligibility screening takes place before registration.</p>
+  <p id="study-roadmap" class="study-note">Four study activities: pre-test (session 1), learning quiz (sessions 1–3), post-test (session 3), and fatigue questionnaire (sessions 1–3). Eligibility screening comes before registration.</p>
   <p id="ai-rule" class="study-rule">Please answer independently. Do not use generative AI tools to solve the questions.</p>
   <label for="language">Language / Langue</label>
   <select id="language" aria-label="Language"><option value="en">English</option><option value="fr">Français</option></select>
@@ -65,7 +65,7 @@
 
 <section id="learning" hidden>
   <h2 id="phase">Current activity</h2>
-  <ol id="session-parts" class="session-parts" aria-label="Four parts of each session" hidden>
+  <ol id="session-parts" class="session-parts" aria-label="Four study activities across three sessions" hidden>
     <li class="upcoming">1. Pre-test</li>
     <li class="upcoming">2. Learning quiz</li>
     <li class="upcoming">3. Post-test</li>
