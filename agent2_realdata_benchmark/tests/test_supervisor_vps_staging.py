@@ -562,3 +562,54 @@ def test_existing_rendered_question_survives_forward_only_resume_migration(tmp_p
         assert row["render_id"]==item["render_id"]
         assert row["resumed_after_idle"]==0
     assert post("item").json["render_id"]==item["render_id"]
+
+
+def test_live_seven_day_inactivity_revokes_an_unfinished_token_but_keeps_study_data(tmp_path):
+    """STAGING is unchanged; explicitly instantiated LIVE policy is tested offline."""
+    from src.prototype.supervisor_operational_intake import OperationalIntake
+    from src.prototype.supervisor_synthetic_store import iso
+    store,intake,_,_=stack(tmp_path)
+    token=intake.issue("seven-day-test@example.example",at=NOW(),
+                       allow_example=True)
+    complete_intake(intake,store,token)
+    ref=intake.learner(token,at=NOW())
+    with store._tx() as db:
+        db.execute("UPDATE learner_state SET updated_at=? WHERE learner_id=?",
+                   (iso(NOW()-timedelta(days=8)),ref))
+        before=db.execute("SELECT COUNT(*) FROM events "
+                          "WHERE learner_id=?",(ref,)).fetchone()[0]
+        assert before>=8
+    strict=OperationalIntake(store,programs=intake.programs,inactivity_days=7)
+    with pytest.raises(SyntheticStudyError,match="expired after seven days"):
+        strict.learner(token,at=NOW())
+    with store._tx() as db:
+        status=db.execute("SELECT status FROM participants WHERE learner_id=?",
+                          (ref,)).fetchone()[0]
+        assert status=="expired"
+        assert db.execute("SELECT COUNT(*) FROM pii.invitations WHERE learner_id=?",
+                          (ref,)).fetchone()[0]==0
+        assert db.execute("SELECT COUNT(*) FROM events WHERE learner_id=?",
+                          (ref,)).fetchone()[0]==before
+        assert db.execute("SELECT COUNT(*) FROM pii.contacts WHERE learner_id=?",
+                          (ref,)).fetchone()[0]==1
+    with pytest.raises(SyntheticStudyError):
+        intake.learner(token,at=NOW())
+
+
+def test_seven_day_inactivity_exempts_scheduled_3_to_5_day_visit_break(tmp_path):
+    from src.prototype.supervisor_operational_intake import OperationalIntake
+    from src.prototype.supervisor_synthetic_store import iso
+    store,intake,_,_=stack(tmp_path)
+    token=intake.issue("waiting-eight-days@example.example",
+                       at=NOW(),allow_example=True)
+    complete_intake(intake,store,token)
+    ref=intake.learner(token,at=NOW())
+    with store._tx() as db:
+        db.execute("UPDATE learner_state SET step='WAITING_NEXT_SESSION',"
+                   "updated_at=? WHERE learner_id=?",
+                   (iso(NOW()-timedelta(days=8)),ref))
+    strict=OperationalIntake(store,programs=intake.programs,inactivity_days=7)
+    assert strict.learner(token,at=NOW())==ref
+    with store._tx() as db:
+        assert db.execute("SELECT status FROM participants WHERE learner_id=?",
+                          (ref,)).fetchone()[0]=="active"
