@@ -117,7 +117,7 @@ async function run(){
       assert.equal(await page.locator("#previous-result").isHidden(),true);
       for(let i=0;i<20;i++)await submitCorrect("question");
       assert.equal(item.kind,"survey");
-      await page.locator("#submit-survey").waitFor({state:"visible"});
+      await page.locator("#fatigue-0").waitFor({state:"visible"});
       assert.equal(await page.locator("#previous-result").isHidden(),true);
       assert.match(await page.locator("#phase-intro").innerText(),/Quiz|quiz/);
       for(let i=0;i<5;i++){
@@ -127,6 +127,7 @@ async function run(){
         await page.locator("#fatigue-next").click();
       }
       assert.equal(await page.locator("#fatigue-5").count(),1);
+      await page.locator("#submit-survey").waitFor({state:"visible"});
       nextItem=page.waitForResponse(respond("item"));
       await page.locator("#submit-survey").click();
       item=await (await nextItem).json();
