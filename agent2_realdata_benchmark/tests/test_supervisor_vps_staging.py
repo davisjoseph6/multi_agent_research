@@ -293,3 +293,62 @@ def test_live_api_does_not_register_staging_review_route(tmp_path):
                          base_url=BASE,
                          headers={"Origin": BASE, "X-Study-Request": "1"})
     assert denied.status_code == 404
+
+
+def test_post_answer_quiz_feedback_and_preserved_display_time(tmp_path):
+    """Correct answer is unavailable before submission or during pretest."""
+    store,intake,_,post=stack(tmp_path)
+    token=intake.issue("screen-safe@example.example",at=NOW(),allow_example=True)
+    complete_intake(intake,store,token)
+    assert post("exchange",{"token":token}).status_code==200
+
+    first=post("item").json
+    again=post("item").json
+    assert first["render_id"]==again["render_id"], "refresh reset response timer"
+    assert "correct_choice" not in first
+    assert "explanation" not in first
+    assert post("session-summary").json["sessions"]==[]
+
+    for index in range(16):
+        q=post("item").json
+        assert q["kind"]=="question" and q["phase"]=="PRETEST"
+        answer=store.bank.get(q["question_id"],form="pretest").correct_answer
+        result=post("answer",dict(
+            render_id=q["render_id"],request_id=f"pre_item_{index:03d}",
+            question_id=q["question_id"],choice=answer,reflection=None,
+        ))
+        assert result.status_code==200,result.json
+        assert "previous_correct" not in result.json
+        assert "correct_choice" not in result.json
+        assert "explanation" not in result.json
+
+    quiz=post("item").json
+    assert quiz["action"]=="QUESTION"
+    assert "correct_choice" not in quiz and "explanation" not in quiz
+    key=store.bank.get(quiz["question_id"],form="practice").correct_answer
+    result=post("answer",dict(
+        render_id=quiz["render_id"],request_id="review_quiz_001",
+        question_id=quiz["question_id"],choice=key,reflection=None,
+    ))
+    assert result.status_code==200,result.json
+    assert result.json["feedback_phase"]=="QUIZ"
+    assert result.json["previous_correct"] is True
+    assert result.json["correct_choice"]==key
+    assert result.json["explanation"]==store.bank.get(
+        quiz["question_id"],form="practice"
+    ).explanation
+    assert result.json["explanation_language"]=="en"
+    assert post("session-summary").json["sessions"]==[]
+    # The same item can never be graded twice by replay.
+    assert post("answer",dict(
+        render_id=quiz["render_id"],request_id="review_quiz_001",
+        question_id=quiz["question_id"],choice=key,reflection=None,
+    )).status_code==409
+
+
+def test_staging_logo_falls_back_when_png_not_committed(tmp_path):
+    _,_,client,_=stack(tmp_path)
+    response=client.get("/study/logo.png",base_url=BASE)
+    assert response.status_code in (200,404)
+    if response.status_code==200:
+        assert response.mimetype=="image/png"
