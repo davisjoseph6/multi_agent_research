@@ -319,6 +319,7 @@ def test_three_four_seven_day_idle_policy_and_session_waiting():
     assert check(3)["reason"]=="automatic_three_day_encouragement"
     assert check(3,automatic_enabled=False)["send"] is False
     assert check(4,automatic_enabled=False,manual_requested=True)["send"]
+    assert check(3.5,manual_requested=True,automatic_enabled=True)["send"] is False
     assert not check(4,manual_requested=True,
                      last_reminder=T+timedelta(days=3.5))["send"]
     assert not check(5,last_reminder=T+timedelta(days=3))["send"]
