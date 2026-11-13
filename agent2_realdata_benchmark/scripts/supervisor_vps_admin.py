@@ -103,7 +103,14 @@ def main():
                         help="absolute, new mode-0600 file containing secret link")
     parser.add_argument("--send",action="store_true",
                         help="LIVE only, deliver invitation via verified SMTP")
+    parser.add_argument("--validity-days",type=int,default=21,
+                        help="Initial registration window only: 1..30 days. "
+                             "Registered participants retain their link.")
     args=parser.parse_args()
+    if not 1<=args.validity_days<=30:
+        parser.error("--validity-days must be 1..30")
+    if args.validity_days!=21 and not args.issue:
+        parser.error("--validity-days is only valid with --issue")
     intake,mode=load()
     if args.counts:
         with intake.store._tx() as db:
@@ -183,6 +190,7 @@ def main():
     if not host or "/" in host or ":" in host:
         parser.error("canonical host is required")
     token=intake.issue(args.issue,at=datetime.now(timezone.utc),
+                       validity_days=args.validity_days,
                        allow_example=(mode=="staging"))
     link=f"https://{host}/study/#invite={token}"
     write_private(args.output,link)
