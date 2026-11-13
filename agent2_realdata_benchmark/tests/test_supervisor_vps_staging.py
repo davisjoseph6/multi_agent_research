@@ -536,3 +536,29 @@ def test_short_refresh_keeps_first_exposure_timestamp_and_no_pause_tag(tmp_path)
                      "WHERE request_id='test_short_refresh_answer'").fetchone()
         assert 35000<e["response_time_ms"]<60000
         assert "TIMING_RESTART_AFTER_24H_IDLE" not in (e["rule_tags"] or "")
+
+
+def test_existing_rendered_question_survives_forward_only_resume_migration(tmp_path):
+    store,intake,_,post=stack(tmp_path)
+    token=intake.issue("legacy-render@example.example",at=NOW(),allow_example=True)
+    complete_intake(intake,store,token)
+    assert post("exchange",{"token":token}).status_code==200
+    item=post("item").json
+    # Simulate a pre-upgrade 2026-11-13 staging database without the new field.
+    # Only a disposable synthetic fixture is altered; no real VPS data.
+    with store._tx() as db:
+        db.execute("ALTER TABLE operational_rendered "
+                   "DROP COLUMN resumed_after_idle")
+        prior=db.execute(
+            "SELECT render_id FROM operational_rendered",
+        ).fetchone()[0]
+    assert prior==item["render_id"]
+    upgraded=SupervisorSyntheticStore(
+        tmp_path,bank=SupervisorBank(BANK),operational=True)
+    with upgraded._tx() as db:
+        row=db.execute(
+            "SELECT render_id,resumed_after_idle FROM operational_rendered",
+        ).fetchone()
+        assert row["render_id"]==item["render_id"]
+        assert row["resumed_after_idle"]==0
+    assert post("item").json["render_id"]==item["render_id"]
