@@ -150,10 +150,10 @@ async function run(){
             await page.locator("#language").selectOption("en");
             assert.equal(await page.locator("#answer-feedback").isVisible(),true);
             assert.equal(await page.locator("#question").innerText(),prompt);
-            assert.match(await page.locator("#feedback-title").innerText(),/Correct/);
+            await page.waitForFunction(()=>document.querySelector("#feedback-title").textContent==="Correct");
             await page.locator("#language").selectOption("fr");
             assert.equal(await page.locator("#answer-feedback").isVisible(),true);
-            assert.match(await page.locator("#feedback-title").innerText(),/Bonne réponse/);
+            await page.waitForFunction(()=>document.querySelector("#feedback-title").textContent==="Bonne réponse");
           }
           nextItem=page.waitForResponse(respond("item"));
           await page.locator("#feedback-next").click();
