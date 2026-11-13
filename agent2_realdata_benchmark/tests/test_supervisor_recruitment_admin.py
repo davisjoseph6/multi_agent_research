@@ -408,5 +408,5 @@ def test_deploy_rollback_uses_unique_temporary_symlink():
     from pathlib import Path
     root=Path(__file__).resolve().parents[1]
     source=(root/"ops/supervisor/install_staging.sh").read_text()
-    assert '.rollback-current.$$' in source
+    assert '.rollback-current.${BASHPID}' in source
     assert '.rollback-current.$"' not in source
