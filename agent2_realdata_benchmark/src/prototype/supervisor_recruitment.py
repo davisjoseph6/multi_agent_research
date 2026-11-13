@@ -136,6 +136,13 @@ class RecruitmentLedger:
                   subject_id INTEGER,
                   details TEXT
                 );
+                CREATE TABLE IF NOT EXISTS mail_dispatch(
+                  candidate_id INTEGER PRIMARY KEY REFERENCES candidates(candidate_id),
+                  state TEXT NOT NULL CHECK(state IN ('dispatching','accepted','uncertain')),
+                  actor TEXT NOT NULL,
+                  attempted_at TEXT NOT NULL,
+                  accepted_at TEXT
+                );
                 CREATE TABLE IF NOT EXISTS policy(
                   key TEXT PRIMARY KEY,
                   value TEXT NOT NULL,
@@ -315,6 +322,95 @@ class RecruitmentLedger:
             db.execute("INSERT INTO audit(at,actor,action,details) VALUES(?,?,?,?)",
                        (utc(at),actor,"candidate_approval",str(changed)))
         return changed
+
+    def selected_for_invitation(self, *, ids: list[int] | None = None,
+                                all_approved: bool = False) -> list[dict]:
+        if (all_approved and ids is not None) or (
+            not all_approved and (
+                type(ids) is not list or not 1 <= len(ids) <= 1000 or
+                any(type(v) is not int or v<1 for v in ids) or
+                len(set(ids))!=len(ids)
+            )
+        ):
+            raise RecruitmentError("specify selected candidate IDs or all approved")
+        with self._tx() as db:
+            if all_approved:
+                rows=db.execute(
+                    "SELECT candidate_id,email,language,approved_for_invitation,"
+                    "invitation_status FROM candidates WHERE approved_for_invitation=1 "
+                    "AND invitation_status IN ('potential','prepared') "
+                    "ORDER BY candidate_id LIMIT 1000"
+                ).fetchall()
+            else:
+                q=",".join("?" for _ in ids)
+                rows=db.execute(
+                    "SELECT candidate_id,email,language,approved_for_invitation,"
+                    "invitation_status FROM candidates WHERE candidate_id IN ("+q+") "
+                    "ORDER BY candidate_id",ids,
+                ).fetchall()
+        return [dict(row) for row in rows]
+
+    def mark_prepared(self, *, candidate_id: int, actor: str, at: datetime):
+        if actor not in ADMIN_EMAILS or type(candidate_id) is not int:
+            raise RecruitmentError("authorized actor and candidate ID required")
+        with self._tx() as db:
+            row=db.execute(
+                "SELECT approved_for_invitation,invitation_status FROM candidates "
+                "WHERE candidate_id=?",(candidate_id,)
+            ).fetchone()
+            if (row is None or not row["approved_for_invitation"] or
+                    row["invitation_status"] not in ("potential","prepared")):
+                raise RecruitmentError("candidate is not approved for invitation")
+            db.execute(
+                "UPDATE candidates SET invitation_status='prepared' "
+                "WHERE candidate_id=?",(candidate_id,)
+            )
+            db.execute("INSERT INTO audit(at,actor,action,subject_id) VALUES(?,?,?,?)",
+                       (utc(at),actor,"invitation_prepared",candidate_id))
+
+    def reserve_mail(self, *, candidate_id: int, actor: str, at: datetime):
+        """One attempt per candidate, even after an unknown network outcome."""
+        if actor not in ADMIN_EMAILS:
+            raise RecruitmentError("authorized administrator required")
+        with self._tx() as db:
+            row=db.execute(
+                "SELECT invitation_status,approved_for_invitation "
+                "FROM candidates WHERE candidate_id=?",(candidate_id,)
+            ).fetchone()
+            if row is None or not row["approved_for_invitation"] or row["invitation_status"]!="prepared":
+                raise RecruitmentError("approved prepared invitation required")
+            if db.execute("SELECT 1 FROM mail_dispatch WHERE candidate_id=?",
+                          (candidate_id,)).fetchone():
+                raise RecruitmentError("prior delivery attempt needs review; refusing duplicate")
+            db.execute(
+                "INSERT INTO mail_dispatch(candidate_id,state,actor,attempted_at) "
+                "VALUES(?,'dispatching',?,?)",(candidate_id,actor,utc(at)),
+            )
+            db.execute("INSERT INTO audit(at,actor,action,subject_id) VALUES(?,?,?,?)",
+                       (utc(at),actor,"outbound_send_started",candidate_id))
+
+    def finish_mail(self, *, candidate_id: int, accepted: bool,
+                    actor: str, at: datetime):
+        if actor not in ADMIN_EMAILS or type(accepted) is not bool:
+            raise RecruitmentError("authorized actor and accepted flag required")
+        with self._tx() as db:
+            value=db.execute(
+                "UPDATE mail_dispatch SET state=?,accepted_at=? "
+                "WHERE candidate_id=? AND state='dispatching'",
+                ("accepted" if accepted else "uncertain",
+                 utc(at) if accepted else None,candidate_id),
+            )
+            if value.rowcount!=1:
+                raise RecruitmentError("mail attempt not found or already finalized")
+            if accepted:
+                db.execute(
+                    "UPDATE candidates SET invitation_status='accepted',invited_at=? "
+                    "WHERE candidate_id=?",(utc(at),candidate_id),
+                )
+            db.execute("INSERT INTO audit(at,actor,action,subject_id) VALUES(?,?,?,?)",
+                       (utc(at),actor,
+                        "outbound_accepted" if accepted else "outbound_uncertain",
+                        candidate_id))
 
     def reminder_enabled(self) -> bool:
         with self._tx() as db:
