@@ -26,7 +26,8 @@ _TOKEN = re.compile(r"[A-Za-z0-9_-]{40,256}\Z")
 
 class OperationalIntake:
     def __init__(self, store: SupervisorSyntheticStore, *,
-                 programs: tuple[str, ...]):
+                 programs: tuple[str, ...],
+                 inactivity_days: int | None = None):
         if not isinstance(store, SupervisorSyntheticStore) or not store.operational:
             raise TypeError("separately configured operational database required")
         if not programs or any(type(v) is not str or not v.strip()
@@ -34,6 +35,57 @@ class OperationalIntake:
             raise ValueError("non-empty institutionally reviewed program list required")
         self.store = store
         self.programs = tuple(programs)
+        if inactivity_days is not None and inactivity_days != 7:
+            raise ValueError("only explicit seven-day policy is supported")
+        self.inactivity_days = inactivity_days
+
+    def _enforce_idle_expiry(self, db, row, *, at: datetime) -> None:
+        """LIVE-only 7-day expiry of an unfinished, active session.
+
+        A normal planned wait between study sessions is not abandonment.
+        Incomplete responses remain in the research database. Contacts stay
+        isolated for subject-rights requests; reapplication needs a fresh
+        questionnaire and explicit staff reconciliation before reinvitation.
+        """
+        if self.inactivity_days is None or row["state"]!="registered":
+            return
+        ref=row["learner_id"]
+        if not ref:
+            return
+        participant=db.execute(
+            "SELECT status FROM participants WHERE learner_id=?", (ref,)
+        ).fetchone()
+        state=db.execute(
+            "SELECT step,updated_at FROM learner_state WHERE learner_id=?",
+            (ref,),
+        ).fetchone()
+        if participant is None or state is None or participant["status"]!="active":
+            return
+        if state["step"] in ("WAITING_NEXT_SESSION","DONE"):
+            return
+        from datetime import timedelta
+        expired=at - datetime.fromisoformat(state["updated_at"])
+        if expired < timedelta(days=7):
+            return
+        # Revoke the capability in the same paired-database transaction as
+        # the terminal status update. No historical answers are erased.
+        db.execute(
+            "UPDATE participants SET status='expired',status_changed_at=? "
+            "WHERE learner_id=? AND status='active'",(iso(at),ref),
+        )
+        db.execute(
+            "UPDATE pii.contacts SET token_hash=? WHERE learner_id=?",
+            (sha256(secrets.token_bytes(48)).hexdigest(),ref),
+        )
+        db.execute("DELETE FROM pii.invitations WHERE learner_id=?", (ref,))
+        db.execute("DELETE FROM pii.reminder_outbox WHERE learner_id=?", (ref,))
+        db.execute("DELETE FROM operational_rendered WHERE learner_id=?", (ref,))
+        db.execute(
+            "UPDATE sessions SET status='expired' "
+            "WHERE learner_id=? AND status='in_progress'",(ref,),
+        )
+        # The caller must reject after committing; never roll back revocation
+        # by raising inside the transaction.
 
     @staticmethod
     def digest(token: str) -> str:
@@ -168,20 +220,34 @@ class OperationalIntake:
         return row
 
     def status(self, token: str, *, at: datetime) -> dict:
+        rejected=False
         with self.store._tx() as db:
             row=self._record(db,token,at=at)
+            self._enforce_idle_expiry(db,row,at=at)
             state=row["state"]
             if state=="registered":
-                self.store._authenticated(db,row["learner_id"],token)
-                progress=self.store._state(db,row["learner_id"])
-                return dict(stage="participant", phase=progress["phase"],
-                            session=progress["session"],
-                            index=progress["index"],
-                            study_language=db.execute(
-                                "SELECT study_language FROM participants "
-                                "WHERE learner_id=?",(row["learner_id"],)
-                            ).fetchone()[0])
-            return dict(stage=state,language=row["consent_lang"] or "en")
+                participant=db.execute(
+                    "SELECT status FROM participants WHERE learner_id=?",
+                    (row["learner_id"],)
+                ).fetchone()
+                rejected=participant is None or participant["status"]=="expired"
+                if rejected:
+                    result=None
+                else:
+                    self.store._authenticated(db,row["learner_id"],token)
+                    progress=self.store._state(db,row["learner_id"])
+                    result=dict(stage="participant",phase=progress["phase"],
+                                session=progress["session"],
+                                index=progress["index"],
+                                study_language=db.execute(
+                                    "SELECT study_language FROM participants "
+                                    "WHERE learner_id=?",(row["learner_id"],)
+                                ).fetchone()[0])
+            else:
+                result=dict(stage=state,language=row["consent_lang"] or "en")
+        if rejected:
+            raise SyntheticStudyError("Session expired after seven days without activity. Please reapply via the interest questionnaire.")
+        return result
 
     def consent_requirements(self, token: str, *, language: str,
                              at: datetime) -> dict:
@@ -287,9 +353,20 @@ class OperationalIntake:
         return dict(registered=True,stage="participant",session=1,phase="PRETEST")
 
     def learner(self, token: str, *, at: datetime):
+        expired=False
+        ref=None
         with self.store._tx() as db:
             row=self._record(db,token,at=at)
             if row["state"]!="registered":
                 raise SyntheticStudyError("participant has not registered")
-            self.store._authenticated(db,row["learner_id"],token)
-            return row["learner_id"]
+            self._enforce_idle_expiry(db,row,at=at)
+            ref=row["learner_id"]
+            participant=db.execute(
+                "SELECT status FROM participants WHERE learner_id=?", (ref,)
+            ).fetchone()
+            expired=participant is not None and participant["status"]=="expired"
+            if not expired:
+                self.store._authenticated(db,ref,token)
+        if expired:
+            raise SyntheticStudyError("Session expired after seven days without activity. Please reapply via the interest questionnaire.")
+        return ref
