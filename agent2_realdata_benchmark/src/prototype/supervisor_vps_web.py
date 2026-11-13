@@ -8,7 +8,7 @@ answer keys. It intentionally does not authorize real enrollment itself.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import re
 import secrets
@@ -276,13 +276,26 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
                 store._authenticated(db,ref,token)
                 # Preserve the first display time across refreshes.
                 prior=db.execute(
-                    "SELECT render_id,phase,action,question_id FROM "
-                    "operational_rendered WHERE learner_id=?", (ref,),
+                    "SELECT render_id,phase,action,question_id,rendered_at,"
+                    "resumed_after_idle FROM operational_rendered "
+                    "WHERE learner_id=?", (ref,),
                 ).fetchone()
                 if (prior is not None and prior["phase"]==state["phase"]
                         and prior["action"]==current.get("action")
                         and prior["question_id"]==current.get("question_id")):
                     render_id=prior["render_id"]
+                    # A participant can return after several days. Retain the
+                    # same item and render capability but restart its exposure
+                    # timer after the hard 24h measurement ceiling. The
+                    # eventual event is explicitly tagged as interrupted.
+                    if now()-datetime.fromisoformat(prior["rendered_at"])>timedelta(days=1):
+                        db.execute(
+                            "UPDATE operational_rendered "
+                            "SET rendered_at=?,resumed_after_idle=resumed_after_idle+1 "
+                            "WHERE learner_id=? AND render_id=?",
+                            (iso(now()),ref,render_id),
+                        )
+                        out["resumed_after_idle"]=True
                 else:
                     render_id=secrets.token_urlsafe(24)
                     db.execute(
@@ -291,7 +304,8 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
                         " VALUES(?,?,?,?,?,?) ON CONFLICT(learner_id) DO UPDATE SET "
                         "render_id=excluded.render_id,phase=excluded.phase,"
                         "action=excluded.action,question_id=excluded.question_id,"
-                        "rendered_at=excluded.rendered_at",
+                        "rendered_at=excluded.rendered_at,"
+                        "resumed_after_idle=0",
                         (ref,render_id,state["phase"],current.get("action"),
                          current.get("question_id"),iso(now())),
                     )
@@ -343,6 +357,11 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         started=shown(ref,token,value["render_id"],phase,action,
                       current.get("question_id"))
         at=now()
+        if at-started>timedelta(days=1):
+            raise SyntheticStudyError(
+                "This question was left inactive for over 24 hours. "
+                "Refresh the current activity to resume; no answer was recorded."
+            )
         if phase in ("PRETEST","POSTTEST"):
             if value["reflection"] is not None:
                 raise SyntheticStudyError("no reflection in independent assessments")
@@ -384,6 +403,11 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
             raise SyntheticStudyError("survey is not due")
         started=shown(ref,token,value["render_id"],"SURVEY",None,None)
         elapsed=round((now()-started).total_seconds()*1000)
+        if elapsed>86_400_000:
+            raise SyntheticStudyError(
+                "This questionnaire was left inactive for over 24 hours. "
+                "Refresh the current activity to resume; no rating was recorded."
+            )
         result=store.submit_survey(
             ref,token,values=tuple(value["values"]),
             time_ms=elapsed,request_id=value["request_id"],at=now(),
