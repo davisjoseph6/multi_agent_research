@@ -320,7 +320,36 @@ issue. The test address is intentionally non-deliverable. A TEST participant
 may now complete the actual VPS-served consent, screening and first session
 under that invite; the database survives application and VPS restarts.
 
-## 4a. Check whether a particular fictional invitation is still usable
+## 4a. Recover from an authorized LIVE invitation SMTP failure
+
+If SMTP fails after a new human invitation was generated, the **original**
+invitation and its private 0600 file remain valid. Do not generate another
+student identity or overwrite the credential file. After obtaining the
+independently signed institutional LIVE release and configuring the approved
+SMTP sender, authorized staff can retry **exactly that existing** unclaimed
+invitation from the protected state directory:
+
+```bash
+# Example only, on the independently approved LIVE deployment, as the
+# dedicated operator account with verified institutional release environment.
+/path/to/live/python -m scripts.supervisor_vps_admin \
+  --send-existing /private/live-state/recipient-invitation.txt \
+  --recipient verified.recipient@institution.example
+```
+
+This code is unavailable in STAGING, and requires the same signed release
+gate as the normal live admin command. It refuses missing, symlinked,
+non-0600, foreign-owned, oversized or noncanonical invitation files;
+a different recipient, an already registered/consented invite, or an
+expired token also fails. It hashes the private token to verify the exact
+unclaimed invitation in the contacts vault. It does **not** create an
+identity, change an arm, reset expiry, print a token, or alter consent.
+The SMTP server's acceptance is not evidence of inbox delivery. Coordinate
+manual retries to avoid duplicate delivery if the sender accepted a message
+immediately before a network failure. The full private link must never be
+placed in an issue, log, console transcript or group chat.
+
+## 4b. Check whether a particular fictional invitation is still usable
 
 The default invitation is **claimable for 21 days**, not 24 hours. A new
 operator-issued invitation may optionally use `--validity-days 1` for

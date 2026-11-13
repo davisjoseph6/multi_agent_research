@@ -13,8 +13,10 @@ import json
 import os
 from pathlib import Path
 import secrets
+import stat
 import smtplib
 import ssl
+from urllib.parse import parse_qs, urlsplit
 
 from scripts.supervisor_vps_wsgi import BANK, _release_verified
 from src.prototype.supervisor_content import SupervisorBank
@@ -56,6 +58,52 @@ def write_private(path: Path, value: str):
         raise
 
 
+def read_retryable_invitation(*, path: Path, root: Path, host: str,
+                              email: str, intake: OperationalIntake,
+                              at: datetime) -> str:
+    """Retrieve an existing private link ONLY for its original invited recipient.
+
+    Called by the offline administrator after LIVE institutional release
+    verification, never by a web route. Does not log or display the link.
+    """
+    if (not root.is_absolute() or not root.is_dir() or root.is_symlink()
+            or not path.is_absolute() or not path.is_file() or path.is_symlink()
+            or path.parent.resolve()!=root.resolve()):
+        raise ValueError("existing private invitation file must be inside the state directory")
+    info=path.stat()
+    if (not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode)!=0o600
+            or info.st_uid!=os.geteuid() or info.st_size>2048):
+        raise ValueError("private invitation must be owned by the operator and mode 0600")
+    if type(email) is not str or not email or type(host) is not str or not host:
+        raise ValueError("explicit recipient and canonical host required")
+    raw=path.read_text(encoding="utf-8")
+    if raw.count("\n")>1 or not raw.endswith("\n"):
+        raise ValueError("invalid private link file formatting")
+    url=raw.strip()
+    parts=urlsplit(url)
+    if (parts.scheme!="https" or parts.hostname!=host or parts.port is not None
+            or parts.username or parts.password or parts.path!="/study/"
+            or parts.query or not parts.fragment.startswith("invite=")):
+        raise ValueError("private link does not match approved study HTTPS origin")
+    parameters=parse_qs(parts.fragment,keep_blank_values=True)
+    if set(parameters)!={"invite"} or len(parameters["invite"])!=1:
+        raise ValueError("malformed invitation capability fragment")
+    token=parameters["invite"][0]
+    if url!=f"https://{host}/study/#invite={token}":
+        raise ValueError("private link is not the exact canonical invitation")
+    digest=intake.digest(token)
+    with intake.store._tx() as db:
+        record=db.execute(
+            "SELECT email,expires_at,state FROM pii.invitations "
+            "WHERE token_hash=?",(digest,)
+        ).fetchone()
+        if (record is None or record["state"]!="invited"
+                or record["email"].casefold()!=email.casefold()
+                or record["expires_at"]<=at.isoformat()):
+            raise ValueError("no matching active, unclaimed invitation for recipient")
+    return url
+
+
 def deliver(recipient: str, link: str, *, mode: str):
     if mode!="live":
         raise ValueError("SMTP delivery disabled outside live approved release")
@@ -93,6 +141,8 @@ def main():
     group=parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--issue",metavar="EMAIL")
     group.add_argument("--counts",action="store_true")
+    group.add_argument("--send-existing",type=Path,metavar="PRIVATE_LINK_FILE",
+                       help="LIVE only: retry SMTP for an existing unclaimed invitation")
     group.add_argument("--rotate-registered-test",metavar="EMAIL",
                        help="STAGING only; replace an existing registered .example invitation without losing progress")
     group.add_argument("--withdraw-verified-ref",metavar="STUDY_PNNN")
@@ -101,6 +151,8 @@ def main():
                         help="absolute private JSON evidence reviewed by authorized staff")
     parser.add_argument("--output",type=Path,
                         help="absolute, new mode-0600 file containing secret link")
+    parser.add_argument("--recipient",metavar="EMAIL",
+                        help="exact intended email address for --send-existing")
     parser.add_argument("--send",action="store_true",
                         help="LIVE only, deliver invitation via verified SMTP")
     parser.add_argument("--validity-days",type=int,default=21,
@@ -111,7 +163,22 @@ def main():
         parser.error("--validity-days must be 1..30")
     if args.validity_days!=21 and not args.issue:
         parser.error("--validity-days is only valid with --issue")
+    if args.recipient and not args.send_existing:
+        parser.error("--recipient is valid only with --send-existing")
     intake,mode=load()
+    if args.send_existing:
+        if mode!="live" or not args.recipient or args.send or args.output:
+            parser.error("--send-existing requires approved LIVE mode and --recipient only")
+        link=read_retryable_invitation(
+            path=args.send_existing,
+            root=Path(os.environ["SUPERVISOR_VPS_ROOT"]),
+            host=os.environ["SUPERVISOR_VPS_HOST"],
+            email=args.recipient,intake=intake,at=datetime.now(timezone.utc),
+        )
+        deliver(args.recipient,link,mode=mode)
+        print("SMTP server accepted re-delivery of the existing invitation; "
+              "inbox receipt is not guaranteed. No new invitation issued.")
+        return
     if args.counts:
         with intake.store._tx() as db:
             counts={row["status"]:row["n"] for row in db.execute(

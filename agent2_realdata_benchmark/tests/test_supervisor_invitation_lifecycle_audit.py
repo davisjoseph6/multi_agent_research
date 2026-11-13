@@ -141,3 +141,78 @@ def test_failed_file_compensation_cannot_delete_consented_or_registered_invite(t
     with pytest.raises(SyntheticStudyError,match="cleanup cannot"):
         intake.cancel_unclaimed_private_file_failure(token)
     assert intake.status(token,at=T)["stage"]=="consented"
+
+
+def test_live_invitation_retry_uses_exact_existing_secret_and_original_recipient(tmp_path,monkeypatch,capsys):
+    """No actual SMTP or live participant; release gating is stubbed in this fixture."""
+    import sys
+    from scripts import supervisor_vps_admin as admin
+    store,intake,token=fixture(tmp_path)
+    link="https://demo.selfhealing-edu.fr/study/#invite="+token
+    private=tmp_path/"unclaimed-link.txt"
+    admin.write_private(private,link)
+    monkeypatch.setattr(admin,"load",lambda:(intake,"live"))
+    monkeypatch.setenv("SUPERVISOR_VPS_ROOT",str(tmp_path))
+    monkeypatch.setenv("SUPERVISOR_VPS_HOST","demo.selfhealing-edu.fr")
+    deliveries=[]
+    monkeypatch.setattr(admin,"deliver",lambda *args,**kw:deliveries.append((args,kw)))
+    monkeypatch.setattr(sys,"argv",["supervisor_vps_admin",
+        "--send-existing",str(private),"--recipient",EMAIL])
+    admin.main()
+    assert deliveries==[((EMAIL,link),{"mode":"live"})]
+    output=capsys.readouterr().out
+    assert EMAIL not in output and token not in output and link not in output
+    with store._tx() as db:
+        assert db.execute("SELECT COUNT(*) FROM pii.invitations").fetchone()[0]==1
+        assert db.execute("SELECT state FROM pii.invitations").fetchone()[0]=="invited"
+
+
+def test_invitation_retry_refuses_staging_and_wrong_recipient(tmp_path,monkeypatch):
+    import sys
+    from scripts import supervisor_vps_admin as admin
+    _,intake,token=fixture(tmp_path)
+    private=tmp_path/"one-time.txt"
+    admin.write_private(private,"https://demo.selfhealing-edu.fr/study/#invite="+token)
+    monkeypatch.setenv("SUPERVISOR_VPS_ROOT",str(tmp_path))
+    monkeypatch.setenv("SUPERVISOR_VPS_HOST","demo.selfhealing-edu.fr")
+    monkeypatch.setattr(sys,"argv",["supervisor_vps_admin",
+        "--send-existing",str(private),"--recipient",EMAIL])
+    monkeypatch.setattr(admin,"load",lambda:(intake,"staging"))
+    with pytest.raises(SystemExit):
+        admin.main()
+    monkeypatch.setattr(admin,"load",lambda:(intake,"live"))
+    with pytest.raises(ValueError,match="matching active"):
+        admin.read_retryable_invitation(
+            path=private,root=tmp_path,host="demo.selfhealing-edu.fr",
+            email="wrong@example.example",intake=intake,at=T)
+
+
+def test_invitation_retry_refuses_untrusted_link_and_advanced_state(tmp_path):
+    import os
+    from scripts.supervisor_vps_admin import read_retryable_invitation,write_private
+    store,intake,token=fixture(tmp_path)
+    private=tmp_path/"original.txt"
+    link="https://demo.selfhealing-edu.fr/study/#invite="+token
+    write_private(private,link)
+    def check(path=private,email=EMAIL,at=T):
+        return read_retryable_invitation(
+            path=path,root=tmp_path,host="demo.selfhealing-edu.fr",
+            email=email,intake=intake,at=at)
+    assert check()==link
+    with pytest.raises(ValueError,match="matching active"):
+        check(at=T+timedelta(days=22))
+    private.chmod(0o644)
+    with pytest.raises(ValueError,match="0600"):
+        check()
+    private.chmod(0o600)
+    linkpath=tmp_path/"symlink.txt"
+    linkpath.symlink_to(private)
+    with pytest.raises(ValueError,match="state directory"):
+        check(path=linkpath)
+    private.write_text("https://elsewhere.invalid/study/#invite="+token+"\n")
+    with pytest.raises(ValueError,match="approved study HTTPS"):
+        check()
+    private.write_text(link+"\n")
+    intake.consent(token,checks=[True]*5,optional=False,language="en",at=T)
+    with pytest.raises(ValueError,match="matching active"):
+        check()
