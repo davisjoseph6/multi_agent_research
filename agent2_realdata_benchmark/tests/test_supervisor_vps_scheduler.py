@@ -125,3 +125,74 @@ def test_reschedule_generates_new_reminder_then_second_miss_revokes_link(tmp_pat
         pass
     else:
         raise AssertionError("removed learner's token still authenticates")
+
+
+def _test_only_survey_phase(store,ref,session):
+    """Create a well-formed synthetic survey boundary; no real subjects."""
+    with store._tx() as db:
+        row=db.execute("SELECT state_json FROM learner_state WHERE learner_id=?",
+                       (ref,)).fetchone()
+        state=json.loads(row["state_json"])
+        state["phase"]="SURVEY"
+        state["session"]=session
+        db.execute(
+            "UPDATE learner_state SET session_no=?,step='SURVEY',"
+            "step_index=0,state_json=? WHERE learner_id=?",
+            (session,json.dumps(state),ref),
+        )
+        db.execute(
+            "UPDATE sessions SET status='in_progress',started_at=? "
+            "WHERE learner_id=? AND session_no=?",
+            (iso(T + timedelta(days=4*(session-1))),ref,session),
+        )
+
+
+def test_late_first_session_completion_cannot_shortcut_to_session_two(tmp_path):
+    """Protect 3-day minimum even if a learner resumes an unfinished session."""
+    from src.prototype.supervisor_synthetic_store import iso,SyntheticStudyError
+    store,intake,token,ref=setup(tmp_path)
+    _test_only_survey_phase(store,ref,1)
+    completed=T+timedelta(days=3,hours=8)
+    store.submit_survey(ref,token,values=(4,4,4,4,4,4),
+                        time_ms=1000,request_id="late_survey_1",at=completed)
+    with store._tx() as db:
+        row=db.execute("SELECT scheduled_for FROM sessions WHERE learner_id=? "
+                       "AND session_no=2",(ref,)).fetchone()
+    assert row["scheduled_for"]==iso(completed+timedelta(days=3))
+    try:
+        store.open_next_session(ref,token,completed+timedelta(days=2))
+    except SyntheticStudyError as exc:
+        assert "date has not arrived" in str(exc)
+    else:
+        raise AssertionError("session started before minimum 3-day interval")
+
+
+def test_late_second_session_completion_shifts_session_three_not_earlier(tmp_path):
+    from src.prototype.supervisor_synthetic_store import iso
+    store,_,token,ref=setup(tmp_path)
+    _test_only_survey_phase(store,ref,2)
+    completed=T+timedelta(days=7,hours=12)
+    store.submit_survey(ref,token,values=(1,2,3,4,5,6),
+                        time_ms=2000,request_id="late_survey_2",at=completed)
+    with store._tx() as db:
+        planned=db.execute(
+            "SELECT scheduled_for FROM sessions WHERE learner_id=? AND session_no=3",
+            (ref,),
+        ).fetchone()["scheduled_for"]
+    assert planned==iso(completed+timedelta(days=3))
+
+
+def test_on_time_completion_preserves_original_day_four_and_day_eight(tmp_path):
+    from src.prototype.supervisor_synthetic_store import iso
+    store,_,token,ref=setup(tmp_path)
+    _test_only_survey_phase(store,ref,1)
+    store.submit_survey(ref,token,values=(4,4,4,4,4,4),
+                        time_ms=1000,request_id="ontime_survey_1",
+                        at=T+timedelta(minutes=25))
+    with store._tx() as db:
+        schedule=db.execute(
+            "SELECT session_no,scheduled_for FROM sessions WHERE learner_id=? "
+            "ORDER BY session_no",(ref,),
+        ).fetchall()
+    assert schedule[1]["scheduled_for"]==iso(T+timedelta(days=4))
+    assert schedule[2]["scheduled_for"]==iso(T+timedelta(days=8))
