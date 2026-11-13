@@ -18,6 +18,8 @@ from .supervisor_recruitment import (
     RecruitmentLedger, RecruitmentError, ADMIN_EMAILS,
 )
 from .supervisor_recruitment_metrics import inter_answer_times, mastery_series
+from .supervisor_inactivity_worker import reconcile_inactivity
+from .supervisor_recruitment_dispatch import InvitationDispatcher
 
 STATIC=Path(__file__).resolve().parent / "static"
 
@@ -28,6 +30,10 @@ def make_recruitment_app(
     public_intake_enabled: bool = False,
     research_db: Path | None = None,
     contacts_db: Path | None = None,
+    dispatcher: InvitationDispatcher | None = None,
+    inactivity_sender=None,
+    operational_store=None,
+    live_verified: bool = False,
 ) -> Flask:
     """Create application without enabling delivery or human participation."""
     if not isinstance(ledger,RecruitmentLedger):
@@ -44,6 +50,10 @@ def make_recruitment_app(
                 or not research_db.is_file() or not contacts_db.is_file()
                 or research_db.is_symlink() or contacts_db.is_symlink()):
             raise ValueError("existing non-symlink private databases required")
+    if (dispatcher is not None or inactivity_sender is not None) and live_verified is not True:
+        raise ValueError("signed LIVE release required for all outbound administrative actions")
+    if dispatcher is not None and not isinstance(dispatcher,InvitationDispatcher):
+        raise TypeError("verified invitation dispatcher required")
     app=Flask("supervisor_recruitment",static_folder=None)
     app.config.update(DEBUG=False,MAX_CONTENT_LENGTH=8192,
                       MAX_FORM_MEMORY_SIZE=8192)
@@ -187,6 +197,43 @@ def make_recruitment_app(
     def candidates():
         admin()
         return jsonify(candidates=ledger.candidates(),contains_pii=True)
+
+    @app.get("/control/api/capabilities")
+    def capabilities():
+        admin()
+        return jsonify(
+            invitation_sending_available=dispatcher is not None and live_verified,
+            manual_reminders_available=(
+                inactivity_sender is not None and operational_store is not None
+                and live_verified
+            ),
+            public_interest_forms_enabled=public_intake_enabled,
+        )
+
+    @app.post("/control/api/send-invitations")
+    def send_invitations():
+        user=admin(mutation=True)
+        if dispatcher is None or not live_verified:
+            raise RecruitmentError("live Graph invitation sending is not configured")
+        selection=body("candidate_ids","select_all")
+        all_selected=selection["select_all"]
+        if type(all_selected) is not bool:
+            raise RecruitmentError("explicit select-all flag required")
+        ids=None if all_selected else selection["candidate_ids"]
+        return jsonify(dispatcher.dispatch(
+            actor=user["email"],at=now(),ids=ids,all_approved=all_selected
+        ))
+
+    @app.post("/control/api/manual-reminder")
+    def manual_reminder():
+        admin(mutation=True)
+        if inactivity_sender is None or operational_store is None or not live_verified:
+            raise RecruitmentError("live Graph reminder sender is not configured")
+        selection=body("learner_id")
+        return jsonify(reconcile_inactivity(
+            operational_store,ledger,at=now(),send=inactivity_sender.send,
+            live_verified=True,manual_ref=selection["learner_id"],
+        ))
 
     @app.post("/control/api/approve")
     def approve():
