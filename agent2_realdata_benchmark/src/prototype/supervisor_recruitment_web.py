@@ -34,6 +34,7 @@ def make_recruitment_app(
     inactivity_sender=None,
     operational_store=None,
     live_verified: bool = False,
+    privacy_notices: dict[str,Path] | None = None,
 ) -> Flask:
     """Create application without enabling delivery or human participation."""
     if not isinstance(ledger,RecruitmentLedger):
@@ -50,6 +51,15 @@ def make_recruitment_app(
                 or not research_db.is_file() or not contacts_db.is_file()
                 or research_db.is_symlink() or contacts_db.is_symlink()):
             raise ValueError("existing non-symlink private databases required")
+    if public_intake_enabled:
+        if not isinstance(privacy_notices,dict) or set(privacy_notices)!=set(("en","fr")):
+            raise ValueError("independently signed English/French recruitment notices required")
+        for notice in privacy_notices.values():
+            path=Path(notice)
+            if not path.is_absolute() or not path.is_file() or path.is_symlink() or path.suffix.lower()!=".pdf":
+                raise ValueError("private approved, versioned PDF recruitment notice required")
+    elif privacy_notices is not None:
+        raise ValueError("privacy notices should not be exposed in disabled staging")
     if (dispatcher is not None or inactivity_sender is not None) and live_verified is not True:
         raise ValueError("signed LIVE release required for all outbound administrative actions")
     if dispatcher is not None and not isinstance(dispatcher,InvitationDispatcher):
@@ -312,6 +322,12 @@ def make_recruitment_app(
         if not public_intake_enabled or kind not in ("school","external"):
             return "",404
         return send_file(STATIC/"supervisor_recruitment_interest.html")
+
+    @app.get("/interest/privacy/<language>")
+    def privacy_notice(language):
+        if not public_intake_enabled or language not in ("en","fr"):
+            return "",404
+        return send_file(Path(privacy_notices[language]),mimetype="application/pdf")
 
     @app.get("/interest/app.js")
     def intake_js():
