@@ -17,6 +17,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from .supervisor_recruitment import (
     RecruitmentLedger, RecruitmentError, ADMIN_EMAILS,
 )
+from .supervisor_recruitment_metrics import inter_answer_times, mastery_series
 
 STATIC=Path(__file__).resolve().parent / "static"
 
@@ -217,6 +218,31 @@ def make_recruitment_app(
             participants.append(value)
         return jsonify(participants=participants,
                        candidates=applicants,contains_pii=True)
+
+    @app.get("/control/api/question-intervals")
+    def intervals():
+        admin()
+        learner=request.args.get("learner_id")
+        with paired_db() as db:
+            results=inter_answer_times(db,learner_id=learner)
+        return jsonify(intervals=results,contains_pii=False,
+                       numerical_units=("milliseconds","seconds","hours","days"))
+
+    @app.get("/control/api/mastery/<ref>")
+    def mastery(ref):
+        admin()
+        with paired_db() as db:
+            value=mastery_series(db,ref)
+            contact=db.execute(
+                "SELECT email FROM pii.contacts WHERE learner_id=?", (ref,)
+            ).fetchone()
+        value["email"]=contact["email"] if contact else None
+        candidates={r["email"]:r for r in ledger.candidates()}
+        candidate=candidates.get((value["email"] or "").casefold(),{})
+        value["first_name"]=candidate.get("first_name")
+        value["last_name"]=candidate.get("last_name")
+        value["contains_pii"]=True
+        return jsonify(value)
 
     @app.get("/control/api/reminder-policy")
     def policy():
