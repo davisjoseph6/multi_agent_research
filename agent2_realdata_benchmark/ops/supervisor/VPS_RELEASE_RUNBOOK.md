@@ -162,6 +162,75 @@ not predetermine groups. Do not send SSH access or the unrelated researcher
 dashboard password. Revoke reviewer access after the review as authorized.
 Human recruitment and SMTP remain disabled.
 
+## 3b. Repeatable technical staging preflight (no secrets)
+
+After deploying a new approved staging commit, run directly on the VPS:
+
+```bash
+sudo bash /srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark/ops/supervisor/staging_infrastructure_smoke.sh
+```
+
+This checks both systemd services, the deployed full commit, direct HTTP
+rejection (403), the SSH-only researcher login rejection (401), and public
+unauthenticated HTTPS rejection (401). It does not enter a participant account,
+read any invite or prompt for the Caddy password.
+
+Run the database consistency audit separately as the dedicated service user:
+
+```bash
+sudo -u ijcai-supervisor bash -c '
+cd /srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark
+/srv/ijcai-supervisor-staging/venv/bin/python \
+  -m scripts.supervisor_staging_db_preflight \
+  --state-dir /var/lib/ijcai-supervisor-staging
+'
+```
+
+The audit opens BOTH databases with `mode=ro`, reports only aggregate
+counts and integrity conditions, and fails closed on inconsistencies.
+It does not prove live-study eligibility or print contacts, tokens, raw
+answers, or researcher credentials. Do not publish its counts outside the
+authorized research team.
+
+Session scheduling protection: if a learner completes session 1 or 2 late,
+the next scheduled visit is automatically shifted forward when necessary
+to preserve at least **three full days after completion**. Later scheduled
+dates are never moved earlier. The original D4/D8 schedule remains unchanged
+for promptly completed visits. This prevents delayed quizzes from shortening
+the gap without changing the A/B/C selection policies. The PI must still
+approve the upper scheduling window, missed-session/reminder policy, and
+any multi-day interrupted-session handling before humans enroll.
+
+The private invitation CLI now compensates if creating the **unclaimed**
+secret output file fails, so a failed disk write cannot strand that address
+as an unclaimable invitation. It will never cancel a consented or already
+registered credential through this compensation route.
+
+For a controlled encrypted backup, use the **existing** reviewed wrapper
+`ops/supervisor/run_safe_encrypted_backup.sh`, not an ad hoc manual service
+stop. Its isolated Python runtime, private key and destination directory
+must already be configured and separately secured. It locks concurrent
+backup runs, restores the study service even if backup fails, and performs
+an in-memory restore integrity check. Offsite replication and recovery on
+a second host still require institutional operations.
+
+## 3c. Production go/no-go remains external and independent
+
+Passing all staging tests does **not** authorize end users. The source
+explicitly blocks live enrollment until the 14-category evidence index,
+institutionally verified signature, separate signed content approval and
+exact-commit verification pass. Still unverified in the repository:
+approved English/French instructional content and their grading equivalence,
+validated fatigue instrument and scoring, exact neural feature contract,
+approved research consent/reward/withdrawal and deadline policies,
+quantified sample size and prespecified analysis, independent security and
+accessibility audits, operational load testing, approved SMTP sender,
+offsite encrypted backups and tested independent recovery.
+
+Do not bypass these gates by changing the mode flag, authoring one's own
+institutional signature, or treating fictional CI results as human-subject
+authorization.
+
 ## 4. Generate one restricted staging invitation, offline
 
 Run this **on the VPS**, as the dedicated service user:
