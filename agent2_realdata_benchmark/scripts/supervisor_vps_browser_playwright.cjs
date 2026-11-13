@@ -71,6 +71,26 @@ async function run(){
         assert(key);
         const chosen=i<4?key:"ABCD".split("").find(x=>x!==key);
         await page.locator('#screen-options input[value="'+chosen+'"]').check();
+        if(isFrench && i===2){
+          // Regression: a consented learner changes only the screen language
+          // at question 3/8; the prior selections and the current choice
+          // must survive, and the question text must really translate.
+          const english=page.waitForResponse(respond("screening"));
+          await page.locator("#language").selectOption("en");
+          const translated=(await english).json();
+          assert.equal((await translated).language,"en");
+          assert.equal(await page.locator("#screen-number").innerText(),"Question 3 of 8");
+          assert.equal(await page.locator("#screen-prompt").innerText(),
+                       (await translated).questions[2].question_text);
+          assert.notEqual((await translated).questions[2].question_text,q.question_text);
+          assert.equal(await page.locator('#screen-options input[value="'+chosen+'"]').isChecked(),true);
+          const french=page.waitForResponse(respond("screening"));
+          await page.locator("#language").selectOption("fr");
+          await french;
+          assert.equal(await page.locator("#screen-number").innerText(),"Question 3 sur 8");
+          assert.equal(await page.locator("#screen-prompt").innerText(),q.question_text);
+          assert.equal(await page.locator('#screen-options input[value="'+chosen+'"]').isChecked(),true);
+        }
         const next=page.locator("#screen-next");
         if(i===7){
           const registration=page.waitForResponse(respond("programs"));
@@ -86,7 +106,25 @@ async function run(){
       let item=await (await nextItem).json();
       assert.equal(item.phase,"PRETEST");
       await page.locator("#learning").waitFor({state:"visible"});
-
+      if(isFrench){
+        // A locale change must keep the same pretest question, render
+        // capability and the choice already selected by the learner.
+        const correct=answerKey[item.question_id];
+        await page.locator('#choices input[value="'+correct+'"]').check();
+        let change=page.waitForResponse(respond("item"));
+        await page.locator("#language").selectOption("en");
+        const english=(await change).json();
+        assert.equal((await english).question_id,item.question_id);
+        assert.equal((await english).render_id,item.render_id);
+        assert.equal(await page.locator('#choices input[value="'+correct+'"]').isChecked(),true);
+        change=page.waitForResponse(respond("item"));
+        await page.locator("#language").selectOption("fr");
+        const french=(await change).json();
+        assert.equal((await french).question_id,item.question_id);
+        assert.equal((await french).render_id,item.render_id);
+        assert.equal(await page.locator('#choices input[value="'+correct+'"]').isChecked(),true);
+      }
+      let checkedFeedbackSwitch=false;
       async function submitCorrect(expectedKind){
         assert.equal(item.kind,expectedKind);
         assert(item.render_id&&item.question_id);
@@ -104,6 +142,19 @@ async function run(){
           assert.equal(feedback.previous_correct,true);
           await page.locator("#answer-feedback").waitFor({state:"visible"});
           assert.match(await page.locator("#feedback-explanation").innerText(),/Explanation|Explication/);
+          if(isFrench && item.phase===undefined && !checkedFeedbackSwitch){
+            // Quiz response has already been committed. Changing language
+            // must NOT fetch the next question or dismiss the explanation.
+            checkedFeedbackSwitch=true;
+            const prompt=await page.locator("#question").innerText();
+            await page.locator("#language").selectOption("en");
+            assert.equal(await page.locator("#answer-feedback").isVisible(),true);
+            assert.equal(await page.locator("#question").innerText(),prompt);
+            assert.match(await page.locator("#feedback-title").innerText(),/Correct/);
+            await page.locator("#language").selectOption("fr");
+            assert.equal(await page.locator("#answer-feedback").isVisible(),true);
+            assert.match(await page.locator("#feedback-title").innerText(),/Bonne réponse/);
+          }
           nextItem=page.waitForResponse(respond("item"));
           await page.locator("#feedback-next").click();
         }else{
@@ -124,6 +175,15 @@ async function run(){
         assert.equal(await page.locator("#surveys input[type=range]").count(),1);
         assert.equal(await page.locator("#fatigue-"+i).getAttribute("min"),"1");
         assert.equal(await page.locator("#fatigue-"+i).getAttribute("max"),"7");
+        if(isFrench&&i===2){
+          await page.locator("#fatigue-2").evaluate(el=>{
+            el.value="6";el.dispatchEvent(new Event("input",{bubbles:true}));
+          });
+          await page.locator("#language").selectOption("en");
+          assert.equal(await page.locator("#fatigue-2").inputValue(),"6");
+          await page.locator("#language").selectOption("fr");
+          assert.equal(await page.locator("#fatigue-2").inputValue(),"6");
+        }
         await page.locator("#fatigue-next").click();
       }
       assert.equal(await page.locator("#fatigue-5").count(),1);
