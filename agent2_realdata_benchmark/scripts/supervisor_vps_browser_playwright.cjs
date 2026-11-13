@@ -226,7 +226,13 @@ const waiting=await page.locator("#question").innerText();
         timeZone:"Europe/Paris",weekday:"long",day:"numeric",
         month:"long",year:"numeric",hour:"2-digit",minute:"2-digit",hourCycle:"h23",
       }).format(new Date(item.scheduled_for));
-      assert(waiting.includes(parisDate),waiting);
+      // Chromium and Node may use different CLDR punctuation for the same
+      // Europe/Paris instant (e.g. an English weekday comma). Compare the
+      // calendar and HH:mm text without relaxing timezone correctness.
+      const normalizeDate=s=>s.toLowerCase().normalize("NFKC")
+        .replace(/[,\u202f]/g," ").replace(/\s+/g," ").trim();
+      assert(normalizeDate(waiting).includes(normalizeDate(parisDate)),
+             "Paris time was not rendered: "+waiting+" expected "+parisDate);
       assert.match(waiting,/Paris/);
       assert.doesNotMatch(waiting,/T\d\d:|\.\d{3,}|\+00:00/);
       assert.equal(await page.locator("#session-parts li.later").count(),1);
