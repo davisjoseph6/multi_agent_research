@@ -66,7 +66,7 @@ def inspect_state(root: Path) -> dict:
             "contacts_sqlite_integrity":contact_check=="ok",
             "research_foreign_keys":len(fk_issues)==0,
             "every_participant_has_private_contact":missing_contact==0,
-            "registered_token_hashes_match":mismatch==0,
+            "registered_credentials_consistent":mismatch==0,
             "completed_sessions_have_end_times":completed_without_end==0,
             "three_session_rows_per_participant":wrong_session_count==0,
         }
