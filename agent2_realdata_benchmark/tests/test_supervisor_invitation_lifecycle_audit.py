@@ -62,3 +62,47 @@ def test_registered_can_resume_past_initial_expiry_without_leaking_secret(tmp_pa
     assert audit["can_register_before_expiry"] is False
     assert token not in json.dumps(audit) and EMAIL not in json.dumps(audit)
     assert "token_hash" not in json.dumps(audit)
+
+
+def test_cli_one_day_invitation_is_optional_and_does_not_send(tmp_path):
+    import os
+    import stat
+    import subprocess
+    import sys
+    from urllib.parse import urlsplit,parse_qs
+    root=Path(__file__).resolve().parents[1]
+    env=os.environ.copy()
+    env.update({
+        "SUPERVISOR_VPS_MODE":"staging",
+        "SUPERVISOR_VPS_ROOT":str(tmp_path),
+        "SUPERVISOR_VPS_HOST":"demo.selfhealing-edu.fr",
+        "SUPERVISOR_VPS_COMMIT":"a"*40,
+        "SUPERVISOR_PROGRAMS":"Test student program",
+    })
+    recipient="one-day-review@example.example"
+    destination=tmp_path/"private-invite.txt"
+    before=datetime.now(timezone.utc)
+    result=subprocess.run([
+        sys.executable,"-m","scripts.supervisor_vps_admin",
+        "--issue",recipient,"--validity-days","1",
+        "--output",str(destination),
+    ],cwd=root,env=env,capture_output=True,text=True,check=True)
+    after=datetime.now(timezone.utc)
+    assert "No email sent" in result.stdout
+    assert recipient not in result.stdout+result.stderr
+    assert (destination.stat().st_mode & 0o777)==0o600
+    invitation=destination.read_text(encoding="utf-8").strip()
+    token=parse_qs(urlsplit(invitation).fragment)["invite"][0]
+    assert token not in result.stdout+result.stderr
+    store=SupervisorSyntheticStore(
+        tmp_path,bank=SupervisorBank(DATA),operational=True,
+    )
+    intake=OperationalIntake(store,programs=("Test student program",))
+    with store._tx() as db:
+        row=db.execute("SELECT expires_at FROM pii.invitations "
+                       "WHERE email=?",(recipient,)).fetchone()
+    until=datetime.fromisoformat(row["expires_at"])
+    assert before+timedelta(days=1)<=until<=after+timedelta(days=1)
+    assert intake.status(token,at=until-timedelta(seconds=1))["stage"]=="invited"
+    with pytest.raises(SyntheticStudyError,match="expired"):
+        intake.status(token,at=until+timedelta(seconds=1))
