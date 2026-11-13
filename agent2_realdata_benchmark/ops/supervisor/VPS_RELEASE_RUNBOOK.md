@@ -191,6 +191,45 @@ issue. The test address is intentionally non-deliverable. A TEST participant
 may now complete the actual VPS-served consent, screening and first session
 under that invite; the database survives application and VPS restarts.
 
+## 4a. Check whether a particular fictional invitation is still usable
+
+The default invitation is **claimable for 21 days**, not 24 hours. A new
+operator-issued invitation may optionally use `--validity-days 1` for
+a 24-hour **initial-registration window**. Do not imply this expires or
+revokes an *already registered* participant link: registered credentials
+are intentionally reusable for the three-session study, until rotated,
+withdrawn, deleted or revoked. Web session cookies have a separate 14-day
+max-age. Caddy authentication is also separate and must be assessed on
+the VPS, not from the invitation database.
+
+For a private individual status check without printing tokens, hashes or
+recipient addresses, use the service account and the existing private
+environment. Do not place email addresses in shell arguments or history:
+
+```bash
+sudo -u ijcai-supervisor bash -c '
+set -a
+source /etc/ijcai-supervisor-staging/staging.env
+set +a
+cd /srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark
+/srv/ijcai-supervisor-staging/venv/bin/python \
+  -m scripts.supervisor_invitation_lifecycle_audit --check
+'
+```
+
+The prompt hides the email typed and prints only invitation state, the
+initial-registration expiry UTC and whether the registered token remains
+associated with an eligible participant record. It does not prove the
+reviewer has the URL or the proper Caddy password and sends no email.
+Avoid sharing even this private status output outside the research team.
+
+Keep real SMTP, automated recruitment, reward verification and removal
+policy disabled until the PI and institutional reviewers approve them.
+The frozen supervisor protocol currently specifies three approximately
+45-minute visits, normally 3-5 days apart; do not change to 30 minutes or
+enforce a five-day/plus-two-day removal rule without an amendment. No
+name or university student ID belongs in research event tables.
+
 ## 4a. Replace a disclosed fictional invitation without deleting study progress
 
 If a full `#invite=` URL was pasted into a chat or document, treat that
