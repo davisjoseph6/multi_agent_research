@@ -412,3 +412,39 @@ def test_mid_question_language_change_preserves_render_credential(tmp_path):
     assert first["question_text"]!=french["question_text"]
     assert post("language",{"language":"en"}).status_code==200
     assert post("item").json["render_id"]==first["render_id"]
+
+
+def test_read_only_database_preflight_never_discloses_contact_or_tokens(tmp_path):
+    from scripts.supervisor_staging_db_preflight import inspect_state
+    import json
+    store,intake,_,_=stack(tmp_path)
+    token=intake.issue("private-preflight@example.example",at=NOW(),
+                       allow_example=True)
+    first=inspect_state(tmp_path)
+    assert first["passed"]
+    assert first["unclaimed_invitation_count"]==1
+    assert not first["real_human_recruitment_approved"]
+    complete_intake(intake,store,token)
+    second=inspect_state(tmp_path)
+    assert second["passed"]
+    assert second["allocation_counts_by_arm"]=={"A":1}
+    assert second["unclaimed_invitation_count"]==0
+    assert second["mutated_database"] is False
+    output=json.dumps(second)
+    assert "private-preflight@example.example" not in output
+    assert token not in output
+    assert "token_hash" not in output
+
+
+def test_read_only_database_preflight_fails_on_contact_hash_mismatch(tmp_path):
+    from scripts.supervisor_staging_db_preflight import inspect_state
+    store,intake,_,_=stack(tmp_path)
+    token=intake.issue("inconsistent@example.example",at=NOW(),allow_example=True)
+    complete_intake(intake,store,token)
+    with store._tx() as db:
+        db.execute("UPDATE pii.contacts SET token_hash=?",
+                   ("0"*64,))
+    status=inspect_state(tmp_path)
+    assert status["passed"] is False
+    assert status["technical_db_checks"]["registered_token_hashes_match"] is False
+    assert status["contains_identifying_contact_details"] is False
