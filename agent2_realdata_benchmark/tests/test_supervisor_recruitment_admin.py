@@ -161,7 +161,7 @@ def test_admin_http_protected_pii_and_bilingual_public_intake(ledger,tmp_path):
     app=make_recruitment_app(
         ledger,public_intake_enabled=True,
         research_db=research,contacts_db=contacts,
-        privacy_notices=notices,
+        privacy_notices=notices,intake_rate_secret=b"test-only-example-key-"+b"x"*32,
     )
     client=app.test_client()
     def post(path,payload):
@@ -301,3 +301,22 @@ def test_three_four_seven_day_idle_policy_and_session_waiting():
         session=2,phase="QUIZ",language="en")
     assert "quiz d’apprentissage" in make_reminder_text(
         session=2,phase="QUIZ",language="fr")
+
+
+def test_rate_limit_keeps_raw_ip_private_and_rejects_abuse(ledger):
+    for n in range(10):
+        assert ledger.check_intake_rate(
+            remote_ip="192.0.2.5",secret=b"x"*32,at=T,
+        )
+    assert ledger.check_intake_rate(
+        remote_ip="192.0.2.5",secret=b"x"*32,at=T,
+    ) is False
+    assert ledger.check_intake_rate(
+        remote_ip="192.0.2.6",secret=b"x"*32,at=T,
+    ) is True
+    with ledger._tx() as db:
+        values=[dict(r) for r in db.execute("SELECT * FROM intake_rate")]
+    assert "192.0.2.5" not in repr(values)
+    assert ledger.check_intake_rate(
+        remote_ip="192.0.2.5",secret=b"x"*32,at=T+timedelta(days=1),
+    ) is True
