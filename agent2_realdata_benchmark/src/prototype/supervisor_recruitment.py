@@ -105,6 +105,7 @@ class RecruitmentLedger:
                   questionnaire TEXT NOT NULL CHECK(questionnaire IN ('school','external')),
                   language TEXT NOT NULL CHECK(language IN ('en','fr')),
                   consent_timestamp TEXT NOT NULL,
+                  privacy_sha256 TEXT NOT NULL DEFAULT 'UNAPPROVED',
                   submitted_at TEXT NOT NULL,
                   approved_for_invitation INTEGER NOT NULL DEFAULT 0,
                   invited_at TEXT,
@@ -158,6 +159,13 @@ class RecruitmentLedger:
                 INSERT OR IGNORE INTO policy VALUES(
                   'automatic_reminders_enabled','0','1970-01-01T00:00:00+00:00','initial');
             """)
+        # Forward migration preserves historical intake records and does
+        # not invent approval for consent forms whose digest was not recorded.
+        with self._tx() as db:
+            fields={r["name"] for r in db.execute("PRAGMA table_info(candidates)")}
+            if "privacy_sha256" not in fields:
+                db.execute("ALTER TABLE candidates ADD COLUMN privacy_sha256 "
+                           "TEXT NOT NULL DEFAULT 'UNAPPROVED'")
         os.chmod(self.file,0o600)
 
     @contextmanager
@@ -205,7 +213,8 @@ class RecruitmentLedger:
 
     def apply(self, *, email: str, first_name: str | None = None,
               last_name: str | None = None, questionnaire: str,
-              language: str, privacy_accepted: bool, at: datetime) -> dict:
+              language: str, privacy_accepted: bool, at: datetime,
+              privacy_sha256: str = "UNAPPROVED") -> dict:
         """Store interest, not enrollment or consent to the actual RCT.
 
         A duplicate request returns the same generic result without changing
@@ -220,14 +229,20 @@ class RecruitmentLedger:
             raise RecruitmentError("institutional email must use school questionnaire")
         if privacy_accepted is not True:
             raise RecruitmentError("recruitment privacy information must be accepted")
+        if type(privacy_sha256) is not str or (
+            privacy_sha256!="UNAPPROVED" and not re.fullmatch(
+                r"[0-9a-f]{64}",privacy_sha256)
+        ):
+            raise RecruitmentError("invalid approved privacy notice digest")
         first,last = _name(first_name),_name(last_name)
         t=utc(at)
         with self._tx() as db:
             db.execute(
                 "INSERT OR IGNORE INTO candidates"
                 "(email,first_name,last_name,questionnaire,language,"
-                "consent_timestamp,submitted_at) VALUES(?,?,?,?,?,?,?)",
-                (address,first,last,questionnaire,language,t,t),
+                "consent_timestamp,privacy_sha256,submitted_at) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (address,first,last,questionnaire,language,t,privacy_sha256,t),
             )
         return dict(received=True,participant_enrolled=False)
 
@@ -334,7 +349,7 @@ class RecruitmentLedger:
         with self._tx() as db:
             return [dict(row) for row in db.execute(
                 "SELECT candidate_id,email,first_name,last_name,questionnaire,"
-                "language,submitted_at,approved_for_invitation,invitation_status "
+                "language,submitted_at,privacy_sha256,approved_for_invitation,invitation_status "
                 "FROM candidates ORDER BY candidate_id DESC"
             )]
 
