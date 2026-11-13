@@ -49,6 +49,12 @@ async function run(){
       await page.locator("#information").waitFor({state:"visible"});
       assert.equal(new URL(page.url()).hash,"");
       assert.match(await page.locator("#ai-rule").innerText(),/generative AI/i);
+assert.equal(
+        (await page.locator("#school-logo").isVisible())||
+        (await page.locator("#school-wordmark").isVisible()),true);
+      assert.match(await page.locator("#study-roadmap").innerText(),/pre-test/i);
+      assert.match(await page.locator("#study-roadmap").innerText(),/post-test/i);
+      assert.doesNotMatch(await page.locator("#study-roadmap").innerText(),/three parts/i);
       assert.equal(await page.locator("#info-copy h2").count()>5,true);
       if(isFrench){
         await page.locator("#language").selectOption("fr");
@@ -109,6 +115,10 @@ async function run(){
       let item=await (await nextItem).json();
       assert.equal(item.phase,"PRETEST");
       await page.locator("#learning").waitFor({state:"visible"});
+assert.equal(await page.locator("#session-parts li").count(),4);
+      assert.equal(await page.locator("#session-parts li.active").count(),1);
+      assert.match(await page.locator("#phase-intro").innerText(),/Pre-test|Pré-test/);
+      assert.match(await page.locator("#session-parts li.later").innerText(),/Post-test/);
       if(isFrench){
         // A locale change must keep the same pretest question, render
         // capability and the choice already selected by the learner.
@@ -168,9 +178,24 @@ async function run(){
       }
       for(let i=0;i<16;i++)await submitCorrect("question");
       assert.equal(item.action,"QUESTION");
+await page.waitForFunction(()=>
+        /quiz/i.test(document.querySelector("#session-parts li.active")?.textContent||""));
+      assert.match(await page.locator("#phase-intro").innerText(),/quiz/i);
+      assert.doesNotMatch(await page.locator("#phase-intro").innerText(),
+                          /initial test is complete|test initial est terminé/i);
       assert.equal(await page.locator("#previous-result").isHidden(),true);
-      for(let i=0;i<20;i++)await submitCorrect("question");
+      for(let i=0;i<20;i++){
+        await submitCorrect("question");
+        if(i===11){
+          assert.match(await page.locator("#phase-intro").innerText(),/quiz/i);
+          assert.doesNotMatch(await page.locator("#phase-intro").innerText(),
+                              /initial test is complete|test initial est terminé/i);
+        }
+      }
       assert.equal(item.kind,"survey");
+await page.locator("#fatigue-0").waitFor({state:"visible"});
+      assert.match(await page.locator("#session-parts li.active").innerText(),/Fatigue|fatigue/);
+      assert.match(await page.locator("#session-parts li.later").innerText(),/Post-test/);
       await page.locator("#fatigue-0").waitFor({state:"visible"});
       assert.equal(await page.locator("#previous-result").isHidden(),true);
       assert.match(await page.locator("#phase-intro").innerText(),/Quiz|quiz/);
@@ -195,6 +220,16 @@ async function run(){
       await page.locator("#submit-survey").click();
       item=await (await nextItem).json();
       assert.equal(item.kind,"waiting_next_session");
+const waiting=await page.locator("#question").innerText();
+      const locale=(await page.locator("#language").inputValue())==="fr"?"fr-FR":"en-GB";
+      const parisDate=new Intl.DateTimeFormat(locale,{
+        timeZone:"Europe/Paris",weekday:"long",day:"numeric",
+        month:"long",year:"numeric",hour:"2-digit",minute:"2-digit",hourCycle:"h23",
+      }).format(new Date(item.scheduled_for));
+      assert(waiting.includes(parisDate),waiting);
+      assert.match(waiting,/Paris/);
+      assert.doesNotMatch(waiting,/T\d\d:|\.\d{3,}|\+00:00/);
+      assert.equal(await page.locator("#session-parts li.later").count(),1);
       assert.equal(await page.locator("#previous-result").isHidden(),true);
       await page.locator("#session-summary").waitFor({state:"visible"});
       assert.match(await page.locator("#session-summary").innerText(),/20/);
