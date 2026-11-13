@@ -36,6 +36,12 @@ id "$ACCOUNT" >/dev/null 2>&1 || { echo "Dedicated live service user missing" >&
 [[ "$(stat -c '%a' "$STATE")" == 700 ]] || { echo "LIVE state must be mode 0700" >&2; exit 2; }
 [[ "$(stat -c '%U' "$STATE")" == "$ACCOUNT" ]] || { echo "LIVE state owner mismatch" >&2; exit 2; }
 # These exact values are expected in the trusted root-owned environment.
+[[ "$(stat -c '%U' "$ENV_FILE")" == root ]] || {
+  echo "LIVE environment must be root-owned" >&2; exit 2;
+}
+[[ ! -w "$ENV_FILE" || "$(stat -c '%a' "$ENV_FILE")" == 640 ]] || {
+  echo "LIVE environment must not be writable by untrusted users" >&2; exit 2;
+}
 grep -qx 'SUPERVISOR_VPS_MODE=live' "$ENV_FILE" || {
   echo "LIVE mode is not configured" >&2; exit 2;
 }
@@ -58,7 +64,7 @@ runuser -u "$ACCOUNT" -- bash -c '
   source "$1"
   set +a
   cd "$2"
-  "$3" -c "from scripts.supervisor_vps_admin import load; i,m=load(); assert m==\x27live\x27"
+  "$3" -c "from scripts.supervisor_vps_admin import load; load()"
 ' bash "$ENV_FILE" "$WORK" "$PY"
 # systemd timer creates a new process each hour. Persistent=true catches
 # missed schedule windows on VPS reboot. The worker handles idempotency in SQLite.
