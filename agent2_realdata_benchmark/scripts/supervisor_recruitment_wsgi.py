@@ -16,6 +16,12 @@ import subprocess
 from scripts.supervisor_vps_wsgi import _release_verified
 from src.prototype.supervisor_recruitment import RecruitmentLedger
 from src.prototype.supervisor_recruitment_web import make_recruitment_app
+from src.prototype.supervisor_recruitment_dispatch import InvitationDispatcher
+from src.prototype.supervisor_operational_intake import OperationalIntake
+from src.prototype.supervisor_synthetic_store import SupervisorSyntheticStore
+from src.prototype.supervisor_content import SupervisorBank
+from src.prototype.supervisor_graph_mail import GraphMailSender
+from scripts.supervisor_vps_wsgi import BANK
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -52,10 +58,39 @@ def make_wsgi_app():
         record=ROOT.parent/".supervisor-source-revision"
         if not record.is_file() or record.read_text().strip()!=commit:
             raise RuntimeError("staging source marker mismatch")
+    ledger=RecruitmentLedger(root)
+    dispatcher=None
+    mailer=None
+    store=None
+    if mode=="live":
+        if os.environ.get("SUPERVISOR_MAIL_TRANSPORT")!="microsoft_graph":
+            raise RuntimeError("institutionally authorized Microsoft Graph transport required")
+        mailer=GraphMailSender(
+            tenant_id=os.environ["SUPERVISOR_GRAPH_TENANT_ID"],
+            client_id=os.environ["SUPERVISOR_GRAPH_CLIENT_ID"],
+            client_secret=os.environ["SUPERVISOR_GRAPH_CLIENT_SECRET"],
+            sender_email=os.environ["SUPERVISOR_GRAPH_SENDER_EMAIL"],
+            live_release_verified=True,
+        )
+        study_host=os.environ.get("SUPERVISOR_VPS_HOST","")
+        if not study_host or "demo" in study_host:
+            raise RuntimeError("real participant study must use canonical non-demo domain")
+        store=SupervisorSyntheticStore(
+            root,bank=SupervisorBank(BANK),operational=True)
+        programs=tuple(v.strip() for v in os.environ.get(
+            "SUPERVISOR_PROGRAMS",""
+        ).split("|") if v.strip())
+        intake=OperationalIntake(store,programs=programs,inactivity_days=7)
+        dispatcher=InvitationDispatcher(
+            intake=intake,ledger=ledger,sender=mailer,
+            hostname=study_host,live_verified=True,
+        )
     return make_recruitment_app(
-        RecruitmentLedger(root),
+        ledger,
         hostname=host,proxy_mode=mode=="live",
         public_intake_enabled=mode=="live",
         research_db=root/"supervisor_operational_study.sqlite3",
         contacts_db=root/"supervisor_operational_contacts.sqlite3",
+        dispatcher=dispatcher,inactivity_sender=mailer,
+        operational_store=store,live_verified=mode=="live",
     )
