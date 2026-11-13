@@ -69,3 +69,15 @@ progress{display:block;width:100%;max-width:100%;height:1rem;accent-color:#215aa
  main.portal{padding:1rem}
  .brand{padding-top:.4rem}
 }
+
+/* Four-part study roadmap: clearly distinguish current, completed and upcoming. */
+.session-parts{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+ gap:.45rem;margin:1rem 0;padding:0}
+.session-parts[hidden]{display:none!important}
+.session-parts li{padding:.65rem .45rem;border:1px solid #d0dae5;border-radius:.4rem;
+ background:#f6f8fa;color:#44566e;text-align:center;font-size:.9rem;line-height:1.35}
+.session-parts li.active{border:2px solid #245fa1;background:#e9f2ff;
+ color:#103f72;font-weight:750}
+.session-parts li.complete{border-color:#71a78a;background:#eef8f1;color:#1e5f3a}
+.session-parts li.later{border-style:dashed;background:#f8f9fb;color:#52647a}
+@media(max-width:560px){.session-parts{grid-template-columns:repeat(2,minmax(0,1fr))}}

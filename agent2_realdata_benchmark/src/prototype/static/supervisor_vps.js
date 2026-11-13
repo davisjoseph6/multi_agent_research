@@ -8,16 +8,16 @@
  const copy={
   en:{
    site:"Adaptive Learning Study",info:"Information and consent",
-   roadmap:"Three parts: eligibility, learning quiz, and fatigue questionnaire. Initial and final knowledge tests are also included.",
+   roadmap:"Four study activities: pre-test (session 1), learning quiz (sessions 1–3), post-test (session 3), and fatigue questionnaire (sessions 1–3). Eligibility screening comes before registration.",
    aiRule:"Please answer independently. Do not use generative AI tools to solve the questions.",
    ageInfo:"Only adults may participate. Select an age from 18 to 99.",
    programInfo:"Your academic program describes the study sample; it does not determine your experimental group.",
    feedbackNext:"Next question",fatigueNext:"Next fatigue question",
    correctAnswer:"Correct answer",why:"Explanation",explanationEnglish:"Bank explanation (English)",
-   quizIntro:"The initial test is complete. Now begin the learning quiz. You will see feedback after each answer.",
-   preIntro:"Complete the 16-question initial test. No correctness feedback is provided here.",
-   postIntro:"The quiz is finished. Complete the 16-question final test. No correctness feedback is provided here.",
-   surveyIntro:"Quiz finished. Please rate the quiz you just completed. There are no right or wrong answers.",
+   quizIntro:"Learning quiz — you will see feedback after each answer.",
+   preIntro:"Pre-test — answer 16 questions. Correctness feedback is not shown here.",
+   postIntro:"Post-test — answer 16 questions. Correctness feedback is not shown here.",
+   surveyIntro:"Fatigue questionnaire — rate the quiz you just completed; there are no right or wrong answers.",
    fatigueCount:i=>"Fatigue question "+i+" of 6",
    sessionSummary:s=>"Session "+s+" result",
    correctCount:(a,b)=>"Regular quiz score: "+a+" of "+b+" correct",
@@ -53,7 +53,7 @@
    surveyItem:i=>"Fatigue item "+i,
    hint:(n,total)=>"Guiding question "+n+" of "+total,
    reattempt:"Answer the original question again.",
-   waiting:date=>"Next scheduled visit: "+date+" (no early entry).",
+   waiting:date=>"Next scheduled visit: "+date+" (Paris time; no early entry).",
    noInvite:"Open the invitation link sent by the study coordinator.",
    confirmed:"Your participation has ended.",
    error:"The request could not be completed.",
@@ -63,16 +63,16 @@
   },
   fr:{
    site:"Étude sur l'apprentissage adaptatif",info:"Information et consentement",
-   roadmap:"Trois parties : admissibilité, quiz et questionnaire de fatigue. Un pré-test et un post-test sont également prévus.",
+   roadmap:"Quatre activités : pré-test (séance 1), quiz d’apprentissage (séances 1 à 3), post-test (séance 3) et questionnaire de fatigue (séances 1 à 3). La présélection précède l’inscription.",
    aiRule:"Répondez de façon autonome. N'utilisez pas d'outils d'IA générative pour résoudre les questions.",
    ageInfo:"Seuls les adultes peuvent participer. Choisissez un âge entre 18 et 99 ans.",
    programInfo:"Votre formation sert à décrire l'échantillon ; elle ne détermine pas le groupe expérimental.",
    feedbackNext:"Question suivante",fatigueNext:"Question de fatigue suivante",
    correctAnswer:"Bonne réponse",why:"Explication",explanationEnglish:"Explication de la banque (en anglais)",
-   quizIntro:"Le test initial est terminé. Le quiz commence. Une explication apparaîtra après chaque réponse.",
-   preIntro:"Commencez par le test initial de 16 questions, sans retour sur la justesse des réponses.",
-   postIntro:"Le quiz est terminé. Répondez au test final de 16 questions sans retour sur la justesse.",
-   surveyIntro:"Quiz terminé. Évaluez le quiz que vous venez d'effectuer. Il n'y a ni bonne ni mauvaise réponse.",
+   quizIntro:"Quiz d’apprentissage — une explication apparaîtra après chaque réponse.",
+   preIntro:"Pré-test — 16 questions, sans indication de justesse des réponses.",
+   postIntro:"Post-test — 16 questions, sans indication de justesse des réponses.",
+   surveyIntro:"Questionnaire de fatigue — évaluez le quiz terminé ; il n’y a ni bonne ni mauvaise réponse.",
    fatigueCount:i=>"Question de fatigue "+i+" sur 6",
    sessionSummary:s=>"Résultat de la séance "+s,
    correctCount:(a,b)=>"Score du quiz ordinaire : "+a+" bonnes réponses sur "+b,
@@ -109,7 +109,7 @@
    surveyItem:i=>"Item de fatigue "+i,
    hint:(n,total)=>"Question guidée "+n+" sur "+total,
    reattempt:"Répondez de nouveau à la question d'origine.",
-   waiting:date=>"Séance suivante prévue : "+date+" (accès anticipé impossible).",
+   waiting:date=>"Séance suivante prévue : "+date+" (heure de Paris ; accès anticipé impossible).",
    noInvite:"Ouvrez le lien d'invitation envoyé par le responsable de l'étude.",
    confirmed:"Votre participation est terminée.",
    error:"La demande n'a pas pu être traitée.",
@@ -118,6 +118,52 @@
    reveal:"Afficher la question d'origine",
   }
  };
+ const studyParts=["PRETEST","QUIZ","POSTTEST","SURVEY"];
+ const partNames={
+  en:["Pre-test (session 1)","Learning quiz (sessions 1–3)",
+      "Post-test (session 3)","Fatigue questionnaire (sessions 1–3)"],
+  fr:["Pré-test (séance 1)","Quiz d’apprentissage (séances 1–3)",
+      "Post-test (séance 3)","Questionnaire de fatigue (séances 1–3)"],
+ };
+ function updateStudyParts(stage,session){
+  const list=$("session-parts");
+  if(!list)return;
+  list.hidden=false;
+  list.setAttribute("aria-label",lang==="fr"?
+    "Quatre activités réparties sur trois séances":
+    "Four study activities across three sessions");
+  // The post-test is in session 3 only. The pre-test is in session 1 only.
+  // Fatigue occurs after each session's quiz, not after a session-1 post-test.
+  const sequence=session===1?["PRETEST","QUIZ","SURVEY"]:
+                 session===2?["QUIZ","SURVEY"]:
+                 ["QUIZ","POSTTEST","SURVEY"];
+  const index=sequence.indexOf(stage);
+  const finished=stage==="WAITING_NEXT_SESSION"||stage==="DONE";
+  for(const [position,item] of [...list.children].entries()){
+   const part=studyParts[position];
+   item.textContent=(position+1)+". "+partNames[lang][position];
+   let state;
+   if(part==="PRETEST"&&session>1)state="complete";
+   else if(part==="POSTTEST"&&session<3)state="later";
+   else if(finished)state="complete";
+   else if(part===stage)state="active";
+   else state=sequence.indexOf(part)<index?"complete":"upcoming";
+   item.className=state;
+   if(state==="active")item.setAttribute("aria-current","step");
+   else item.removeAttribute("aria-current");
+  }
+ }
+ function parisVisit(value){
+  // Render the API's UTC instant in Paris, independent of browser location.
+  const date=new Date(value);
+  if(!Number.isFinite(date.getTime()))
+   return lang==="fr"?"date indisponible":"date unavailable";
+  return new Intl.DateTimeFormat(lang==="fr"?"fr-FR":"en-GB",{
+   timeZone:"Europe/Paris",weekday:"long",day:"numeric",
+   month:"long",year:"numeric",hour:"2-digit",minute:"2-digit",
+   hourCycle:"h23",
+  }).format(date);
+ }
  const t=(key,...args)=>{
    const val=copy[lang][key];
    if(val===undefined)throw Error("Missing UI copy "+key);
@@ -149,6 +195,7 @@
    document.title=t("site");
    $("site-title").textContent=t("site");
    $("study-roadmap").textContent=t("roadmap");
+   if(registered && phase)updateStudyParts(phase,activeSession);
    $("ai-rule").textContent=t("aiRule");
    $("age-info").textContent=t("ageInfo");
    $("program-info").textContent=t("programInfo");
@@ -321,7 +368,9 @@
    });
    control.append(low,input,high,output);
    panel.append(heading,question,control);
-   $("progress").textContent=t("fatigueCount",surveyStep+1);
+   $("progress").textContent=(lang==="fr"?
+     "Séance "+activeSession+"/3 — Questionnaire de fatigue — ":
+     "Session "+activeSession+"/3 — Fatigue questionnaire — ")+t("fatigueCount",surveyStep+1);
    $("phase-meter").hidden=false;$("phase-meter").max=6;
    $("phase-meter").value=surveyStep+1;
    $("phase-intro").textContent=t("surveyIntro");
@@ -368,7 +417,7 @@
      }
      showSurveyQuestion();
    }else if(data.kind==="waiting_next_session"){
-     $("question").textContent=t("waiting",data.scheduled_for);
+     $("question").textContent=t("waiting",parisVisit(data.scheduled_for));
      visibility($("mode-warning").hidden?"next-session":"staging-next-session");
    }else if(data.kind==="done"){
      $("question").textContent=t("completed");
@@ -420,6 +469,7 @@
    }
  }
  function showProgress(status,data){
+   updateStudyParts(status.phase,status.session);
    if(data.kind==="survey")return;
    const meter=$("phase-meter"),tip=$("phase-intro");
    meter.hidden=false;
@@ -431,13 +481,13 @@
      if(data.kind==="recovery"){
        // Recovery happens BETWEEN ordinary quiz questions, not as a new Q.
        $("progress").textContent=lang==="fr"?
-         "Séance "+status.session+"/3 — aide pédagogique (sans numéro)":
-         "Session "+status.session+"/3 — learning support (unnumbered)";
+         "Séance "+status.session+"/3 — Quiz d’apprentissage — aide pédagogique (sans numéro)":
+         "Session "+status.session+"/3 — Learning quiz — learning support (unnumbered)";
        meter.hidden=true;
      }else{
        $("progress").textContent=lang==="fr"?
-         "Séance "+status.session+"/3 — question "+(status.index+1)+" sur "+total:
-         "Session "+status.session+"/3 — Question "+(status.index+1)+" of "+total;
+         "Séance "+status.session+"/3 — "+partNames[lang][studyParts.indexOf(status.phase)]+" — question "+(status.index+1)+" sur "+total:
+         "Session "+status.session+"/3 — "+partNames[lang][studyParts.indexOf(status.phase)]+" — Question "+(status.index+1)+" of "+total;
      }
      tip.textContent=t(status.phase==="PRETEST"?"preIntro":
                        status.phase==="POSTTEST"?"postIntro":"quizIntro");
