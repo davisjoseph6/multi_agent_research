@@ -346,7 +346,7 @@ class SupervisorSyntheticStore:
         status = db.execute(
             "SELECT status FROM participants WHERE learner_id=?", (ref,)
         ).fetchone()
-        if status is None or status["status"] in ("withdrawn", "removed"):
+        if status is None or status["status"] in ("withdrawn", "removed", "expired"):
             raise SyntheticStudyError("fictional participant is inactive")
 
     def _state(self, db, ref):
