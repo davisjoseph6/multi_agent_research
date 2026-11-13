@@ -86,7 +86,7 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
             "Permissions-Policy":"camera=(),microphone=(),geolocation=()",
             "Content-Security-Policy":(
                 "default-src 'none'; script-src 'self'; style-src 'self'; "
-                "connect-src 'self'; img-src 'none'; object-src 'none'; "
+                "connect-src 'self'; img-src 'self'; object-src 'none'; "
                 "base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
             ),
         })
@@ -138,6 +138,14 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         return send_file(ROOT/"static"/"supervisor_vps.css",
                          mimetype="text/css")
 
+    @app.get("/study/logo.png")
+    def school_logo():
+        # Only a reviewed, committed PNG supplied by the research team.
+        logo=ROOT/"static"/"aivancity_logo.png"
+        if not logo.is_file() or logo.is_symlink():
+            return "",404
+        return send_file(logo,mimetype="image/png")
+
     @app.get("/study/health")
     def health():
         return jsonify(service="supervisor_parallel_three_arm",
@@ -153,6 +161,12 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         eligible=intake.reward_eligible(credential(),at=now())
         filename=(f"info_sheet_{language}_v1.0.html" if eligible else
                   f"info_sheet_{language}_v1.1_nonreward.html")
+        # Never rewrite the immutable prior v1.1 document for participants
+        # who have already recorded consent. Staging displays the professor's
+        # dated, formatted review candidate. Live requires a separately
+        # approved/versioned consent migration before using that candidate.
+        if release_mode=="staging" and not eligible:
+            filename="info_sheet_"+language+"_v1.1_nonreward_20261113_review.html"
         path=ROOT.parents[1]/"content"/"consent"/filename
         return send_file(path,mimetype="text/html")
 
@@ -251,19 +265,29 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         current=store.next_item(ref,token)
         out={k:v for k,v in current.items() if k!="synthetic_only"}
         if state["phase"] in ("PRETEST","POSTTEST","QUIZ","SURVEY"):
-            render_id=secrets.token_urlsafe(24)
             with store._tx() as db:
                 store._authenticated(db,ref,token)
-                db.execute(
-                    "INSERT INTO operational_rendered("
-                    "learner_id,render_id,phase,action,question_id,rendered_at)"
-                    " VALUES(?,?,?,?,?,?) ON CONFLICT(learner_id) DO UPDATE SET "
-                    "render_id=excluded.render_id,phase=excluded.phase,"
-                    "action=excluded.action,question_id=excluded.question_id,"
-                    "rendered_at=excluded.rendered_at",
-                    (ref,render_id,state["phase"],current.get("action"),
-                     current.get("question_id"),iso(now())),
-                )
+                # Preserve the first display time across refreshes.
+                prior=db.execute(
+                    "SELECT render_id,phase,action,question_id FROM "
+                    "operational_rendered WHERE learner_id=?", (ref,),
+                ).fetchone()
+                if (prior is not None and prior["phase"]==state["phase"]
+                        and prior["action"]==current.get("action")
+                        and prior["question_id"]==current.get("question_id")):
+                    render_id=prior["render_id"]
+                else:
+                    render_id=secrets.token_urlsafe(24)
+                    db.execute(
+                        "INSERT INTO operational_rendered("
+                        "learner_id,render_id,phase,action,question_id,rendered_at)"
+                        " VALUES(?,?,?,?,?,?) ON CONFLICT(learner_id) DO UPDATE SET "
+                        "render_id=excluded.render_id,phase=excluded.phase,"
+                        "action=excluded.action,question_id=excluded.question_id,"
+                        "rendered_at=excluded.rendered_at",
+                        (ref,render_id,state["phase"],current.get("action"),
+                         current.get("question_id"),iso(now())),
+                    )
             out["render_id"]=render_id
         if state["phase"]=="WAITING_NEXT_SESSION":
             with store._tx() as db:
@@ -334,7 +358,15 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
                 free_text=value["reflection"],
             )
         clear_render(ref,value["render_id"])
-        return jsonify({k:v for k,v in result.items() if k!="synthetic_only"})
+        returned={k:v for k,v in result.items() if k!="synthetic_only"}
+        # Reveal the correct choice/explanation only AFTER the graded quiz
+        # response is committed, never during screening or pre/post-testing.
+        if (phase=="QUIZ" and result.get("previous_correct") is not None):
+            item=store.bank.get(value["question_id"],form="practice")
+            returned["correct_choice"]=item.correct_answer
+            returned["explanation"]=item.explanation
+            returned["explanation_language"]="en"
+        return jsonify(returned)
 
     @app.post("/study/api/survey")
     def survey():
@@ -351,6 +383,44 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         )
         clear_render(ref,value["render_id"])
         return jsonify({k:v for k,v in result.items() if k!="synthetic_only"})
+
+    @app.post("/study/api/session-summary")
+    def session_summary():
+        data()
+        ref,token=enrolled()
+        with store._tx() as db:
+            store._authenticated(db,ref,token)
+            rows=db.execute(
+                "SELECT s.session_no,s.started_at,s.ended_at,s.status,"
+                " SUM(CASE WHEN e.phase='QUIZ' AND e.action_type='QUESTION'"
+                " THEN 1 ELSE 0 END) AS questions,"
+                " SUM(CASE WHEN e.phase='QUIZ' AND e.action_type='QUESTION'"
+                " THEN COALESCE(e.is_correct,0) ELSE 0 END) AS correct,"
+                " SUM(CASE WHEN e.phase IN ('PRETEST','QUIZ','POSTTEST')"
+                " AND e.action_type='QUESTION' THEN e.response_time_ms ELSE 0 END)"
+                " AS answer_ms "
+                "FROM sessions s LEFT JOIN events e "
+                "ON s.learner_id=e.learner_id AND s.session_no=e.session_no "
+                "WHERE s.learner_id=? GROUP BY s.session_no ORDER BY s.session_no",
+                (ref,),
+            ).fetchall()
+        summaries=[]
+        for row in rows:
+            if row["status"]!="completed" or not row["ended_at"]:
+                continue
+            elapsed=(datetime.fromisoformat(row["ended_at"])-
+                     datetime.fromisoformat(row["started_at"])).total_seconds()
+            total=int(row["questions"])
+            count=int(row["correct"])
+            summaries.append(dict(
+                session=row["session_no"],quiz_correct=count,
+                quiz_questions=total,
+                quiz_percentage=round(100*count/total,1) if total else None,
+                question_answer_seconds=round(row["answer_ms"]/1000,1),
+                elapsed_seconds=round(max(0,elapsed),1),
+                elapsed_includes_breaks=True,
+            ))
+        return jsonify(sessions=summaries, arm_disclosed=False)
 
     @app.post("/study/api/next-session")
     def next_session():

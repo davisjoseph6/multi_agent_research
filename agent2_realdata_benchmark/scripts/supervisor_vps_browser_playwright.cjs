@@ -48,6 +48,8 @@ async function run(){
                       {waitUntil:"networkidle"});
       await page.locator("#information").waitFor({state:"visible"});
       assert.equal(new URL(page.url()).hash,"");
+      assert.match(await page.locator("#ai-rule").innerText(),/generative AI/i);
+      assert.equal(await page.locator("#info-copy h2").count()>5,true);
       if(isFrench){
         await page.locator("#language").selectOption("fr");
         await page.waitForFunction(()=>
@@ -77,7 +79,7 @@ async function run(){
         }else await next.click();
       }
       await page.locator("#registration").waitFor({state:"visible"});
-      await page.locator("#age").fill("23");
+      await page.locator("#age").selectOption("23");
       await page.locator("#program").selectOption("Test student program");
       let nextItem=page.waitForResponse(respond("item"));
       await page.locator("#register").click();
@@ -94,8 +96,20 @@ async function run(){
           document.querySelector("#question").textContent===question,
           item.question_text);
         await page.locator('#choices input[value="'+correct+'"]').check();
-        nextItem=page.waitForResponse(respond("item"));
-        await page.locator("#answer").click();
+        if(item.action==="QUESTION"){
+          const answerRes=page.waitForResponse(respond("answer"));
+          await page.locator("#answer").click();
+          const feedback=await (await answerRes).json();
+          assert.equal(feedback.correct_choice,correct);
+          assert.equal(feedback.previous_correct,true);
+          await page.locator("#answer-feedback").waitFor({state:"visible"});
+          assert.match(await page.locator("#feedback-explanation").innerText(),/Explanation|Explication/);
+          nextItem=page.waitForResponse(respond("item"));
+          await page.locator("#feedback-next").click();
+        }else{
+          nextItem=page.waitForResponse(respond("item"));
+          await page.locator("#answer").click();
+        }
         item=await (await nextItem).json();
       }
       for(let i=0;i<16;i++)await submitCorrect("question");
@@ -103,14 +117,24 @@ async function run(){
       assert.equal(await page.locator("#previous-result").isHidden(),true);
       for(let i=0;i<20;i++)await submitCorrect("question");
       assert.equal(item.kind,"survey");
+      await page.locator("#fatigue-0").waitFor({state:"visible"});
+      assert.equal(await page.locator("#previous-result").isHidden(),true);
+      assert.match(await page.locator("#phase-intro").innerText(),/Quiz|quiz/);
+      for(let i=0;i<5;i++){
+        assert.equal(await page.locator("#surveys input[type=range]").count(),1);
+        assert.equal(await page.locator("#fatigue-"+i).getAttribute("min"),"1");
+        assert.equal(await page.locator("#fatigue-"+i).getAttribute("max"),"7");
+        await page.locator("#fatigue-next").click();
+      }
+      assert.equal(await page.locator("#fatigue-5").count(),1);
       await page.locator("#submit-survey").waitFor({state:"visible"});
-      assert.equal(await page.locator("#previous-result-icon").innerText(),"✓");
-      for(let i=0;i<5;i++)await page.locator("#fatigue-"+i).selectOption("4");
       nextItem=page.waitForResponse(respond("item"));
       await page.locator("#submit-survey").click();
       item=await (await nextItem).json();
       assert.equal(item.kind,"waiting_next_session");
       assert.equal(await page.locator("#previous-result").isHidden(),true);
+      await page.locator("#session-summary").waitFor({state:"visible"});
+      assert.match(await page.locator("#session-summary").innerText(),/20/);
       assert.deepEqual(pageErrors,[]);
       console.log("PASS "+fixture+" / "+["A","B","C"][index]+" / "+
                   (isFrench?"French mobile":"English desktop")+

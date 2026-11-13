@@ -3,9 +3,33 @@
  const $=id=>document.getElementById(id);
  let lang="en",current=null,screening=[],screenIndex=0,answers={};
  let hintIndex=0,reflections=[],previous=null,phase=null,busy=false,registered=false;
+ let activeSession=1,quizIndex=0,surveyStep=0,surveyValues=Array(6).fill(4),surveySeen=false;
  const copy={
   en:{
    site:"Adaptive Learning Study",info:"Information and consent",
+   roadmap:"Three parts: eligibility, learning quiz, and fatigue questionnaire. Initial and final knowledge tests are also included.",
+   aiRule:"Please answer independently. Do not use generative AI tools to solve the questions.",
+   ageInfo:"Only adults may participate. Select an age from 18 to 99.",
+   programInfo:"Your academic program describes the study sample; it does not determine your experimental group.",
+   feedbackNext:"Next question",fatigueNext:"Next fatigue question",
+   correctAnswer:"Correct answer",why:"Explanation",explanationEnglish:"Bank explanation (English)",
+   quizIntro:"The initial test is complete. Now begin the learning quiz. You will see feedback after each answer.",
+   preIntro:"Complete the 16-question initial test. No correctness feedback is provided here.",
+   postIntro:"The quiz is finished. Complete the 16-question final test. No correctness feedback is provided here.",
+   surveyIntro:"Quiz finished. Please rate the quiz you just completed. There are no right or wrong answers.",
+   fatigueCount:i=>"Fatigue question "+i+" of 6",
+   sessionSummary:s=>"Session "+s+" result",
+   correctCount:(a,b)=>"Regular quiz score: "+a+" of "+b+" correct",
+   timeAnswer:s=>"Time answering scored questions: "+s+" seconds",
+   timeElapsed:s=>"Elapsed session time (including breaks): "+s+" seconds",
+   fatigueQuestions:[
+    ["Mental demand. How mentally demanding was the quiz?","Very low","Very high"],
+    ["Physical demand. How physically demanding was the quiz?","Very low","Very high"],
+    ["Time pressure. How hurried or rushed did you feel?","Very low","Very high"],
+    ["Performance. How successful were you in doing what you were asked to do?","Perfect","Failure"],
+    ["Effort. How hard did you have to work to reach your level of performance?","Very low","Very high"],
+    ["Frustration. How insecure, discouraged, irritated or stressed did you feel?","Very low","Very high"],
+   ],
    begin:"I agree and continue",course:"I previously took an economics course",
    screen:"Eligibility screening",next:"Next",finish:"Finish screening",
    nofeedback:"No correctness feedback is provided for screening.",
@@ -38,6 +62,29 @@
   },
   fr:{
    site:"Étude sur l'apprentissage adaptatif",info:"Information et consentement",
+   roadmap:"Trois parties : admissibilité, quiz et questionnaire de fatigue. Un pré-test et un post-test sont également prévus.",
+   aiRule:"Répondez de façon autonome. N'utilisez pas d'outils d'IA générative pour résoudre les questions.",
+   ageInfo:"Seuls les adultes peuvent participer. Choisissez un âge entre 18 et 99 ans.",
+   programInfo:"Votre formation sert à décrire l'échantillon ; elle ne détermine pas le groupe expérimental.",
+   feedbackNext:"Question suivante",fatigueNext:"Question de fatigue suivante",
+   correctAnswer:"Bonne réponse",why:"Explication",explanationEnglish:"Explication de la banque (en anglais)",
+   quizIntro:"Le test initial est terminé. Le quiz commence. Une explication apparaîtra après chaque réponse.",
+   preIntro:"Commencez par le test initial de 16 questions, sans retour sur la justesse des réponses.",
+   postIntro:"Le quiz est terminé. Répondez au test final de 16 questions sans retour sur la justesse.",
+   surveyIntro:"Quiz terminé. Évaluez le quiz que vous venez d'effectuer. Il n'y a ni bonne ni mauvaise réponse.",
+   fatigueCount:i=>"Question de fatigue "+i+" sur 6",
+   sessionSummary:s=>"Résultat de la séance "+s,
+   correctCount:(a,b)=>"Score du quiz ordinaire : "+a+" bonnes réponses sur "+b,
+   timeAnswer:s=>"Temps de réponse aux questions notées : "+s+" secondes",
+   timeElapsed:s=>"Durée totale de la séance (pauses incluses) : "+s+" secondes",
+   fatigueQuestions:[
+    ["Exigence mentale. Le quiz vous a-t-il demandé beaucoup d'effort mental ?","Très faible","Très élevée"],
+    ["Exigence physique. Le quiz vous a-t-il demandé beaucoup d'effort physique ?","Très faible","Très élevée"],
+    ["Pression temporelle. Vous êtes-vous senti pressé ou bousculé ?","Très faible","Très élevée"],
+    ["Performance. Dans quelle mesure avez-vous réussi les tâches proposées ?","Parfaite","Échec"],
+    ["Effort. Quelle quantité de travail a été nécessaire pour votre performance ?","Très faible","Très élevée"],
+    ["Frustration. Vous êtes-vous senti inquiet, découragé, irrité ou stressé ?","Très faible","Très élevée"],
+   ],
    begin:"J'accepte et je continue",course:"J'ai déjà suivi un cours d'économie",
    screen:"Test de présélection",next:"Suivant",finish:"Terminer la présélection",
    nofeedback:"La présélection ne donne aucune indication de justesse.",
@@ -82,7 +129,7 @@
                    "learning","finished","excluded","stop"])$(p).hidden=p!==id;
  }
  function visibility(...ids){
-   for(const id of ["answer","continue","hint-next","submit-survey","next-session","staging-next-session"])
+   for(const id of ["answer","continue","hint-next","submit-survey","next-session","staging-next-session","feedback-next","fatigue-next"])
      $(id).hidden=!ids.includes(id);
  }
  async function api(route,body={}){
@@ -100,6 +147,12 @@
    document.documentElement.lang=lang;
    document.title=t("site");
    $("site-title").textContent=t("site");
+   $("study-roadmap").textContent=t("roadmap");
+   $("ai-rule").textContent=t("aiRule");
+   $("age-info").textContent=t("ageInfo");
+   $("program-info").textContent=t("programInfo");
+   $("feedback-next").textContent=t("feedbackNext");
+   $("fatigue-next").textContent=t("fatigueNext");
    $("info-title").textContent=t("info");
    $("start-consent").textContent=t("begin");
    $("exclude-course").textContent=t("course");
@@ -157,12 +210,15 @@
    const r=await fetch("/study/info/"+lang,{cache:"no-store"});
    if(!r.ok)throw Error("Information sheet unavailable");
    const page=new DOMParser().parseFromString(await r.text(),"text/html");
-   const content=page.querySelector("article pre, main pre, pre");
-   if(!content)throw Error("Approved information sheet is missing");
+   const content=page.querySelector("main");
+   if(!content)throw Error("Information sheet is missing");
    $("info-copy").replaceChildren();
-   const pre=document.createElement("pre");
-   pre.textContent=content.textContent;
-   $("info-copy").append(pre);
+   // Trusted same-origin, version-controlled sheet: keep semantic headings,
+   // paragraph spacing, bold words and links instead of printing raw Markdown.
+   for(const element of content.children){
+     if(["H1","H2","H3","P","SECTION","UL","OL","PRE","A"].includes(element.tagName))
+       $("info-copy").append(document.importNode(element,true));
+   }
    const field=$("consent-required");field.replaceChildren();
    const legend=document.createElement("legend");
    legend.textContent=t("required");field.append(legend);
@@ -189,11 +245,20 @@
    show("screening");
    const q=screening[screenIndex];
    $("screen-number").textContent=t("questionNumber",screenIndex+1);
+   $("screen-meter").value=screenIndex+1;
    $("screen-prompt").textContent=q.question_text;
    selectChoices($("screen-options"),q.options,"screen-choice");
    $("screen-next").textContent=screenIndex===7?t("finish"):t("next");
  }
  async function programs(){
+   const ages=$("age");ages.replaceChildren();
+   const prompt=document.createElement("option");prompt.value="";
+   prompt.textContent=lang==="fr"?"Choisissez un âge (18–99)":"Choose an age (18–99)";
+   ages.append(prompt);
+   for(let n=18;n<=99;n++){
+     const option=document.createElement("option");
+     option.value=String(n);option.textContent=String(n);ages.append(option);
+   }
    const resp=await api("programs");
    const selection=$("program");selection.replaceChildren();
    for(const v of resp.programs){
@@ -215,8 +280,39 @@
    $("hint-next").textContent=hintIndex===1?t("reveal"):t("hintNext");
    visibility("hint-next");
  }
+ function showSurveyQuestion(){
+   const item=t("fatigueQuestions")[surveyStep];
+   const panel=$("surveys");panel.replaceChildren();panel.hidden=false;
+   const heading=document.createElement("h3");
+   heading.textContent=t("fatigueCount",surveyStep+1);
+   const question=document.createElement("p");question.textContent=item[0];
+   const control=document.createElement("div");control.className="scale";
+   const low=document.createElement("span"),high=document.createElement("span");
+   low.textContent="1 — "+item[1];high.textContent="7 — "+item[2];
+   const input=document.createElement("input");
+   input.type="range";input.min="1";input.max="7";input.step="1";
+   input.value=String(surveyValues[surveyStep]);
+   input.id="fatigue-"+surveyStep;
+   input.setAttribute("aria-label",item[0]);
+   const output=document.createElement("output");
+   output.htmlFor=input.id;
+   output.textContent=String(surveyValues[surveyStep]);
+   input.addEventListener("input",()=>{
+     surveyValues[surveyStep]=Number(input.value);
+     output.textContent=input.value;
+   });
+   control.append(low,input,high,output);
+   panel.append(heading,question,control);
+   $("progress").textContent=t("fatigueCount",surveyStep+1);
+   $("phase-meter").hidden=false;$("phase-meter").max=6;
+   $("phase-meter").value=surveyStep+1;
+   $("phase-intro").textContent=t("surveyIntro");
+   visibility(surveyStep===5?"submit-survey":"fatigue-next");
+ }
  function renderItem(data){
    current=data;hintIndex=0;reflections=[];
+   $("answer-feedback").hidden=true;
+   $("session-summary").hidden=true;
    $("question").textContent="";
    $("teaching").hidden=true;$("reflection").hidden=true;
    $("choices").hidden=true;$("surveys").hidden=true;
@@ -249,25 +345,91 @@
        visibility("continue");
      }else throw Error("Unknown recovery stage");
    }else if(data.kind==="survey"){
-     $("question").textContent=t("fatigue");
-     $("surveys").replaceChildren();$("surveys").hidden=false;
-     for(let i=0;i<6;i++){
-       const label=document.createElement("label");
-       label.textContent=t("surveyItem",i+1);
-       const input=document.createElement("select");input.id="fatigue-"+i;
-       for(let k=1;k<=7;k++){
-         const opt=document.createElement("option");
-         opt.value=String(k);opt.textContent=String(k);input.append(opt);
-       }
-       label.append(input);$("surveys").append(label);
+     if(!surveySeen){
+       surveySeen=true;surveyStep=0;surveyValues=Array(6).fill(4);
      }
-     visibility("submit-survey");
+     showSurveyQuestion();
    }else if(data.kind==="waiting_next_session"){
      $("question").textContent=t("waiting",data.scheduled_for);
      visibility($("mode-warning").hidden?"next-session":"staging-next-session");
    }else if(data.kind==="done"){
      $("question").textContent=t("completed");
    }else throw Error("Unexpected stage "+data.kind);
+ }
+ function showProgress(status,data){
+   if(data.kind==="survey")return;
+   const meter=$("phase-meter"),tip=$("phase-intro");
+   meter.hidden=false;
+   if(status.phase==="PRETEST" || status.phase==="POSTTEST" ||
+      status.phase==="QUIZ"){
+     const total=status.phase==="QUIZ"?(status.session===3?15:20):16;
+     meter.max=total;
+     meter.value=Math.min(total,status.index+1);
+     if(data.kind==="recovery"){
+       // Recovery happens BETWEEN ordinary quiz questions, not as a new Q.
+       $("progress").textContent=lang==="fr"?
+         "Séance "+status.session+"/3 — aide pédagogique (sans numéro)":
+         "Session "+status.session+"/3 — learning support (unnumbered)";
+       meter.hidden=true;
+     }else{
+       $("progress").textContent=lang==="fr"?
+         "Séance "+status.session+"/3 — question "+(status.index+1)+" sur "+total:
+         "Session "+status.session+"/3 — Question "+(status.index+1)+" of "+total;
+     }
+     tip.textContent=t(status.phase==="PRETEST"?"preIntro":
+                       status.phase==="POSTTEST"?"postIntro":"quizIntro");
+   }else{
+     meter.hidden=true;
+     $("progress").textContent=lang==="fr"?
+       "Séance "+status.session+"/3 terminée":
+       "Session "+status.session+"/3 completed";
+     tip.textContent=lang==="fr"?
+       "Le questionnaire est terminé. Résultats du quiz ci-dessous.":
+       "The questionnaire is complete. Quiz results appear below.";
+   }
+ }
+ function showAnswerFeedback(resp,chosen){
+   if(!["A","B","C","D"].includes(resp.correct_choice))
+     throw Error("Server did not return authorized post-answer feedback");
+   const panel=$("answer-feedback");panel.hidden=false;
+   panel.className="feedback "+(resp.previous_correct?"correct":"incorrect");
+   $("feedback-title").textContent=resp.previous_correct?
+     (lang==="fr"?"Bonne réponse":"Correct"):
+     (lang==="fr"?"Réponse incorrecte":"Incorrect");
+   const answerText=current.options[resp.correct_choice];
+   $("feedback-answer").textContent=t("correctAnswer")+": "+
+     resp.correct_choice+". "+(answerText||"");
+   $("feedback-explanation").textContent=t(resp.explanation_language===lang?
+     "why":"explanationEnglish")+": "+(resp.explanation||"");
+   for(const label of $("choices").querySelectorAll("label")){
+     const input=label.querySelector("input");
+     if(!input)continue;
+     input.disabled=true;
+     if(input.value===resp.correct_choice)label.classList.add("correct-option");
+     else if(input.value===chosen&&!resp.previous_correct)
+       label.classList.add("incorrect-option");
+   }
+   $("previous-result").hidden=true;
+   visibility("feedback-next");
+   panel.scrollIntoView({behavior:"smooth",block:"nearest"});
+ }
+ async function showCompletedSummary(id){
+   const node=$(id);node.replaceChildren();
+   const results=await api("session-summary");
+   if(!results.sessions?.length){node.hidden=true;return}
+   node.hidden=false;
+   for(const row of results.sessions){
+     const section=document.createElement("section");
+     const h=document.createElement("h3");h.textContent=t("sessionSummary",row.session);
+     const score=document.createElement("p");
+     score.textContent=t("correctCount",row.quiz_correct,row.quiz_questions)+
+       " ("+row.quiz_percentage+"%)";
+     const answered=document.createElement("p");
+     answered.textContent=t("timeAnswer",row.question_answer_seconds);
+     const elapsed=document.createElement("p");
+     elapsed.textContent=t("timeElapsed",row.elapsed_seconds);
+     section.append(h,score,answered,elapsed);node.append(section);
+   }
  }
  async function refresh(){
    if(busy)return;
@@ -285,17 +447,21 @@
      }else if(status.stage==="screened"){
        await programs();show("registration");
      }else if(registered){
-       phase=status.phase;
-       $("progress").textContent=t("progress",status.session,status.phase,status.index);
+       phase=status.phase;activeSession=status.session;quizIndex=status.index;
+       previous=null;feedback();
        if(status.phase==="DONE"){
-         previous=null;feedback();
+         surveySeen=false;
          const result=await api("debrief");
          $("debrief").textContent=result.text;show("finished");
+         await showCompletedSummary("finished-summary");
        }else{
-         if(!["QUIZ","SURVEY"].includes(status.phase))previous=null;
-         feedback();
-         renderItem(await api("item"));
+         if(status.phase!=="SURVEY")surveySeen=false;
+         const item=await api("item");
+         renderItem(item);
+         showProgress(status,item);
          show("learning");
+         if(status.phase==="WAITING_NEXT_SESSION")
+           await showCompletedSummary("session-summary");
        }
      }else show("entry");
    }catch(e){error(e.message);show("entry")}
@@ -334,7 +500,12 @@
    }catch(e){error(e.message)}
  });
  $("register").addEventListener("click",()=>{
-   act("register",{age:Number($("age").value),program:$("program").value});
+   const age=Number($("age").value);
+   if(!Number.isInteger(age)||age<18||age>99){
+     error(lang==="fr"?"Choisissez un âge entre 18 et 99.":"Select an age from 18 to 99.");
+     return;
+   }
+   act("register",{age,program:$("program").value});
  });
  $("language").addEventListener("change",async()=>{
    const desired=$("language").value;
@@ -349,15 +520,22 @@
      }
    }catch(e){error(e.message);$("language").value=lang}
  });
- function reply(choice,reflection=null){
-   return act("answer",{
-     render_id:current.render_id,
-     request_id:"submit_"+crypto.randomUUID().replaceAll("-",""),
-     question_id:current.question_id||null,
-     choice,reflection,
-   },resp=>{
-     previous=typeof resp.previous_correct==="boolean"?resp.previous_correct:null;
-   });
+ async function reply(choice,reflection=null){
+   if(busy)return;
+   busy=true;error("");notice("");
+   try{
+     const resp=await api("answer",{
+       render_id:current.render_id,
+       request_id:"submit_"+crypto.randomUUID().replaceAll("-",""),
+       question_id:current.question_id||null,
+       choice,reflection,
+     });
+     if(resp.feedback_phase==="QUIZ"&&typeof resp.previous_correct==="boolean"){
+       showAnswerFeedback(resp,choice);
+       busy=false;return;
+     }
+   }catch(e){busy=false;error(e.message);return}
+   busy=false;await refresh();
  }
  $("answer").addEventListener("click",()=>{
    try{
@@ -382,11 +560,19 @@
    // The main answer handler submits the two typed reflections alongside
    // the graded four-option re-attempt. No answer is revealed before then.
  });
- $("submit-survey").addEventListener("click",()=>{
-   const values=Array.from({length:6},(_,i)=>Number($("fatigue-"+i).value));
-   act("survey",{render_id:current.render_id,request_id:"survey_"+crypto.randomUUID().replaceAll("-",""),values},
-       ()=>{previous=null});
+ $("fatigue-next").addEventListener("click",()=>{
+   surveyStep++;
+   if(surveyStep>=6)return;
+   showSurveyQuestion();
  });
+ $("submit-survey").addEventListener("click",()=>{
+   if(surveyStep!==5)return;
+   act("survey",{render_id:current.render_id,
+       request_id:"survey_"+crypto.randomUUID().replaceAll("-"),
+       values:surveyValues.slice()},
+       ()=>{previous=null;surveySeen=false});
+ });
+ $("feedback-next").addEventListener("click",refresh);
  $("next-session").addEventListener("click",()=>act("next-session"));
  $("staging-next-session").addEventListener("click",()=>{
    if(!$("mode-warning").hidden)act("staging-next-session");
@@ -408,6 +594,11 @@
  $("withdraw-keep").addEventListener("click",()=>withdraw(false));
  $("withdraw-delete").addEventListener("click",()=>withdraw(true));
  async function initial(){
+   const logo=$("school-logo"),fallback=$("school-wordmark");
+   const loaded=()=>{logo.hidden=false;fallback.hidden=true};
+   logo.addEventListener("load",loaded);
+   logo.addEventListener("error",()=>{logo.hidden=true;fallback.hidden=false});
+   if(logo.complete&&logo.naturalWidth>0)loaded();
    updateLanguage();
    const params=new URLSearchParams(window.location.hash.slice(1));
    const token=params.get("invite");

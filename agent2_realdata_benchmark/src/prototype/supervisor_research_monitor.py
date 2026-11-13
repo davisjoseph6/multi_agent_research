@@ -9,7 +9,10 @@ and MUST NOT inform the participant's intervention policy.
 """
 from __future__ import annotations
 
+import csv
+from datetime import datetime
 import hashlib
+import io
 import hmac
 import json
 from pathlib import Path
@@ -17,7 +20,7 @@ import re
 import secrets
 import sqlite3
 
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, Response, jsonify, request, send_file
 from werkzeug.exceptions import Unauthorized, Forbidden, MethodNotAllowed
 from werkzeug.datastructures import WWWAuthenticate
 
@@ -115,6 +118,82 @@ def make_monitor_app(research_db: str | Path, *, admin_password_hash: str) -> Fl
         return send_file(ROOT / "static" / "supervisor_research_monitor.css",
                          mimetype="text/css")
 
+    def session_metrics(ref=None):
+        """Read-only, pseudonymous completed and in-progress session metrics."""
+        with connect() as db:
+            rows=db.execute(
+                "SELECT p.learner_id,p.grp,s.session_no,s.status,"
+                "s.started_at,s.ended_at,"
+                "SUM(CASE WHEN e.phase='QUIZ' AND e.action_type='QUESTION' "
+                "THEN 1 ELSE 0 END) AS quiz_count,"
+                "SUM(CASE WHEN e.phase='QUIZ' AND e.action_type='QUESTION' "
+                "THEN COALESCE(e.is_correct,0) ELSE 0 END) AS quiz_correct,"
+                "SUM(CASE WHEN e.phase IN ('PRETEST','QUIZ','POSTTEST') "
+                "AND e.action_type='QUESTION' THEN e.response_time_ms ELSE 0 END) "
+                "AS answer_ms "
+                "FROM sessions s JOIN participants p USING(learner_id) "
+                "LEFT JOIN events e ON e.learner_id=s.learner_id "
+                "AND e.session_no=s.session_no "
+                "WHERE (? IS NULL OR p.learner_id=?) "
+                "GROUP BY p.learner_id,s.session_no "
+                "ORDER BY p.learner_id,s.session_no",
+                (ref,ref),
+            ).fetchall()
+        result=[]
+        for row in rows:
+            elapsed=None
+            if row["started_at"] and row["ended_at"]:
+                elapsed=round(max(0,(datetime.fromisoformat(row["ended_at"])-
+                    datetime.fromisoformat(row["started_at"])).total_seconds()),1)
+            total=int(row["quiz_count"] or 0)
+            correct=int(row["quiz_correct"] or 0)
+            result.append(dict(
+                learner_id=row["learner_id"],arm=row["grp"],
+                session=row["session_no"],status=row["status"],
+                quiz_correct=correct,quiz_questions=total,
+                quiz_percentage=round(100*correct/total,1) if total else None,
+                question_answer_seconds=round((row["answer_ms"] or 0)/1000,1),
+                elapsed_seconds=elapsed,elapsed_includes_breaks=True,
+            ))
+        return result
+
+    @app.get("/admin/api/session-metrics.csv")
+    def session_metrics_csv():
+        out=io.StringIO()
+        fields=("learner_id","arm","session","status","quiz_correct",
+                "quiz_questions","quiz_percentage","question_answer_seconds",
+                "elapsed_seconds","elapsed_includes_breaks")
+        writer=csv.DictWriter(out,fieldnames=fields);writer.writeheader()
+        for row in session_metrics():writer.writerow(row)
+        return Response(out.getvalue(),mimetype="text/csv",
+                        headers={"Content-Disposition":
+                                 "attachment; filename=study-session-metrics.csv"})
+
+    @app.get("/admin/api/question-timings.csv")
+    def question_timings_csv():
+        out=io.StringIO()
+        writer=csv.writer(out)
+        writer.writerow(("learner_id","arm","session","phase","question_id",
+                         "action","answered_at_utc","response_seconds",
+                         "correct"))
+        with connect() as db:
+            rows=db.execute(
+                "SELECT p.learner_id,p.grp,e.session_no,e.phase,e.question_id,"
+                "e.action_type,e.answered_at,e.response_time_ms,e.is_correct "
+                "FROM events e JOIN participants p USING(learner_id) "
+                "WHERE e.question_id IS NOT NULL "
+                "AND e.phase IN ('PRETEST','QUIZ','POSTTEST') "
+                "ORDER BY p.learner_id,e.event_id"
+            ).fetchall()
+        for row in rows:
+            writer.writerow((row["learner_id"],row["grp"],row["session_no"],
+                row["phase"],row["question_id"],row["action_type"],
+                row["answered_at"],round(row["response_time_ms"]/1000,3),
+                "" if row["is_correct"] is None else int(row["is_correct"])))
+        return Response(out.getvalue(),mimetype="text/csv",
+                        headers={"Content-Disposition":
+                                 "attachment; filename=study-question-timings.csv"})
+
     @app.get("/admin/api/participants")
     def participants():
         with connect() as db:
@@ -155,7 +234,7 @@ def make_monitor_app(research_db: str | Path, *, admin_password_hash: str) -> Fl
                 return jsonify(error="no such participant"), 404
             rows = db.execute(
                 "SELECT e.event_id,e.session_no,e.action_type,e.concept_id,"
-                " e.bloom_level,e.answered_at,h.state_json "
+                " e.bloom_level,e.answered_at,e.response_time_ms,h.state_json "
                 "FROM events e JOIN state_history h USING(event_id) "
                 "WHERE e.learner_id=? AND e.phase='QUIZ' "
                 "AND e.action_type IN ('QUESTION','DROP_2','SOCRATIC_HINT') "
@@ -178,6 +257,7 @@ def make_monitor_app(research_db: str | Path, *, admin_password_hash: str) -> Fl
                 "x":n, "event_id":row["event_id"],
                 "session":row["session_no"],"action":row["action_type"],
                 "concept":row["concept_id"],"answered_at":row["answered_at"],
+                "response_seconds":round(row["response_time_ms"]/1000,3),
                 "mastery":curve,
             })
         current_state = json.loads(participant["state_json"])
@@ -188,7 +268,7 @@ def make_monitor_app(research_db: str | Path, *, admin_password_hash: str) -> Fl
             session=participant["session_no"], stage=participant["step"],
             last_update=participant["updated_at"], concepts=list(CONCEPT_IDS),
             current_mastery={k:current.get(k) for k in CONCEPT_IDS},
-            points=points, x_axis="Scored quiz/recovery response index",
+            sessions=session_metrics(ref),points=points, x_axis="Scored quiz/recovery response index",
             y_axis="Estimated BKT mastery probability (0–1)",
             contains_pii=False, observational_only=True,
             interpretation="BKT estimates, not measured knowledge",
