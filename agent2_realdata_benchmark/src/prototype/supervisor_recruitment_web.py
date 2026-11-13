@@ -53,6 +53,8 @@ def make_recruitment_app(
                 or not research_db.is_file() or not contacts_db.is_file()
                 or research_db.is_symlink() or contacts_db.is_symlink()):
             raise ValueError("existing non-symlink private databases required")
+    if public_intake_enabled and live_verified is not True:
+        raise ValueError("public recruitment forms require signed LIVE release")
     if public_intake_enabled:
         if type(intake_rate_secret) is not bytes or len(intake_rate_secret)<32:
             raise ValueError("protected intake request quota secret required")
