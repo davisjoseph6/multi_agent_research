@@ -151,7 +151,11 @@ def make_recruitment_app(
     def _check_initial_csrf():
         # A forced password-change request must also be CSRF guarded.
         token=request.headers.get("X-CSRF-Token","")
-        if not hmac.compare_digest(token,request.cookies.get("recruitment_csrf","")):
+        cookie=request.cookies.get("recruitment_csrf","")
+        # Empty token and absent cookie must NEVER compare equal. The initial
+        # mandatory password-change route gets the same nonempty CSRF rule as
+        # every other authenticated state mutation.
+        if not token or not cookie or not hmac.compare_digest(token,cookie):
             raise RecruitmentError("invalid initial password change CSRF")
 
     def paired_db():
