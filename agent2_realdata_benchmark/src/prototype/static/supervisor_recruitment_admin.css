@@ -22,3 +22,12 @@ tr:hover td{background:#f7fbfc}
 footer{border-top:1px solid #ccdbe4;padding:1rem 0}
 [hidden]{display:none!important}
 @media(max-width:740px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.section-head{display:block}.top{align-items:flex-start;flex-direction:column}}
+
+.chart-wrap{width:100%;max-width:100%;overflow:auto;border:1px solid #d2e2e9;border-radius:12px;background:#fbfdff}
+.chart-wrap svg{display:block;width:100%;min-width:600px;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:1rem;padding:1rem 0;color:#263a4a}
+.legend span{display:inline-flex;align-items:center;gap:.35rem}
+.legend-dot{display:inline-block;width:.85rem;height:.85rem;border-radius:50%}
+.inline-button{background:transparent;color:#056d75;text-decoration:underline;
+ padding:0;font-weight:700}
+.inline-button:hover{background:transparent;color:#03444b}
