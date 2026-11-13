@@ -26,6 +26,9 @@ command -v python3 >/dev/null
 command -v caddy >/dev/null
 command -v curl >/dev/null
 command -v systemctl >/dev/null
+command -v flock >/dev/null
+exec 9>/run/lock/ijcai-supervisor-staging-deploy.lock
+flock -n 9 || { echo "Another staging deployment is already running" >&2; exit 2; }
 
 if ! id ijcai-supervisor >/dev/null 2>&1; then
     useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin ijcai-supervisor
