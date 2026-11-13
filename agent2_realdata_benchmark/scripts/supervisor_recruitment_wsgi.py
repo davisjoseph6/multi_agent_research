@@ -114,4 +114,8 @@ def make_wsgi_app():
         dispatcher=dispatcher,inactivity_sender=mailer,
         operational_store=store,live_verified=mode=="live",
         privacy_notices=privacy_notices,
+        intake_rate_secret=(
+            os.environ["SUPERVISOR_INTAKE_RATE_SECRET"].encode("utf-8")
+            if mode=="live" else None
+        ),
     )
