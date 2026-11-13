@@ -136,6 +136,12 @@ class RecruitmentLedger:
                   subject_id INTEGER,
                   details TEXT
                 );
+                CREATE TABLE IF NOT EXISTS intake_rate(
+                  ip_digest TEXT NOT NULL,
+                  utc_day TEXT NOT NULL,
+                  n INTEGER NOT NULL,
+                  PRIMARY KEY(ip_digest,utc_day)
+                );
                 CREATE TABLE IF NOT EXISTS mail_dispatch(
                   candidate_id INTEGER PRIMARY KEY REFERENCES candidates(candidate_id),
                   state TEXT NOT NULL CHECK(state IN ('dispatching','accepted','uncertain')),
@@ -170,6 +176,32 @@ class RecruitmentLedger:
             raise
         finally:
             db.close()
+
+    def check_intake_rate(self, *, remote_ip: str, secret: bytes,
+                          at: datetime, max_per_day: int = 10) -> bool:
+        """Private salted daily counter; raw source IP is never stored."""
+        if (type(remote_ip) is not str or not 3 <= len(remote_ip) <= 64
+                or type(secret) is not bytes or len(secret)<32
+                or type(max_per_day) is not int or not 1 <= max_per_day <= 100):
+            raise RecruitmentError("invalid request rate-limit configuration")
+        day=utc(at)[:10]
+        digest=hmac.new(secret,remote_ip.encode(),"sha256").hexdigest()
+        with self._tx() as db:
+            db.execute("DELETE FROM intake_rate WHERE utc_day<?",(day,))
+            db.execute(
+                "INSERT OR IGNORE INTO intake_rate VALUES(?,?,0)",(digest,day)
+            )
+            n=db.execute(
+                "SELECT n FROM intake_rate WHERE ip_digest=? AND utc_day=?",
+                (digest,day),
+            ).fetchone()[0]
+            if n>=max_per_day:
+                return False
+            db.execute(
+                "UPDATE intake_rate SET n=n+1 WHERE ip_digest=? AND utc_day=?",
+                (digest,day),
+            )
+        return True
 
     def apply(self, *, email: str, first_name: str | None = None,
               last_name: str | None = None, questionnaire: str,
