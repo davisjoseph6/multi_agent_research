@@ -58,6 +58,26 @@ def make_wsgi_app():
         record=ROOT.parent/".supervisor-source-revision"
         if not record.is_file() or record.read_text().strip()!=commit:
             raise RuntimeError("staging source marker mismatch")
+    privacy_notices=None
+    if mode=="live":
+        privacy_notices={}
+        public_key=Path(os.environ["SUPERVISOR_INSTITUTION_PUBLIC_KEY"])
+        if not public_key.is_file() or public_key.is_symlink():
+            raise RuntimeError("trusted institutional signing key required")
+        for language in ("en","fr"):
+            document=Path(os.environ[f"SUPERVISOR_RECRUITMENT_NOTICE_{language.upper()}"])
+            signature=Path(os.environ[f"SUPERVISOR_RECRUITMENT_NOTICE_SIGNATURE_{language.upper()}"])
+            if (not document.is_absolute() or document.suffix.lower()!=".pdf"
+                    or not document.is_file() or document.is_symlink()
+                    or not signature.is_file() or signature.is_symlink()):
+                raise RuntimeError("approved bilingual recruitment notice and signature required")
+            check=subprocess.run([
+                "openssl","dgst","-sha256","-verify",str(public_key),
+                "-signature",str(signature),str(document)],
+                capture_output=True,text=True,timeout=10,check=False)
+            if check.returncode!=0:
+                raise RuntimeError("institutional bilingual recruitment notice signature invalid")
+            privacy_notices[language]=document
     ledger=RecruitmentLedger(root)
     dispatcher=None
     mailer=None
@@ -93,4 +113,5 @@ def make_wsgi_app():
         contacts_db=root/"supervisor_operational_contacts.sqlite3",
         dispatcher=dispatcher,inactivity_sender=mailer,
         operational_store=store,live_verified=mode=="live",
+        privacy_notices=privacy_notices,
     )
