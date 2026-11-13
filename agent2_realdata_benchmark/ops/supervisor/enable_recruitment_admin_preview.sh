@@ -50,6 +50,10 @@ ExecStart=/srv/ijcai-supervisor-staging/venv/bin/gunicorn --bind 127.0.0.1:8791 
 Restart=on-failure
 RestartSec=5
 ProtectSystem=strict
+# The private SQLite ledger must remain writable under ProtectSystem=strict.
+# All other filesystem paths are read-only; do not grant write access to
+# source releases, Caddy, or operator data outside this protected directory.
+ReadWritePaths=/var/lib/ijcai-supervisor-staging
 ProtectHome=true
 PrivateTmp=true
 NoNewPrivileges=true
