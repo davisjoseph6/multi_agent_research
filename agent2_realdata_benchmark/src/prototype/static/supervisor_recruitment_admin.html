@@ -49,6 +49,21 @@
  <div class="scroll"><table><thead><tr>
  <th>Student</th><th>Email</th><th>Optional name</th><th>Session</th><th>Current stage</th><th>Status</th><th>Last activity (UTC)</th>
  </tr></thead><tbody id="students"></tbody></table></div></section>
+ <section class="panel">
+  <h2>Individual mastery and inter-question timing</h2>
+  <p class="muted">Select a student above. Mastery estimates are observational and do not change randomization or recovery decisions.</p>
+  <p id="selected-student" aria-live="polite">No student selected</p>
+  <div class="chart-wrap">
+    <svg id="mastery-chart" viewBox="0 0 950 370" role="img" aria-label="BKT mastery progression" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+  <div id="chart-legend" class="legend"></div>
+  <h3>Time between consecutive question answers</h3>
+  <p class="muted">Decimal values; intervals include breaks, instructions, and interventions (different from answer latency).</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Session</th><th>Phase</th><th>Question</th>
+    <th>Milliseconds</th><th>Seconds</th><th>Hours</th><th>Days</th></tr></thead>
+    <tbody id="intervals"></tbody></table></div>
+ </section>
  <section class="panel"><h2>Reminder settings</h2>
  <label class="row-select"><input id="auto-reminder" type="checkbox"> Automatic reminders enabled (policy setting only; mail transport not yet connected)</label>
  <p class="muted">The application must never send a recruitment questionnaire automatically; only the supervisor sends those links.</p>
