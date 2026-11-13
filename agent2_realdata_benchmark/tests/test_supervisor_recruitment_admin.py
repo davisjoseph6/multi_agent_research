@@ -265,3 +265,31 @@ def test_decimal_time_intervals_include_breaks_not_just_response_latency(tmp_pat
     assert rows[1]["response_latency_ms"]==2000
     assert rows[1]["includes_breaks_and_interventions"] is True
     db.close()
+
+
+def test_three_four_seven_day_idle_policy_and_session_waiting():
+    from src.prototype.supervisor_inactivity_policy import (
+        evaluate_inactivity,make_reminder_text,
+    )
+    last=T
+    def check(days,**changes):
+        args=dict(now=T+timedelta(days=days),last_active=last,phase="QUIZ",
+                  session=2,status="active",locale="en",automatic_enabled=True)
+        args.update(changes)
+        return evaluate_inactivity(**args)
+    assert not check(2.9)["send"]
+    assert check(3)["reason"]=="automatic_three_day_encouragement"
+    assert check(3,automatic_enabled=False)["send"] is False
+    assert check(4,automatic_enabled=False,manual_requested=True)["send"]
+    assert not check(4,manual_requested=True,
+                     last_reminder=T+timedelta(days=3.5))["send"]
+    assert not check(5,last_reminder=T+timedelta(days=3))["send"]
+    assert check(6,last_reminder=T+timedelta(days=3))["send"]
+    assert check(7)["expired"] and not check(7)["send"]
+    assert not check(100,phase="WAITING_NEXT_SESSION")["expired"]
+    assert not check(100,phase="DONE")["expired"]
+    assert not check(100,status="withdrawn")["expired"]
+    assert "learning quiz" in make_reminder_text(
+        session=2,phase="QUIZ",language="en")
+    assert "quiz d’apprentissage" in make_reminder_text(
+        session=2,phase="QUIZ",language="fr")
