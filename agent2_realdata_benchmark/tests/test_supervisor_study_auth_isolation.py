@@ -70,3 +70,45 @@ def test_no_credential_reuse_or_unsupported_hash():
         render(original(), "plaintext-password")
     with pytest.raises(ValueError, match="bcrypt"):
         render(original(), "$argon2id$v=19$m=47104")
+
+
+from ops.supervisor.separate_caddy_auth_realms import render as split_realms
+
+
+def test_browser_auth_realms_are_distinct_without_credential_mutation():
+    source=render(original(),HASH)
+    separated=split_realms(source)
+    assert "basic_auth @supervisorStudy bcrypt StudyReview {" in separated
+    assert "basic_auth @frontend bcrypt OperatorDemo {" in separated
+    assert separated.count("operator REPLACE_WITH_CADDY_HASH_PASSWORD")==1
+    assert separated.count("studyreviewer "+HASH)==1
+    assert "reverse_proxy @supervisorStudy 127.0.0.1:8788" in separated
+    assert "reverse_proxy 127.0.0.1:8077" in separated
+    assert split_realms(separated)==separated
+    assert separated.replace(
+        "basic_auth @supervisorStudy bcrypt StudyReview {",
+        "basic_auth @supervisorStudy {",
+    ).replace(
+        "basic_auth @frontend bcrypt OperatorDemo {",
+        "basic_auth @frontend {",
+    )==source
+
+
+@pytest.mark.parametrize("change",[
+    lambda x:x.replace("basic_auth @supervisorStudy {",
+                       "basic_auth @supervisorStudy bcrypt UnknownRealm {"),
+    lambda x:x.replace("basic_auth @frontend {",
+                       "basic_auth @frontend bcrypt UnknownRealm {"),
+    lambda x:x.replace("reverse_proxy 127.0.0.1:8077",
+                       "reverse_proxy 127.0.0.1:1234"),
+    lambda x:x.replace("@supervisorStudy path /study /study/*",
+                       "@supervisorStudy path /study /study/* /admin/*"),
+    lambda x:x.replace("basic_auth @supervisorStudy {",
+                       "basic_auth @supervisorStudy {\n"
+                       "    studyreviewer $2a$14$"+("A"*53)+"\n"
+                       "    }\n"
+                       "    basic_auth @supervisorStudy {"),
+])
+def test_realm_split_refuses_unknown_or_ambiguous_layout(change):
+    with pytest.raises(ValueError):
+        split_realms(change(render(original(),HASH)))

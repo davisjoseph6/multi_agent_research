@@ -79,16 +79,19 @@ async function run(){
           await page.locator("#language").selectOption("en");
           const translated=(await english).json();
           assert.equal((await translated).language,"en");
-          assert.equal(await page.locator("#screen-number").innerText(),"Question 3 of 8");
-          assert.equal(await page.locator("#screen-prompt").innerText(),
-                       (await translated).questions[2].question_text);
+          await page.waitForFunction(expected=>
+            document.querySelector("#screen-number").textContent==="Question 3 of 8" &&
+            document.querySelector("#screen-prompt").textContent===expected,
+          (await translated).questions[2].question_text);
           assert.notEqual((await translated).questions[2].question_text,q.question_text);
           assert.equal(await page.locator('#screen-options input[value="'+chosen+'"]').isChecked(),true);
           const french=page.waitForResponse(respond("screening"));
           await page.locator("#language").selectOption("fr");
           await french;
-          assert.equal(await page.locator("#screen-number").innerText(),"Question 3 sur 8");
-          assert.equal(await page.locator("#screen-prompt").innerText(),q.question_text);
+          await page.waitForFunction(expected=>
+            document.querySelector("#screen-number").textContent==="Question 3 sur 8" &&
+            document.querySelector("#screen-prompt").textContent===expected,
+          q.question_text);
           assert.equal(await page.locator('#screen-options input[value="'+chosen+'"]').isChecked(),true);
         }
         const next=page.locator("#screen-next");
