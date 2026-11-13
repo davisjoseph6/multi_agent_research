@@ -446,5 +446,5 @@ def test_read_only_database_preflight_fails_on_contact_hash_mismatch(tmp_path):
                    ("0"*64,))
     status=inspect_state(tmp_path)
     assert status["passed"] is False
-    assert status["technical_db_checks"]["registered_token_hashes_match"] is False
+    assert status["technical_db_checks"]["registered_credentials_consistent"] is False
     assert status["contains_identifying_contact_details"] is False
