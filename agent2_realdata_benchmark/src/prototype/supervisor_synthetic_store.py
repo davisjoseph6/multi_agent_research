@@ -783,6 +783,35 @@ class SupervisorSyntheticStore:
                 "WHERE learner_id=? AND session_no=?",
                 (iso(at), ref, session),
             )
+            if session < 3:
+                # A learner may pause a quiz or finish a visit late. The
+                # original D0/D4/D8 dates cannot force the next visit to
+                # start less than three full days after the preceding one
+                # actually finished. Respect an existing later approved
+                # schedule; only move earlier scheduled visits forward.
+                next_session=db.execute(
+                    "SELECT scheduled_for,status FROM sessions "
+                    "WHERE learner_id=? AND session_no=?",
+                    (ref,session+1),
+                ).fetchone()
+                if (next_session is None or next_session["status"]!="scheduled"):
+                    raise SyntheticStudyError("upcoming session not available")
+                earliest=at + timedelta(days=3)
+                planned=datetime.fromisoformat(next_session["scheduled_for"])
+                if planned < earliest:
+                    db.execute(
+                        "UPDATE sessions SET scheduled_for=? "
+                        "WHERE learner_id=? AND session_no=? AND status='scheduled'",
+                        (iso(earliest),ref,session+1),
+                    )
+                    # Old pending messages refer to superseded dates and
+                    # must not be sent. Retain sent records for private audit.
+                    db.execute(
+                        "DELETE FROM pii.reminder_outbox "
+                        "WHERE learner_id=? AND session_no=? "
+                        "AND status='pending' AND scheduled_for!=?",
+                        (ref,session+1,iso(earliest)),
+                    )
             if session == 3:
                 state["phase"] = "DONE"
                 db.execute(
