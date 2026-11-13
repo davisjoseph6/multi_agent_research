@@ -146,3 +146,5 @@ jobs:
         run: node scripts/supervisor_vps_browser_playwright.cjs
       - name: Researcher-only live BKT dashboard in real Chromium
         run: node scripts/supervisor_research_monitor_playwright.cjs
+      - name: Operational staging language switch and second Socratic hint persistence
+        run: node scripts/supervisor_vps_language_playwright.cjs

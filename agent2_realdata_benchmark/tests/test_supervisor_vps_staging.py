@@ -352,3 +352,63 @@ def test_staging_logo_falls_back_when_png_not_committed(tmp_path):
     assert response.status_code in (200,404)
     if response.status_code==200:
         assert response.mimetype=="image/png"
+
+
+def test_mid_screening_language_override_preserves_signed_consent(tmp_path):
+    """Signed consent stays French; questions may display in English.
+    
+    The locale-only endpoint never scores, changes an item ID, or accepts a
+    client's proposal for the current screening question or answer keys.
+    """
+    store,intake,_,post=stack(tmp_path)
+    token=intake.issue("switch-screen@example.example",at=NOW(),allow_example=True)
+    assert post("exchange",{"token":token}).status_code==200
+    assert post("consent",{"checks":[True]*5,"optional":False,
+                           "language":"fr"}).status_code==200
+    fr=post("screening").json
+    assert fr["language"]=="fr"
+    en_result=post("screening",{"language":"en"})
+    assert en_result.status_code==200,en_result.json
+    en=en_result.json
+    assert en["language"]=="en"
+    assert [q["question_id"] for q in fr["questions"]]==[
+        q["question_id"] for q in en["questions"]]
+    assert fr["questions"][2]["question_text"]!=en["questions"][2]["question_text"]
+    assert set(fr["questions"][2]["options"])==set(en["questions"][2]["options"])
+    assert post("status").json["stage"]=="consented"
+    assert post("status").json["language"]=="fr"
+    for invalid in ({"language":"de"},{"language":""},{"language":1},
+                    {"language":"en","index":0},{"index":0}):
+        assert post("screening",invalid).status_code==409
+    assert post("screening",{"language":"fr"}).json["questions"]==fr["questions"]
+
+    answers={
+        q.question_id:(q.correct_answer if i<4 else next(
+            a for a in "ABCD" if a!=q.correct_answer))
+        for i,q in enumerate(store.bank.forms["screening"])
+    }
+    assert post("screen",{"answers":answers}).json["eligible"]
+    assert post("register",{"age":23,"program":"Test student program"}).status_code==200
+    assert post("language",{"language":"en"}).status_code==200
+    assert post("status").json["study_language"]=="en"
+    ref=intake.learner(token,at=NOW())
+    with store._tx() as db:
+        row=db.execute("SELECT consent_lang,study_language FROM participants "
+                       "WHERE learner_id=?",(ref,)).fetchone()
+    assert (row["consent_lang"],row["study_language"])==("fr","en")
+
+
+def test_mid_question_language_change_preserves_render_credential(tmp_path):
+    """A translated pre-test item is the same measured exposure."""
+    store,intake,_,post=stack(tmp_path)
+    token=intake.issue("switch-render@example.example",at=NOW(),allow_example=True)
+    complete_intake(intake,store,token)
+    assert post("exchange",{"token":token}).status_code==200
+    first=post("item").json
+    assert post("language",{"language":"fr"}).status_code==200
+    french=post("item").json
+    assert first["question_id"]==french["question_id"]
+    assert first["render_id"]==french["render_id"]
+    assert first["question_text"]!=french["question_text"]
+    assert post("language",{"language":"en"}).status_code==200
+    assert post("item").json["render_id"]==first["render_id"]
