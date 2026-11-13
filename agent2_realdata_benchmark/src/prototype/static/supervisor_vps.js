@@ -4,6 +4,7 @@
  let lang="en",current=null,screening=[],screenIndex=0,answers={};
  let hintIndex=0,reflections=[],previous=null,phase=null,busy=false,registered=false;
  let activeSession=1,quizIndex=0,surveyStep=0,surveyValues=Array(6).fill(4),surveySeen=false;
+ let lastFeedback=null;
  const copy={
   en:{
    site:"Adaptive Learning Study",info:"Information and consent",
@@ -235,11 +236,28 @@
    label.append(input,document.createTextNode(result.optional));
    optional.append(label);
  }
- async function screen(){
-   const response=await api("screening");
-   screening=response.questions;screenIndex=0;answers={};
-   if(screening.length!==8)throw Error("Expected eight screening questions");
+ async function screen(preserve=false){
+   // The server translates only the displayed wording. Question identifiers,
+   // answer letters and signed consent remain unchanged.
+   const priorId=screening[screenIndex]?.question_id;
+   const priorChoice=document.querySelector('#screen-options input[name="screen-choice"]:checked')?.value;
+   const response=await api("screening",{language:lang});
+   const questions=response.questions;
+   if(questions.length!==8)throw Error("Expected eight screening questions");
+   if(preserve){
+     if(screening.length!==8 || questions.some((q,i)=>
+       q.question_id!==screening[i].question_id) ||
+       questions[screenIndex].question_id!==priorId)
+       throw Error("Screening question identity changed during translation");
+   }else{
+     screenIndex=0;answers={};
+   }
+   screening=questions;
    drawScreen();
+   if(preserve && priorChoice){
+     const option=$("screen-options").querySelector('input[value="'+priorChoice+'"]');
+     if(option)option.checked=true;
+   }
  }
  function drawScreen(){
    show("screening");
@@ -356,6 +374,51 @@
      $("question").textContent=t("completed");
    }else throw Error("Unexpected stage "+data.kind);
  }
+ function showSocraticReattempt(){
+   $("reflection").hidden=true;
+   $("teaching").hidden=true;
+   $("question").textContent=t("reattempt")+" "+current.question_text;
+   selectChoices($("choices"),current.options,"answer-choice");
+   $("choices").hidden=false;
+   visibility("answer");
+ }
+ function itemDraft(){
+   if(!current)return null;
+   return {
+     kind:current.kind,action:current.action,
+     questionId:current.question_id,renderId:current.render_id,
+     selected:document.querySelector('#choices input[name="answer-choice"]:checked')?.value,
+     hintIndex,reflections:reflections.slice(),
+     reasoning:$("reasoning").value,
+     surveyStep,surveyValues:surveyValues.slice(),surveySeen,
+   };
+ }
+ function renderKeepingDraft(data){
+   const saved=itemDraft();
+   const same=Boolean(saved && saved.renderId && data.render_id===saved.renderId &&
+     data.kind===saved.kind && data.action===saved.action &&
+     data.question_id===saved.questionId);
+   renderItem(data);
+   if(!same)return;
+   if(data.kind==="recovery"&&data.action==="SOCRATIC_HINT"){
+     hintIndex=saved.hintIndex;reflections=saved.reflections.slice();
+     if(hintIndex>=2)showSocraticReattempt();
+     else{
+       socratic();
+       $("reasoning").value=saved.reasoning;
+     }
+   }
+   if(data.kind==="survey"){
+     surveyStep=saved.surveyStep;
+     surveyValues=saved.surveyValues.slice();
+     surveySeen=saved.surveySeen;
+     showSurveyQuestion();
+   }
+   if(saved.selected){
+     const option=$("choices").querySelector('input[name="answer-choice"][value="'+saved.selected+'"]');
+     if(option)option.checked=true;
+   }
+ }
  function showProgress(status,data){
    if(data.kind==="survey")return;
    const meter=$("phase-meter"),tip=$("phase-intro");
@@ -389,6 +452,7 @@
    }
  }
  function showAnswerFeedback(resp,chosen){
+   lastFeedback={response:resp,chosen};
    if(!["A","B","C","D"].includes(resp.correct_choice))
      throw Error("Server did not return authorized post-answer feedback");
    const panel=$("answer-feedback");panel.hidden=false;
@@ -437,8 +501,12 @@
    try{
      const status=await api("status");
      registered=status.stage==="participant";
-     if(status.stage!=="invited"&&(status.study_language||status.language)){
-       lang=status.study_language||status.language;updateLanguage();
+     // A screening translation does NOT alter the signed consent locale.
+     // Do not force the consent language back onto an active screening page.
+     if(status.stage==="participant"&&status.study_language){
+       lang=status.study_language;updateLanguage();
+     }else if(status.stage==="consented"&&!screening.length&&status.language){
+       lang=status.language;updateLanguage();
      }
      if(status.stage==="invited"){
        await info();show("information");
@@ -457,7 +525,7 @@
        }else{
          if(status.phase!=="SURVEY")surveySeen=false;
          const item=await api("item");
-         renderItem(item);
+         renderKeepingDraft(item);
          showProgress(status,item);
          show("learning");
          if(status.phase==="WAITING_NEXT_SESSION")
@@ -472,7 +540,7 @@
    busy=true;error("");notice("");
    try{
      const resp=await api(route,payload);
-     if(onDone)onDone(resp);
+     if(onDone)await onDone(resp);
    }catch(e){error(e.message);busy=false;return}
    busy=false;await refresh();
  }
@@ -505,20 +573,72 @@
      error(lang==="fr"?"Choisissez un âge entre 18 et 99.":"Select an age from 18 to 99.");
      return;
    }
-   act("register",{age,program:$("program").value});
+   act("register",{age,program:$("program").value},
+       async()=>{await api("language",{language:lang})});
  });
- $("language").addEventListener("change",async()=>{
-   const desired=$("language").value;
+ async function changeLanguage(desired){
+   if(desired!=="en"&&desired!=="fr")throw Error("Invalid display language");
+   if(desired===lang)return;
+   const original=lang;
+   let serverChanged=false;
    try{
      if(registered){
+       // Server owns the language of subsequent answers/events; this does
+       // not submit, skip or repeat any scored question or hint.
        await api("language",{language:desired});
-       lang=desired;updateLanguage();await refresh();
-     }else if(phase===null){
-       lang=desired;updateLanguage();await refresh();
-     }else{
+       serverChanged=true;
        lang=desired;updateLanguage();
+       if(!$("learning").hidden){
+         if(!$("answer-feedback").hidden && lastFeedback){
+           // The answer is ALREADY committed: /item now points to the NEXT
+           // question. Never fetch it before the learner presses Next.
+           showAnswerFeedback(lastFeedback.response,lastFeedback.chosen);
+         }else{
+           const item=await api("item");
+           renderKeepingDraft(item);
+           showProgress({phase,session:activeSession,index:quizIndex},item);
+           if(phase==="WAITING_NEXT_SESSION")await showCompletedSummary("session-summary");
+         }
+       }else if(!$("finished").hidden){
+         await showCompletedSummary("finished-summary");
+       }
+     }else if(!$("screening").hidden){
+       lang=desired;updateLanguage();
+       await screen(true);
+     }else if(!$("information").hidden){
+       const checks=[...$("consent-required").querySelectorAll("input.required")].map(x=>x.checked);
+       const optional=$("optional-choice")?.checked||false;
+       lang=desired;updateLanguage();
+       await info();
+       const required=[...$("consent-required").querySelectorAll("input.required")];
+       if(required.length===checks.length){
+         required.forEach((box,i)=>box.checked=checks[i]);
+       }
+       $("optional-choice").checked=optional;
+     }else{
+       // Registration is still local UI state. Preserve age and program.
+       lang=desired;updateLanguage();
+       if(!$("registration").hidden){
+         const label=$("age").querySelector('option[value=""]');
+         if(label)label.textContent=lang==="fr"?
+           "Choisissez un âge (18–99)":"Choose an age (18–99)";
+       }
      }
-   }catch(e){error(e.message);$("language").value=lang}
+   }catch(e){
+     // A successful /language request is authoritative: do not lie about
+     // the server locale if the subsequent local render failed.
+     if(!serverChanged){
+       lang=original;updateLanguage();
+     }
+     error(e.message);
+   }
+ }
+ $("language").addEventListener("change",async()=>{
+   if(busy){$("language").value=lang;return}
+   const desired=$("language").value;
+   busy=true;error("");
+   try{await changeLanguage(desired)}
+   finally{busy=false}
  });
  async function reply(choice,reflection=null){
    if(busy)return;
@@ -552,11 +672,7 @@
    reflections.push(value);
    hintIndex++;
    if(hintIndex<2){socratic();return}
-   $("reflection").hidden=true;
-   $("teaching").hidden=true;
-   $("question").textContent=t("reattempt")+" "+current.question_text;
-   selectChoices($("choices"),current.options,"answer-choice");
-   $("choices").hidden=false;visibility("answer");
+   showSocraticReattempt();
    // The main answer handler submits the two typed reflections alongside
    // the graded four-option re-attempt. No answer is revealed before then.
  });
