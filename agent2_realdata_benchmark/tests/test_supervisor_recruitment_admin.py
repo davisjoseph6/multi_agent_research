@@ -364,3 +364,49 @@ def test_public_intake_is_forbidden_without_separately_verified_live_release(led
             ledger,public_intake_enabled=True,
             privacy_notices=notices,intake_rate_secret=b"x"*32,
         )
+
+
+def test_staging_recruitment_service_can_write_only_its_private_state():
+    """ProtectSystem=strict must not make the SQLite candidate ledger read-only."""
+    from pathlib import Path
+    import subprocess
+    root=Path(__file__).resolve().parents[1]
+    script=root/"ops/supervisor/enable_recruitment_admin_preview.sh"
+    source=script.read_text()
+    assert subprocess.run(["bash","-n",str(script)],check=False).returncode==0
+    assert "ProtectSystem=strict" in source
+    assert "ReadWritePaths=/var/lib/ijcai-supervisor-staging" in source
+    assert "127.0.0.1:8791" in source
+    assert "SUPERVISOR_VPS_MODE=staging" in source
+    assert 'form_status" == 404' in source or '$form_status" == 404' in source
+    assert "EnvironmentFile=/etc/ijcai-supervisor-staging/staging.env" in source
+
+
+def test_live_hourly_reminder_timer_is_fail_closed_and_never_runs_in_staging():
+    """No live credentials or emails are baked into the systemd unit."""
+    from pathlib import Path
+    import subprocess
+    root=Path(__file__).resolve().parents[1]
+    script=root/"ops/supervisor/install_live_reminder_timer.sh"
+    source=script.read_text()
+    assert subprocess.run(["bash","-n",str(script)],check=False).returncode==0
+    assert "SUPERVISOR_VPS_MODE=live" in source
+    assert "SUPERVISOR_MAIL_TRANSPORT=microsoft_graph" in source
+    assert "from scripts.supervisor_vps_admin import load; load()" in source
+    assert "ProtectSystem=strict" in source
+    assert "ReadWritePaths=$STATE" in source
+    assert "Persistent=true" in source
+    assert "OnCalendar=hourly" in source
+    assert "flock -n $STATE/.reminders.lock" in source
+    assert "scripts.supervisor_vps_daily --grace-hours $GRACE_HOURS --send" in source
+    assert "/srv/ijcai-supervisor-live" in source
+    assert 'systemctl enable --now ijcai-supervisor-live-reminders.timer' in source
+    assert 'systemctl start ijcai-supervisor-live-reminders.service' not in source
+
+
+def test_deploy_rollback_uses_unique_temporary_symlink():
+    from pathlib import Path
+    root=Path(__file__).resolve().parents[1]
+    source=(root/"ops/supervisor/install_staging.sh").read_text()
+    assert '.rollback-current.$$' in source
+    assert '.rollback-current.$"' not in source
