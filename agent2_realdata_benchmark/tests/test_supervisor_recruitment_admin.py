@@ -153,9 +153,15 @@ def test_admin_http_protected_pii_and_bilingual_public_intake(ledger,tmp_path):
     research,contacts=fake_db(tmp_path)
     ledger.provision(email="davis.joseph@aivancity.education",
                      temporary_password=P,at=datetime.now(timezone.utc))
+    notices={}
+    for language in ("en","fr"):
+        notice=tmp_path/f"approved_recruitment_{language}.pdf"
+        notice.write_bytes(b"%PDF-1.4\n% fake fictional test-only notice\n")
+        notices[language]=notice
     app=make_recruitment_app(
         ledger,public_intake_enabled=True,
         research_db=research,contacts_db=contacts,
+        privacy_notices=notices,
     )
     client=app.test_client()
     def post(path,payload):
@@ -167,6 +173,8 @@ def test_admin_http_protected_pii_and_bilingual_public_intake(ledger,tmp_path):
     assert client.get("/control/api/overview").status_code==409
     assert client.get("/control/api/candidates").status_code==409
     assert client.get("/interest/school").status_code==200
+    assert client.get("/interest/privacy/en").status_code==200
+    assert client.get("/interest/privacy/fr").status_code==200
     assert client.get("/interest/external").status_code==200
     assert post("/interest/api/apply",dict(
         email="student@example.org",first_name="Test",last_name="Student",
