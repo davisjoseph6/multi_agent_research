@@ -60,7 +60,7 @@ def _password_digest(password: str, *, salt: bytes | None = None) -> str:
     if type(password) is not str or not 18 <= len(password) <= 512:
         raise RecruitmentError("password must contain 18–512 characters")
     salt = secrets.token_bytes(16) if salt is None else salt
-    return f"pbkdf2_sha256\u0024{PASSWORD_ITERATIONS}\u0024{salt.hex()}\u0024{pbkdf2_hmac('sha256',password.encode(),salt,PASSWORD_ITERATIONS).hex()}"
+    return f"pbkdf2_sha256${PASSWORD_ITERATIONS}${salt.hex()}${pbkdf2_hmac('sha256',password.encode(),salt,PASSWORD_ITERATIONS).hex()}"
 
 
 def _password_valid(password: str, stored: str) -> bool:
@@ -211,29 +211,36 @@ class RecruitmentLedger:
     def login(self, *, email: str, password: str, at: datetime):
         address=canonical_email(email)
         t=utc(at)
+        denied=False
+        result=None
         with self._tx() as db:
             row=db.execute("SELECT * FROM administrators WHERE email=?",
                            (address,)).fetchone()
             # A single error for bad user/password (no account enumeration).
             if row is None or row["enabled"]!=1:
-                raise RecruitmentError("invalid credentials")
-            if row["locked_until"] and row["locked_until"]>t:
-                raise RecruitmentError("invalid credentials")
-            if not _password_valid(password,row["password_hash"]):
+                denied=True
+            elif row["locked_until"] and row["locked_until"]>t:
+                denied=True
+            elif not _password_valid(password,row["password_hash"]):
                 fails=row["failures"]+1
                 locked=utc(at+timedelta(minutes=15)) if fails>=5 else None
                 db.execute("UPDATE administrators SET failures=?,locked_until=? WHERE email=?",
                            (fails,locked,address))
-                raise RecruitmentError("invalid credentials")
-            db.execute("UPDATE administrators SET failures=0,locked_until=NULL WHERE email=?",
-                       (address,))
-            session=secrets.token_urlsafe(48)
-            csrf=secrets.token_urlsafe(32)
-            db.execute("INSERT INTO admin_sessions VALUES(?,?,?,?,?)",
-                       (sha256(session.encode()).hexdigest(),address,
-                        sha256(csrf.encode()).hexdigest(),utc(at+SESSION_AGE),t))
-            return dict(cookie=session,csrf=csrf,role=row["role"],
-                        must_change_password=bool(row["must_change_password"]))
+                denied=True
+            else:
+                db.execute("UPDATE administrators SET failures=0,locked_until=NULL WHERE email=?",
+                           (address,))
+                session=secrets.token_urlsafe(48)
+                csrf=secrets.token_urlsafe(32)
+                db.execute("INSERT INTO admin_sessions VALUES(?,?,?,?,?)",
+                           (sha256(session.encode()).hexdigest(),address,
+                            sha256(csrf.encode()).hexdigest(),utc(at+SESSION_AGE),t))
+                result=dict(cookie=session,csrf=csrf,role=row["role"],
+                            must_change_password=bool(row["must_change_password"]))
+        # Reject *after* transaction commits so lockout counters persist.
+        if denied:
+            raise RecruitmentError("invalid credentials")
+        return result
 
     def authenticate(self, *, cookie: str, at: datetime,
                      csrf: str | None = None, mutation: bool = False) -> dict:
