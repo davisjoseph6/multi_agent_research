@@ -35,6 +35,7 @@ def make_recruitment_app(
     operational_store=None,
     live_verified: bool = False,
     privacy_notices: dict[str,Path] | None = None,
+    intake_rate_secret: bytes | None = None,
 ) -> Flask:
     """Create application without enabling delivery or human participation."""
     if not isinstance(ledger,RecruitmentLedger):
@@ -52,6 +53,8 @@ def make_recruitment_app(
                 or research_db.is_symlink() or contacts_db.is_symlink()):
             raise ValueError("existing non-symlink private databases required")
     if public_intake_enabled:
+        if type(intake_rate_secret) is not bytes or len(intake_rate_secret)<32:
+            raise ValueError("protected intake request quota secret required")
         if not isinstance(privacy_notices,dict) or set(privacy_notices)!=set(("en","fr")):
             raise ValueError("independently signed English/French recruitment notices required")
         for notice in privacy_notices.values():
@@ -347,6 +350,10 @@ def make_recruitment_app(
             return "",404
         data=body("email","first_name","last_name","questionnaire",
                   "language","privacy_accepted")
+        if not ledger.check_intake_rate(
+                remote_ip=request.remote_addr,
+                secret=intake_rate_secret,at=now()):
+            return jsonify(error="Submission quota reached; contact research coordinator"),429
         ledger.apply(
             email=data["email"],first_name=data["first_name"],
             last_name=data["last_name"],questionnaire=data["questionnaire"],
