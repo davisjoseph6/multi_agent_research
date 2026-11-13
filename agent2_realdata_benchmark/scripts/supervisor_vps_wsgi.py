@@ -104,7 +104,10 @@ def make_wsgi_app():
         raise RuntimeError("at least one institutionally chosen program required")
     release_ok=_release_verified(commit) if mode=="live" else False
     store=SupervisorSyntheticStore(root,bank=SupervisorBank(BANK),operational=True)
-    intake=OperationalIntake(store,programs=programs)
+    intake=OperationalIntake(
+        store,programs=programs,
+        inactivity_days=7 if mode=="live" else None,
+    )
     app=make_supervisor_vps_app(
         intake,hostname=host,proxy_mode=True,release_mode=mode,
         release_authorized=release_ok,
