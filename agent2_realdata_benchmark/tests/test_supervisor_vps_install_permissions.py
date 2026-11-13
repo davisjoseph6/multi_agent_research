@@ -45,9 +45,16 @@ def test_installer_fixes_preexisting_release_before_systemd_restart():
     copy = text.index('cp -a "$SOURCE/." "$RELEASE/"')
     normalization = text.index('\nchmod 0755 "$RELEASE"\n')
     preflight = text.index('runuser -u ijcai-supervisor -- test -x')
-    link = text.index('ln -sfn "${PREFIX}/releases/${SHA}" "${PREFIX}/current"')
+    link = text.index('ln -s "${PREFIX}/releases/${SHA}" "${PREFIX}/.next-current.$"')
+    swap = text.index('mv -Tf "${PREFIX}/.next-current.$" "${PREFIX}/current"')
     restart = text.index('systemctl restart "${SERVICE}"')
-    assert copy < normalization < preflight < link < restart
+    assert copy < normalization < preflight < link < swap < restart
+    assert "trap rollback EXIT" in text
+    assert "SUPERVISOR_VPS_MODE" in text
+    assert "Expected an exact pre-existing STAGING environment value" in text
+    assert 'cp -a "$ROLLBACK_DIR/staging.env" "$ENV_FILE"' in text
+    assert 'cp -a "$ROLLBACK_DIR/Caddyfile" "$CADDY"' in text
+    assert "CHANGED=0" in text
     # The normalization is outside the new-release branch, and therefore
     # applies if an existing release was previously installed incorrectly.
     assert text.index('\nfi\n\n# cp -a') < normalization
