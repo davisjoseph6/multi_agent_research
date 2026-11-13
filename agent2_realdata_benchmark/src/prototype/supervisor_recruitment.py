@@ -113,6 +113,13 @@ class RecruitmentLedger:
                     CHECK(invitation_status IN ('potential','prepared','accepted')),
                   UNIQUE(email)
                 );
+                CREATE TABLE IF NOT EXISTS candidate_submissions(
+                  submission_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  candidate_id INTEGER NOT NULL REFERENCES candidates(candidate_id),
+                  received_at TEXT NOT NULL,
+                  language TEXT NOT NULL,
+                  privacy_sha256 TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS administrators(
                   email TEXT PRIMARY KEY,
                   role TEXT NOT NULL CHECK(role IN ('researcher','supervisor')),
@@ -244,6 +251,16 @@ class RecruitmentLedger:
                 "VALUES(?,?,?,?,?,?,?,?)",
                 (address,first,last,questionnaire,language,t,privacy_sha256,t),
             )
+            candidate=db.execute(
+                "SELECT candidate_id FROM candidates WHERE email=? COLLATE NOCASE",
+                (address,),
+            ).fetchone()
+            db.execute(
+                "INSERT INTO candidate_submissions"
+                "(candidate_id,received_at,language,privacy_sha256) "
+                "VALUES(?,?,?,?)",
+                (candidate["candidate_id"],t,language,privacy_sha256),
+            )
         return dict(received=True,participant_enrolled=False)
 
     def provision(self, *, email: str, temporary_password: str,
@@ -349,8 +366,10 @@ class RecruitmentLedger:
         with self._tx() as db:
             return [dict(row) for row in db.execute(
                 "SELECT candidate_id,email,first_name,last_name,questionnaire,"
-                "language,submitted_at,privacy_sha256,approved_for_invitation,invitation_status "
-                "FROM candidates ORDER BY candidate_id DESC"
+                "language,submitted_at,privacy_sha256,approved_for_invitation,invitation_status,"
+                "(SELECT COUNT(*) FROM candidate_submissions x "
+                "WHERE x.candidate_id=c.candidate_id) AS application_count "
+                "FROM candidates c ORDER BY candidate_id DESC"
             )]
 
     def approve(self, *, ids: list[int], actor: str, at: datetime) -> int:
