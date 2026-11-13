@@ -613,3 +613,82 @@ def test_seven_day_inactivity_exempts_scheduled_3_to_5_day_visit_break(tmp_path)
     with store._tx() as db:
         assert db.execute("SELECT status FROM participants WHERE learner_id=?",
                           (ref,)).fetchone()[0]=="active"
+
+
+def test_live_inactivity_worker_is_private_idempotent_and_stage_specific(tmp_path):
+    from src.prototype.supervisor_recruitment import RecruitmentLedger
+    from src.prototype.supervisor_inactivity_worker import reconcile_inactivity
+    from src.prototype.supervisor_synthetic_store import iso
+    store,intake,_,_=stack(tmp_path)
+    token=intake.issue("reminder-worker@example.example",at=NOW(),
+                       allow_example=True)
+    complete_intake(intake,store,token)
+    ref=intake.learner(token,at=NOW())
+    private=tmp_path/"recruitment"
+    private.mkdir(mode=0o700)
+    ledger=RecruitmentLedger(private)
+    ledger.set_reminder_enabled(enabled=True,
+        actor="yaacoub@aivancity.ai",at=NOW())
+    at=NOW()
+    with store._tx() as db:
+        db.execute(
+            "UPDATE learner_state SET updated_at=?,step='PRETEST' "
+            "WHERE learner_id=?",(iso(at-timedelta(days=3)),ref),
+        )
+    dry=reconcile_inactivity(store,ledger,at=at,send=None)
+    assert dry["due"]==1 and dry["accepted"]==0 and not dry["mail_sent"]
+    with store._tx() as db:
+        assert db.execute("SELECT COUNT(*) FROM pii.inactivity_outbox").fetchone()[0]==0
+    sent=[]
+    def fake(**kw):
+        sent.append(kw)
+    with pytest.raises(ValueError,match="signed live release"):
+        reconcile_inactivity(store,ledger,at=at,send=fake)
+    first=reconcile_inactivity(
+        store,ledger,at=at,send=fake,live_verified=True)
+    assert first["accepted"]==1 and first["mail_sent"]==True
+    assert len(sent)==1 and sent[0]["to"]=="reminder-worker@example.example"
+    assert "pre-test" in sent[0]["body"]
+    retry=reconcile_inactivity(
+        store,ledger,at=at,send=fake,live_verified=True)
+    assert retry["due"]==0 and len(sent)==1
+    sixth=reconcile_inactivity(
+        store,ledger,at=at+timedelta(days=3),send=fake,live_verified=True)
+    assert sixth["accepted"]==1 and len(sent)==2
+    seventh=reconcile_inactivity(
+        store,ledger,at=at+timedelta(days=4),send=fake,live_verified=True)
+    assert seventh["expired"]==1 and len(sent)==2
+    with store._tx() as db:
+        assert db.execute("SELECT status FROM participants WHERE learner_id=?",
+                          (ref,)).fetchone()[0]=="expired"
+
+
+def test_inactivity_worker_never_sends_a_second_mail_after_uncertain_result(tmp_path):
+    from src.prototype.supervisor_recruitment import RecruitmentLedger
+    from src.prototype.supervisor_inactivity_worker import reconcile_inactivity
+    from src.prototype.supervisor_synthetic_store import iso
+    store,intake,_,_=stack(tmp_path)
+    token=intake.issue("uncertain-worker@example.example",at=NOW(),
+                       allow_example=True)
+    complete_intake(intake,store,token)
+    ref=intake.learner(token,at=NOW())
+    private=tmp_path/"recruitment"
+    private.mkdir(mode=0o700)
+    ledger=RecruitmentLedger(private)
+    ledger.set_reminder_enabled(enabled=True,
+        actor="yaacoub@aivancity.ai",at=NOW())
+    at=NOW()
+    with store._tx() as db:
+        db.execute("UPDATE learner_state SET updated_at=? WHERE learner_id=?",
+                   (iso(at-timedelta(days=4)),ref))
+    counter=[]
+    def uncertain(**kwargs):
+        counter.append(kwargs)
+        raise ConnectionError("delivery might have succeeded")
+    first=reconcile_inactivity(
+        store,ledger,at=at,send=uncertain,live_verified=True)
+    assert first["uncertain"]==1
+    retry=reconcile_inactivity(
+        store,ledger,at=at+timedelta(hours=4),
+        send=uncertain,live_verified=True)
+    assert retry["due"]==0 and len(counter)==1
