@@ -28,7 +28,11 @@
   $("email-label").firstChild.textContent=c.email;
   $("first-label").firstChild.textContent=c.first;
   $("last-label").firstChild.textContent=c.last;
-  $("privacy-note").textContent=c.note;
+  const privacy=$("privacy-link");
+  privacy.href="/interest/privacy/"+lang;
+  privacy.textContent=lang==="fr"?
+   "Lire l’avis de confidentialité approuvé (PDF)":
+   "Read the approved recruitment privacy notice (PDF)";
  }
  $("language").addEventListener("change",()=>{lang=$("language").value;redraw()});
  $("apply").addEventListener("submit",async e=>{
