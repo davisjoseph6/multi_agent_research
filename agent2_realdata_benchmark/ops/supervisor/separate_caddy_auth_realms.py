@@ -37,9 +37,16 @@ EXPECTED=(
 
 def render(source: str) -> str:
     """Return an idempotently isolated config, rejecting ambiguous layouts."""
-    for expected in (*MATCHERS,*EXPECTED):
-        if source.count(expected)!=1:
-            raise ValueError("unknown or duplicated Caddy routing layout")
+    for expected in MATCHERS:
+        # A prefix match is insufficient: a modified matcher could silently
+        # include /admin/* while still containing the trusted substring.
+        pattern=r"(?m)^[ \\t]*"+re.escape(expected)+r"[ \\t]*$"
+        if len(re.findall(pattern,source))!=1:
+            raise ValueError("unknown or duplicated Caddy path matcher")
+    for expected in EXPECTED:
+        pattern=r"(?m)^[ \\t]*"+re.escape(expected)+r"[ \\t]*\\{[ \\t]*$"
+        if len(re.findall(pattern,source))!=1:
+            raise ValueError("unknown or duplicated Caddy upstream")
     if source.count("basic_auth @supervisorStudy")!=1:
         raise ValueError("expected exactly one study reviewer auth block")
     if source.count("basic_auth @frontend")!=1:
