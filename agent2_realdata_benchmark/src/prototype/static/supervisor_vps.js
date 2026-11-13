@@ -8,16 +8,16 @@
  const copy={
   en:{
    site:"Adaptive Learning Study",info:"Information and consent",
-   roadmap:"Each study session has four parts: pre-test, learning quiz, post-test, and fatigue questionnaire. Eligibility screening happens before registration.",
+   roadmap:"Four study activities: pre-test (session 1), learning quiz (sessions 1–3), post-test (session 3), and fatigue questionnaire (sessions 1–3). Eligibility screening comes before registration.",
    aiRule:"Please answer independently. Do not use generative AI tools to solve the questions.",
    ageInfo:"Only adults may participate. Select an age from 18 to 99.",
    programInfo:"Your academic program describes the study sample; it does not determine your experimental group.",
    feedbackNext:"Next question",fatigueNext:"Next fatigue question",
    correctAnswer:"Correct answer",why:"Explanation",explanationEnglish:"Bank explanation (English)",
-   quizIntro:"Part 2 of 4 — Learning quiz. You will see feedback after each answer.",
-   preIntro:"Part 1 of 4 — Pre-test: answer 16 questions. Correctness feedback is not shown in this part.",
-   postIntro:"Part 3 of 4 — Post-test: answer 16 questions. Correctness feedback is not shown in this part.",
-   surveyIntro:"Part 4 of 4 — Fatigue questionnaire. Rate the quiz you just completed; there are no right or wrong answers.",
+   quizIntro:"Learning quiz — you will see feedback after each answer.",
+   preIntro:"Pre-test — answer 16 questions. Correctness feedback is not shown here.",
+   postIntro:"Post-test — answer 16 questions. Correctness feedback is not shown here.",
+   surveyIntro:"Fatigue questionnaire — rate the quiz you just completed; there are no right or wrong answers.",
    fatigueCount:i=>"Fatigue question "+i+" of 6",
    sessionSummary:s=>"Session "+s+" result",
    correctCount:(a,b)=>"Regular quiz score: "+a+" of "+b+" correct",
@@ -63,16 +63,16 @@
   },
   fr:{
    site:"Étude sur l'apprentissage adaptatif",info:"Information et consentement",
-   roadmap:"Chaque séance comprend quatre parties : pré-test, quiz d’apprentissage, post-test et questionnaire de fatigue. La présélection a lieu avant l’inscription.",
+   roadmap:"Quatre activités : pré-test (séance 1), quiz d’apprentissage (séances 1 à 3), post-test (séance 3) et questionnaire de fatigue (séances 1 à 3). La présélection précède l’inscription.",
    aiRule:"Répondez de façon autonome. N'utilisez pas d'outils d'IA générative pour résoudre les questions.",
    ageInfo:"Seuls les adultes peuvent participer. Choisissez un âge entre 18 et 99 ans.",
    programInfo:"Votre formation sert à décrire l'échantillon ; elle ne détermine pas le groupe expérimental.",
    feedbackNext:"Question suivante",fatigueNext:"Question de fatigue suivante",
    correctAnswer:"Bonne réponse",why:"Explication",explanationEnglish:"Explication de la banque (en anglais)",
-   quizIntro:"Partie 2 sur 4 — Quiz d’apprentissage. Une explication apparaîtra après chaque réponse.",
-   preIntro:"Partie 1 sur 4 — Pré-test : 16 questions, sans indication de justesse des réponses.",
-   postIntro:"Partie 3 sur 4 — Post-test : 16 questions, sans indication de justesse des réponses.",
-   surveyIntro:"Partie 4 sur 4 — Questionnaire de fatigue. Évaluez le quiz terminé ; il n’y a ni bonne ni mauvaise réponse.",
+   quizIntro:"Quiz d’apprentissage — une explication apparaîtra après chaque réponse.",
+   preIntro:"Pré-test — 16 questions, sans indication de justesse des réponses.",
+   postIntro:"Post-test — 16 questions, sans indication de justesse des réponses.",
+   surveyIntro:"Questionnaire de fatigue — évaluez le quiz terminé ; il n’y a ni bonne ni mauvaise réponse.",
    fatigueCount:i=>"Question de fatigue "+i+" sur 6",
    sessionSummary:s=>"Résultat de la séance "+s,
    correctCount:(a,b)=>"Score du quiz ordinaire : "+a+" bonnes réponses sur "+b,
@@ -120,19 +120,34 @@
  };
  const studyParts=["PRETEST","QUIZ","POSTTEST","SURVEY"];
  const partNames={
-  en:["Pre-test","Learning quiz","Post-test","Fatigue questionnaire"],
-  fr:["Pré-test","Quiz d’apprentissage","Post-test","Questionnaire de fatigue"],
+  en:["Pre-test (session 1)","Learning quiz (sessions 1–3)",
+      "Post-test (session 3)","Fatigue questionnaire (sessions 1–3)"],
+  fr:["Pré-test (séance 1)","Quiz d’apprentissage (séances 1–3)",
+      "Post-test (séance 3)","Questionnaire de fatigue (séances 1–3)"],
  };
- function updateStudyParts(stage){
+ function updateStudyParts(stage,session){
   const list=$("session-parts");
   if(!list)return;
   list.hidden=false;
-  list.setAttribute("aria-label",lang==="fr"?"Quatre parties de chaque séance":"Four parts of each session");
-  const position=studyParts.indexOf(stage);
+  list.setAttribute("aria-label",lang==="fr"?
+    "Quatre activités réparties sur trois séances":
+    "Four study activities across three sessions");
+  // The post-test is in session 3 only. The pre-test is in session 1 only.
+  // Fatigue occurs after each session's quiz, not after a session-1 post-test.
+  const sequence=session===1?["PRETEST","QUIZ","SURVEY"]:
+                 session===2?["QUIZ","SURVEY"]:
+                 ["QUIZ","POSTTEST","SURVEY"];
+  const index=sequence.indexOf(stage);
   const finished=stage==="WAITING_NEXT_SESSION"||stage==="DONE";
-  for(const [index,item] of [...list.children].entries()){
-   item.textContent=(index+1)+". "+partNames[lang][index];
-   const state=finished||index<position?"complete":index===position?"active":"upcoming";
+  for(const [position,item] of [...list.children].entries()){
+   const part=studyParts[position];
+   item.textContent=(position+1)+". "+partNames[lang][position];
+   let state;
+   if(part==="PRETEST"&&session>1)state="complete";
+   else if(part==="POSTTEST"&&session<3)state="later";
+   else if(finished)state="complete";
+   else if(part===stage)state="active";
+   else state=sequence.indexOf(part)<index?"complete":"upcoming";
    item.className=state;
    if(state==="active")item.setAttribute("aria-current","step");
    else item.removeAttribute("aria-current");
@@ -180,7 +195,7 @@
    document.title=t("site");
    $("site-title").textContent=t("site");
    $("study-roadmap").textContent=t("roadmap");
-   if(registered && phase)updateStudyParts(phase);
+   if(registered && phase)updateStudyParts(phase,activeSession);
    $("ai-rule").textContent=t("aiRule");
    $("age-info").textContent=t("ageInfo");
    $("program-info").textContent=t("programInfo");
@@ -454,7 +469,7 @@
    }
  }
  function showProgress(status,data){
-   updateStudyParts(status.phase);
+   updateStudyParts(status.phase,status.session);
    if(data.kind==="survey")return;
    const meter=$("phase-meter"),tip=$("phase-intro");
    meter.hidden=false;
