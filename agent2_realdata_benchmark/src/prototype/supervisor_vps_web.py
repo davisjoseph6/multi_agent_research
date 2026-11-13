@@ -217,11 +217,18 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
 
     @app.post("/study/api/screening")
     def screening():
-        data()
+        # Screening display language may change without mutating the legally
+        # recorded consent language. The client sends only a locale, never
+        # assessment progress, identities, answers or grading keys.
+        body=request.get_json(silent=True)
+        if type(body) is not dict or set(body) not in (set(), {"language"}):
+            raise SyntheticStudyError("invalid screening request fields")
         status=intake.status(credential(),at=now())
         if status["stage"]!="consented":
             raise SyntheticStudyError("consent required before screening")
-        language=status["language"]
+        language=body.get("language",status["language"])
+        if language not in ("en","fr"):
+            raise SyntheticStudyError("unsupported screening language")
         return jsonify(questions=[
             localize_public(q.public(),language=language)
             for q in store.bank.forms["screening"]
