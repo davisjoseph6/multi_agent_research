@@ -692,3 +692,66 @@ def test_inactivity_worker_never_sends_a_second_mail_after_uncertain_result(tmp_
         store,ledger,at=at+timedelta(hours=4),
         send=uncertain,live_verified=True)
     assert retry["due"]==0 and len(counter)==1
+
+
+def test_recruitment_approved_bulk_dispatch_preserves_original_token_and_prevents_resend(tmp_path):
+    from src.prototype.supervisor_recruitment import RecruitmentLedger
+    from src.prototype.supervisor_recruitment_dispatch import InvitationDispatcher
+    store,intake,_,_=stack(tmp_path)
+    tmp_path.chmod(0o700)
+    ledger=RecruitmentLedger(tmp_path)
+    ledger.apply(email="dispatch-one@example.example",questionnaire="external",
+                 language="en",privacy_accepted=True,at=NOW())
+    ledger.apply(email="dispatch-two@example.example",questionnaire="external",
+                 language="fr",privacy_accepted=True,at=NOW())
+    actor="yaacoub@aivancity.ai"
+    ledger.approve(ids=[1,2],actor=actor,at=NOW())
+    class FakeGraph:
+        sent=[]
+        def send(self,**kwargs):
+            self.sent.append(kwargs)
+    graph=FakeGraph()
+    dispatcher=InvitationDispatcher(
+        intake=intake,ledger=ledger,sender=graph,
+        hostname="study.example.org",live_verified=True,allow_test_examples=True)
+    result=dispatcher.dispatch(actor=actor,at=NOW(),all_approved=True)
+    assert result["selected"]==2 and result["accepted"]==2
+    assert len(graph.sent)==2
+    assert all("https://study.example.org/study/#invite=" in m["body"]
+               for m in graph.sent)
+    assert "Étude" not in graph.sent[0]["subject"]
+    assert "Invitation" in graph.sent[1]["subject"]
+    with store._tx() as db:
+        assert db.execute("SELECT COUNT(*) FROM pii.invitations").fetchone()[0]==2
+    for i in (1,2):
+        p=tmp_path/f"candidate-invite-{i:06d}.txt"
+        assert p.is_file() and p.stat().st_mode&0o077==0
+    repeated=dispatcher.dispatch(actor=actor,at=NOW(),ids=[1,2])
+    assert repeated["rejected"]==2 and len(graph.sent)==2
+
+
+def test_bulk_dispatch_does_not_retry_ambiguous_graph_outcome(tmp_path):
+    from src.prototype.supervisor_recruitment import RecruitmentLedger,RecruitmentError
+    from src.prototype.supervisor_recruitment_dispatch import InvitationDispatcher
+    store,intake,_,_=stack(tmp_path)
+    tmp_path.chmod(0o700)
+    ledger=RecruitmentLedger(tmp_path)
+    ledger.apply(email="dispatch-unknown@example.example",
+                 questionnaire="external",language="en",
+                 privacy_accepted=True,at=NOW())
+    ledger.approve(ids=[1],actor="yaacoub@aivancity.ai",at=NOW())
+    class UnknownSender:
+        count=0
+        def send(self,**kwargs):
+            self.count+=1
+            raise ConnectionError("outcome unknown")
+    fake=UnknownSender()
+    dispatcher=InvitationDispatcher(
+        intake=intake,ledger=ledger,sender=fake,
+        hostname="study.example.org",live_verified=True,allow_test_examples=True)
+    assert dispatcher.dispatch(actor="yaacoub@aivancity.ai",
+                               at=NOW(),ids=[1])["uncertain"]==1
+    with pytest.raises(RecruitmentError,match="prior delivery attempt"):
+        dispatcher.dispatch(actor="yaacoub@aivancity.ai",
+                            at=NOW(),ids=[1])
+    assert fake.count==1
