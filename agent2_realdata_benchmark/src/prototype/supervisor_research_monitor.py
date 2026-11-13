@@ -182,6 +182,7 @@ def make_monitor_app(research_db: str | Path, *, admin_password_hash: str) -> Fl
                 "e.action_type,e.answered_at,e.response_time_ms,e.is_correct "
                 "FROM events e JOIN participants p USING(learner_id) "
                 "WHERE e.question_id IS NOT NULL "
+                "AND e.phase IN ('PRETEST','QUIZ','POSTTEST') "
                 "ORDER BY p.learner_id,e.event_id"
             ).fetchall()
         for row in rows:
