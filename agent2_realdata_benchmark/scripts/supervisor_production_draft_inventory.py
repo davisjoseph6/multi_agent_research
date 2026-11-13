@@ -75,16 +75,38 @@ def scaffold(output: Path, commit: str) -> dict:
         _json(output / "content_review_PENDING.json", content)
         _private_file(output / "notices" / "recruitment_notice_en_DRAFT.md",
                       "# Recruitment privacy notice — English\n\n"
-                      "DRAFT / NOT APPROVED / NOT FOR PARTICIPANTS.\n"
-                      "Replace with the final institutionally approved and "
-                      "signed PDF, including rights, data controller, purposes, "
-                      "retention, contacts, recipients and transfer information.\n")
+                      "DRAFT / NOT APPROVED / NOT FOR PARTICIPANTS.\n\n"
+                      "- Data controller / joint-controller: [INSTITUTIONAL REVIEW]\n"
+                      "- Responsible investigator and study contact: [REVIEW]\n"
+                      "- DPO / privacy rights contact: [REVIEW]\n"
+                      "- Purpose(s) of recruitment and research: [REVIEW]\n"
+                      "- Legal basis and any special-category data conditions: [REVIEW]\n"
+                      "- Categories of data collected: [REVIEW]\n"
+                      "- Voluntary participation, consent/withdrawal procedure: [REVIEW]\n"
+                      "- Access recipients / researcher roles: [REVIEW]\n"
+                      "- Hosting, subprocessors and international transfers: [REVIEW]\n"
+                      "- Retention, erasure schedule and deletion process: [REVIEW]\n"
+                      "- Data subject rights and supervisory authority: [REVIEW]\n"
+                      "- AI-points eligibility and contact policy (if approved): [REVIEW]\n"
+                      "- Version, date and independent approval details: [REVIEW]\n\n"
+                      "Replace with the final approved/signed PDF.\n")
         _private_file(output / "notices" / "recruitment_notice_fr_DRAFT.md",
                       "# Notice d'information pour le recrutement — Français\n\n"
-                      "BROUILLON / NON APPROUVÉ / NON DESTINÉ AUX PARTICIPANTS.\n"
-                      "Remplacer par le PDF définitif approuvé et signé, "
-                      "précisant le responsable du traitement, les finalités, "
-                      "les droits, les destinataires, la conservation et les contacts.\n")
+                      "BROUILLON / NON APPROUVÉ / NON DESTINÉ AUX PARTICIPANTS.\n\n"
+                      "- Responsable(s) du traitement : [VALIDATION REQUISE]\n"
+                      "- Responsable scientifique et contact de l'étude : [VALIDATION]\n"
+                      "- DPO / contact pour les droits : [VALIDATION]\n"
+                      "- Finalités du recrutement et de la recherche : [VALIDATION]\n"
+                      "- Base légale et données sensibles éventuelles : [VALIDATION]\n"
+                      "- Catégories de données recueillies : [VALIDATION]\n"
+                      "- Participation volontaire, consentement et retrait : [VALIDATION]\n"
+                      "- Destinataires et accès des chercheurs : [VALIDATION]\n"
+                      "- Hébergement, sous-traitants et transferts internationaux : [VALIDATION]\n"
+                      "- Conservation, effacement et procédure de suppression : [VALIDATION]\n"
+                      "- Droits des personnes et autorité de contrôle : [VALIDATION]\n"
+                      "- Conditions d'attribution des points IA, si approuvées : [VALIDATION]\n"
+                      "- Version, date et approbation indépendante : [VALIDATION]\n\n"
+                      "Remplacer par le PDF final approuvé et signé.\n")
         _private_file(output / "configuration" / "live.env.template",
                       "# EXAMPLE ONLY — NOT A RUNNABLE PRODUCTION ENVIRONMENT.\n"
                       "# NEVER source or install this file; keep all actual secrets out of Git.\n"
