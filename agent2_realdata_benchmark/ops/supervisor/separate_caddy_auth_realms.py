@@ -40,11 +40,11 @@ def render(source: str) -> str:
     for expected in MATCHERS:
         # A prefix match is insufficient: a modified matcher could silently
         # include /admin/* while still containing the trusted substring.
-        pattern=r"(?m)^[ \\t]*"+re.escape(expected)+r"[ \\t]*$"
+        pattern=r"(?m)^[ \t]*"+re.escape(expected)+r"[ \t]*$"
         if len(re.findall(pattern,source))!=1:
             raise ValueError("unknown or duplicated Caddy path matcher")
     for expected in EXPECTED:
-        pattern=r"(?m)^[ \\t]*"+re.escape(expected)+r"[ \\t]*\\{[ \\t]*$"
+        pattern=r"(?m)^[ \t]*"+re.escape(expected)+r"[ \t]*\{[ \t]*$"
         if len(re.findall(pattern,source))!=1:
             raise ValueError("unknown or duplicated Caddy upstream")
     if source.count("basic_auth @supervisorStudy")!=1:
