@@ -207,3 +207,61 @@ def test_intake_disabled_by_default_and_browser_origin_enforced(ledger):
     assert client.post("/control/api/login",json={},
                        headers={"Origin":"https://evil.example",
                                 "X-Study-Request":"1"}).status_code==403
+
+
+def test_graph_outlook_sender_requires_signed_release_and_scope():
+    import json
+    from urllib.parse import parse_qs
+    from src.prototype.supervisor_graph_mail import GraphMailSender,GraphMailError
+    calls=[]
+    def http(url,*,data,headers,timeout):
+        calls.append((url,data,headers))
+        if "oauth2/v2.0/token" in url:
+            assert parse_qs(data.decode())["scope"]==[
+                "https://graph.microsoft.com/.default"]
+            return (200,b'{"access_token":"dummy-totally-fictional-access-token"}')
+        assert url.endswith("/users/davis.joseph@aivancity.education/sendMail")
+        assert headers["Authorization"].startswith("Bearer dummy-totally")
+        body=json.loads(data)
+        assert body["message"]["toRecipients"][0]["emailAddress"]["address"]=="fake@example.org"
+        assert body["message"]["subject"]=="Test invitation"
+        return (202,b"")
+    kwargs=dict(tenant_id="01234567-89ab-cdef-0123-456789abcdef",
+                client_id="12345678-1234-1234-1234-123456789abc",
+                client_secret="example-client-secret-not-real",
+                sender_email="davis.joseph@aivancity.education",transport=http)
+    with pytest.raises(GraphMailError,match="signed institutional"):
+        GraphMailSender(**kwargs)
+    sender=GraphMailSender(**kwargs,live_release_verified=True)
+    sender.send(to="FAKE@example.org",subject="Test invitation",body="Hello")
+    assert len(calls)==2
+    with pytest.raises(GraphMailError,match="content"):
+        sender.send(to="fake@example.org",subject="Bad\r\nSubject",body="body")
+    assert len(calls)==2
+
+
+def test_decimal_time_intervals_include_breaks_not_just_response_latency(tmp_path):
+    from src.prototype.supervisor_recruitment_metrics import inter_answer_times
+    db=sqlite3.connect(":memory:")
+    db.row_factory=sqlite3.Row
+    db.executescript("""
+      CREATE TABLE events(
+       event_id INTEGER PRIMARY KEY,learner_id TEXT,session_no INTEGER,
+       phase TEXT,question_id TEXT,answered_at TEXT,
+       response_time_ms INTEGER,action_type TEXT);
+      INSERT INTO events VALUES
+        (1,'STUDY_P001',1,'PRETEST','a','2026-11-13T13:00:00+00:00',1500,'QUESTION'),
+        (2,'STUDY_P001',1,'QUIZ',NULL,'2026-11-13T13:00:03+00:00',1200,'CONCEPT_SUMMARY'),
+        (3,'STUDY_P001',1,'QUIZ','b','2026-11-13T14:00:01+00:00',2000,'QUESTION'),
+        (4,'STUDY_P001',1,'QUIZ','c','2026-11-14T14:00:01+00:00',2100,'QUESTION');
+    """)
+    rows=inter_answer_times(db,learner_id="STUDY_P001")
+    assert len(rows)==3
+    assert rows[0]["between_answers_seconds"] is None
+    assert rows[1]["between_answers_seconds"]==3601
+    assert rows[1]["between_answers_ms"]==3601000
+    assert rows[1]["between_answers_hours"]==round(3601/3600,9)
+    assert rows[2]["between_answers_days"]==1
+    assert rows[1]["response_latency_ms"]==2000
+    assert rows[1]["includes_breaks_and_interventions"] is True
+    db.close()
