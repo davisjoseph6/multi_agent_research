@@ -231,6 +231,47 @@ Do not bypass these gates by changing the mode flag, authoring one's own
 institutional signature, or treating fictional CI results as human-subject
 authorization.
 
+## Browser access troubleshooting: independent Basic Auth realms
+
+The original operator interface at `/` and the separate supervisor
+participant portal at `/study/` use distinct usernames and password hashes.
+Historically, both used Caddy's default HTTP Basic realm `restricted`, which
+can lead to confusing browser credential reuse on the same domain. A valid
+invitation `#invite=...` authenticates the fictional participant **after**
+passing the Caddy login; it does not supply the Caddy password.
+
+To give these accounts distinct browser authentication scopes **without
+changing either password or modifying study data**, apply the reviewed,
+fail-closed repair on the VPS:
+
+```bash
+sudo python3 /srv/ijcai-supervisor-staging/current/agent2_realdata_benchmark/ops/supervisor/separate_caddy_auth_realms.py
+```
+
+It validates a strictly recognized Caddy layout, writes an independent
+rollback backup, atomically updates only the two `basic_auth` declarations,
+reloads Caddy, checks that anonymous operator/study/JS/CSS requests all
+return 401 with the **correct distinct realms**, and rolls back on failure.
+It never prints or requests credentials. This is a one-time operations
+repair, not an invitation reissue or new app deployment.
+
+Afterward, test in **separate private browser windows**:
+- `https://demo.selfhealing-edu.fr/` with the original operator account;
+- `https://demo.selfhealing-edu.fr/study/` with `studyreviewer` and the
+  **latest** study-review password, then open the full personal invitation
+  link (a literal asterisk-redacted link cannot work).
+
+Do not place passwords, full invitation fragments, password hashes or the
+complete Caddyfile in chat, email threads or public GitHub issues.
+Keep operator credentials inside the operator team. The study reviewer account
+intentionally cannot access `/`. A reviewer who also needs the operator
+demo requires the separately authorized operator login.
+
+If the operator account still fails in a clean browser after realm isolation,
+do not reset it blindly; test credentials against `/` and rotate operator
+access using its existing operator-owned procedure, verifying the original
+demo service and its API are unchanged.
+
 ## 4. Generate one restricted staging invitation, offline
 
 Run this **on the VPS**, as the dedicated service user:
