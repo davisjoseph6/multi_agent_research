@@ -38,16 +38,20 @@
  </div>
  <section class="panel"><div class="section-head"><div><h2>Application questionnaire submissions</h2>
  <p class="muted">Identifiable intake records · private to the authorized research team</p></div>
- <button id="approve" type="button">Approve selected</button></div>
+ <div class="action-buttons">
+  <button id="approve" type="button">Approve selected</button>
+  <button id="send-selected" type="button" disabled>Send selected invitations</button>
+  <button id="send-all" type="button" disabled>Send all approved</button>
+ </div></div>
  <div class="scroll"><table><thead><tr>
  <th><label class="row-select"><input id="all" type="checkbox"> Select all</label></th>
  <th>Email</th><th>Name (optional)</th><th>Questionnaire</th><th>Status</th><th>Received (UTC)</th>
  </tr></thead><tbody id="applicants"></tbody></table></div>
- <p class="muted">Approval only flags the applications for manual review; it does not send invitations. Automated Microsoft Graph delivery must be separately authorized and configured.</p>
+ <p class="muted" id="mail-capability">Invitations can only be sent after the signed live release, Microsoft Graph mailbox setup, and approved recruitment intake are enabled.</p>
  </section>
  <section class="panel"><h2>Registered students and current progress</h2>
  <div class="scroll"><table><thead><tr>
- <th>Student</th><th>Email</th><th>Optional name</th><th>Session</th><th>Current stage</th><th>Status</th><th>Last activity (UTC)</th>
+ <th>Student</th><th>Email</th><th>Optional name</th><th>Session</th><th>Current stage</th><th>Status</th><th>Last activity (UTC)</th><th>Encouragement</th>
  </tr></thead><tbody id="students"></tbody></table></div></section>
  <section class="panel">
   <h2>Individual mastery and inter-question timing</h2>
