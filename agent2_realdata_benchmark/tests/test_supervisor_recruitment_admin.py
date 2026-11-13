@@ -47,6 +47,8 @@ def test_candidate_school_external_language_and_private_names(ledger):
     assert rows[1]["first_name"]=="Marie"
     assert rows[1]["last_name"]=="L."
     assert rows[1]["language"]=="fr"
+    assert rows[1]["application_count"]==2
+    assert len(rows)==2
     assert ledger.file.stat().st_mode&0o077==0
     with pytest.raises(RecruitmentError):
         ledger.apply(email="wrong@example.org",questionnaire="school",
@@ -141,6 +143,23 @@ def fake_db(tmp_path):
             INSERT INTO participants VALUES('STUDY_P001','A','active');
             INSERT INTO learner_state VALUES('STUDY_P001',1,'QUIZ','2026-11-13T13:00:00+00:00');
         """)
+    with sqlite3.connect(research) as db:
+        db.executescript("""
+            CREATE TABLE events(
+                event_id INTEGER,learner_id TEXT,session_no INTEGER,
+                phase TEXT,question_id TEXT,answered_at TEXT,
+                response_time_ms INTEGER,action_type TEXT,is_correct INTEGER
+            );
+            CREATE TABLE state_history(event_id INTEGER,state_json TEXT);
+            INSERT INTO events VALUES
+            (1,'STUDY_P001',1,'QUIZ','q1','2026-11-13T13:00:00+00:00',2000,'QUESTION',1),
+            (2,'STUDY_P001',1,'QUIZ','q2','2026-11-13T13:00:10+00:00',2400,'QUESTION',0);
+        """)
+        from src.prototype.supervisor_trace_engine import CONCEPT_IDS
+        import json
+        for eid,value in ((1,.5),(2,.6)):
+            engine=json.dumps({"engine":{"mastery":dict.fromkeys(CONCEPT_IDS,value)}})
+            db.execute("INSERT INTO state_history VALUES(?,?)",(eid,engine))
     with sqlite3.connect(contacts) as db:
         db.executescript("""
             CREATE TABLE contacts(learner_id TEXT,email TEXT);
@@ -195,6 +214,17 @@ def test_admin_http_protected_pii_and_bilingual_public_intake(ledger,tmp_path):
     assert overview.json["participants"][0]["email"]=="student@example.org"
     assert overview.json["participants"][0]["first_name"]=="Test"
     assert overview.json["participants"][0]["step"]=="QUIZ"
+    mastery=client.get("/control/api/mastery/STUDY_P001")
+    assert mastery.status_code==200,mastery.json
+    assert mastery.json["email"]=="student@example.org"
+    assert mastery.json["first_name"]=="Test"
+    assert len(mastery.json["points"])==2
+    timing=client.get("/control/api/question-intervals?learner_id=STUDY_P001")
+    assert timing.status_code==200,timing.json
+    assert len(timing.json["intervals"])==2
+    assert timing.json["intervals"][1]["between_answers_seconds"]==10
+    assert post("/control/api/send-invitations",
+                {"candidate_ids":[1],"select_all":False}).status_code==409
     assert post("/control/api/approve",{"candidate_ids":[1]}).json=={
         "approved":1,"email_sent":False
     }
