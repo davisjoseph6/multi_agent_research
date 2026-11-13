@@ -59,7 +59,7 @@ def evaluate_inactivity(*, now: datetime, last_active: datetime,
     if (manual_requested and delta>=MANUAL_AFTER and
             (since_reminder is None or since_reminder>=SILENCE)):
         baseline.update(send=True,reason="manual_four_day_encouragement")
-    elif (automatic_enabled and delta>=AUTO_AFTER and
+    elif (not manual_requested and automatic_enabled and delta>=AUTO_AFTER and
           (since_reminder is None or since_reminder>=AUTO_AFTER)):
         baseline.update(send=True,reason="automatic_three_day_encouragement")
     return baseline
