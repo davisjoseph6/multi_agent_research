@@ -41,6 +41,7 @@ trap restore_service EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 systemctl stop "$SERVICE"
+cd "$PREFIX/current/agent2_realdata_benchmark"
 # Avoid exposing the key, decrypted data or personal contacts in command logs.
 runuser -u ijcai-supervisor -- env \
   PYTHONDONTWRITEBYTECODE=1 \
