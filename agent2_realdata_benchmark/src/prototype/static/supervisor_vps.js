@@ -546,10 +546,12 @@
    }
  }
  async function refresh(){
-   if(busy)return;
+   if(busy)return false;
    busy=true;error("");
+   let verified=false;
    try{
      const status=await api("status");
+     verified=true;
      registered=status.stage==="participant";
      // A screening translation does NOT alter the signed consent locale.
      // Do not force the consent language back onto an active screening page.
@@ -584,6 +586,7 @@
      }else show("entry");
    }catch(e){error(e.message);show("entry")}
    finally{busy=false}
+   return verified;
  }
  async function act(route,payload={},onDone=null){
    if(busy)return;
@@ -774,7 +777,7 @@
        history.replaceState(null,"",location.pathname+location.search);
      }catch(e){error(e.message);show("entry");return}
    }
-   await refresh();
+   if(await refresh())$("app").hidden=false;
  }
  initial().catch(e=>{error(e.message);show("entry")});
 })();

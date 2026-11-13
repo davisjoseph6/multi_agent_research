@@ -242,6 +242,18 @@ class SupervisorSyntheticStore:
                     )
                 """)
                 db.execute("""
+                    CREATE TABLE IF NOT EXISTS pii.inactivity_outbox(
+                        learner_id TEXT NOT NULL,
+                        activity_at TEXT NOT NULL,
+                        kind TEXT NOT NULL CHECK(kind IN ('automatic','manual')),
+                        slot TEXT NOT NULL,
+                        state TEXT NOT NULL CHECK(state IN ('dispatching','accepted','uncertain')),
+                        at TEXT NOT NULL,
+                        accepted_at TEXT,
+                        PRIMARY KEY(learner_id,activity_at,kind,slot)
+                    )
+                """)
+                db.execute("""
                     CREATE TABLE IF NOT EXISTS pii.invitations(
                         token_hash TEXT PRIMARY KEY,
                         email TEXT NOT NULL COLLATE NOCASE UNIQUE,
@@ -346,7 +358,7 @@ class SupervisorSyntheticStore:
         status = db.execute(
             "SELECT status FROM participants WHERE learner_id=?", (ref,)
         ).fetchone()
-        if status is None or status["status"] in ("withdrawn", "removed"):
+        if status is None or status["status"] in ("withdrawn", "removed", "expired"):
             raise SyntheticStudyError("fictional participant is inactive")
 
     def _state(self, db, ref):

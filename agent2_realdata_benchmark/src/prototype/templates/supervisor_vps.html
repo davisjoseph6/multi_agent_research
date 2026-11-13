@@ -9,7 +9,7 @@
 <script src="/study/app.js" defer></script>
 </head>
 <body>
-<main id="app" class="portal">
+<main id="app" class="portal" {% if release_mode == 'live' %}hidden{% endif %}>
 <header>
   <div class="brand" aria-label="aivancity">
     <img id="school-logo" src="/study/logo.png" alt="aivancity logo" hidden>

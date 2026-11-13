@@ -562,3 +562,196 @@ def test_existing_rendered_question_survives_forward_only_resume_migration(tmp_p
         assert row["render_id"]==item["render_id"]
         assert row["resumed_after_idle"]==0
     assert post("item").json["render_id"]==item["render_id"]
+
+
+def test_live_seven_day_inactivity_revokes_an_unfinished_token_but_keeps_study_data(tmp_path):
+    """STAGING is unchanged; explicitly instantiated LIVE policy is tested offline."""
+    from src.prototype.supervisor_operational_intake import OperationalIntake
+    from src.prototype.supervisor_synthetic_store import iso
+    store,intake,_,_=stack(tmp_path)
+    token=intake.issue("seven-day-test@example.example",at=NOW(),
+                       allow_example=True)
+    complete_intake(intake,store,token)
+    ref=intake.learner(token,at=NOW())
+    with store._tx() as db:
+        db.execute("UPDATE learner_state SET updated_at=? WHERE learner_id=?",
+                   (iso(NOW()-timedelta(days=8)),ref))
+        before=db.execute("SELECT COUNT(*) FROM events "
+                          "WHERE learner_id=?",(ref,)).fetchone()[0]
+        assert before>=8
+    strict=OperationalIntake(store,programs=intake.programs,inactivity_days=7)
+    with pytest.raises(SyntheticStudyError,match="expired after seven days"):
+        strict.learner(token,at=NOW())
+    with store._tx() as db:
+        status=db.execute("SELECT status FROM participants WHERE learner_id=?",
+                          (ref,)).fetchone()[0]
+        assert status=="expired"
+        assert db.execute("SELECT COUNT(*) FROM pii.invitations WHERE learner_id=?",
+                          (ref,)).fetchone()[0]==0
+        assert db.execute("SELECT COUNT(*) FROM events WHERE learner_id=?",
+                          (ref,)).fetchone()[0]==before
+        assert db.execute("SELECT COUNT(*) FROM pii.contacts WHERE learner_id=?",
+                          (ref,)).fetchone()[0]==1
+    with pytest.raises(SyntheticStudyError):
+        intake.learner(token,at=NOW())
+
+
+def test_seven_day_inactivity_exempts_scheduled_3_to_5_day_visit_break(tmp_path):
+    from src.prototype.supervisor_operational_intake import OperationalIntake
+    from src.prototype.supervisor_synthetic_store import iso
+    store,intake,_,_=stack(tmp_path)
+    token=intake.issue("waiting-eight-days@example.example",
+                       at=NOW(),allow_example=True)
+    complete_intake(intake,store,token)
+    ref=intake.learner(token,at=NOW())
+    with store._tx() as db:
+        db.execute("UPDATE learner_state SET step='WAITING_NEXT_SESSION',"
+                   "updated_at=? WHERE learner_id=?",
+                   (iso(NOW()-timedelta(days=8)),ref))
+    strict=OperationalIntake(store,programs=intake.programs,inactivity_days=7)
+    assert strict.learner(token,at=NOW())==ref
+    with store._tx() as db:
+        assert db.execute("SELECT status FROM participants WHERE learner_id=?",
+                          (ref,)).fetchone()[0]=="active"
+
+
+def test_live_inactivity_worker_is_private_idempotent_and_stage_specific(tmp_path):
+    from src.prototype.supervisor_recruitment import RecruitmentLedger
+    from src.prototype.supervisor_inactivity_worker import reconcile_inactivity
+    from src.prototype.supervisor_synthetic_store import iso
+    store,intake,_,_=stack(tmp_path)
+    token=intake.issue("reminder-worker@example.example",at=NOW(),
+                       allow_example=True)
+    complete_intake(intake,store,token)
+    ref=intake.learner(token,at=NOW())
+    private=tmp_path/"recruitment"
+    private.mkdir(mode=0o700)
+    ledger=RecruitmentLedger(private)
+    ledger.set_reminder_enabled(enabled=True,
+        actor="yaacoub@aivancity.ai",at=NOW())
+    at=NOW()
+    with store._tx() as db:
+        db.execute(
+            "UPDATE learner_state SET updated_at=?,step='PRETEST' "
+            "WHERE learner_id=?",(iso(at-timedelta(days=3)),ref),
+        )
+    dry=reconcile_inactivity(store,ledger,at=at,send=None)
+    assert dry["due"]==1 and dry["accepted"]==0 and not dry["mail_sent"]
+    with store._tx() as db:
+        assert db.execute("SELECT COUNT(*) FROM pii.inactivity_outbox").fetchone()[0]==0
+    sent=[]
+    def fake(**kw):
+        sent.append(kw)
+    with pytest.raises(ValueError,match="signed live release"):
+        reconcile_inactivity(store,ledger,at=at,send=fake)
+    first=reconcile_inactivity(
+        store,ledger,at=at,send=fake,live_verified=True)
+    assert first["accepted"]==1 and first["mail_sent"]==True
+    assert len(sent)==1 and sent[0]["to"]=="reminder-worker@example.example"
+    assert "pre-test" in sent[0]["body"]
+    retry=reconcile_inactivity(
+        store,ledger,at=at,send=fake,live_verified=True)
+    assert retry["due"]==0 and len(sent)==1
+    sixth=reconcile_inactivity(
+        store,ledger,at=at+timedelta(days=3),send=fake,live_verified=True)
+    assert sixth["accepted"]==1 and len(sent)==2
+    seventh=reconcile_inactivity(
+        store,ledger,at=at+timedelta(days=4),send=fake,live_verified=True)
+    assert seventh["expired"]==1 and len(sent)==2
+    with store._tx() as db:
+        assert db.execute("SELECT status FROM participants WHERE learner_id=?",
+                          (ref,)).fetchone()[0]=="expired"
+
+
+def test_inactivity_worker_never_sends_a_second_mail_after_uncertain_result(tmp_path):
+    from src.prototype.supervisor_recruitment import RecruitmentLedger
+    from src.prototype.supervisor_inactivity_worker import reconcile_inactivity
+    from src.prototype.supervisor_synthetic_store import iso
+    store,intake,_,_=stack(tmp_path)
+    token=intake.issue("uncertain-worker@example.example",at=NOW(),
+                       allow_example=True)
+    complete_intake(intake,store,token)
+    ref=intake.learner(token,at=NOW())
+    private=tmp_path/"recruitment"
+    private.mkdir(mode=0o700)
+    ledger=RecruitmentLedger(private)
+    ledger.set_reminder_enabled(enabled=True,
+        actor="yaacoub@aivancity.ai",at=NOW())
+    at=NOW()
+    with store._tx() as db:
+        db.execute("UPDATE learner_state SET updated_at=? WHERE learner_id=?",
+                   (iso(at-timedelta(days=4)),ref))
+    counter=[]
+    def uncertain(**kwargs):
+        counter.append(kwargs)
+        raise ConnectionError("delivery might have succeeded")
+    first=reconcile_inactivity(
+        store,ledger,at=at,send=uncertain,live_verified=True)
+    assert first["uncertain"]==1
+    retry=reconcile_inactivity(
+        store,ledger,at=at+timedelta(hours=4),
+        send=uncertain,live_verified=True)
+    assert retry["due"]==0 and len(counter)==1
+
+
+def test_recruitment_approved_bulk_dispatch_preserves_original_token_and_prevents_resend(tmp_path):
+    from src.prototype.supervisor_recruitment import RecruitmentLedger
+    from src.prototype.supervisor_recruitment_dispatch import InvitationDispatcher
+    store,intake,_,_=stack(tmp_path)
+    tmp_path.chmod(0o700)
+    ledger=RecruitmentLedger(tmp_path)
+    ledger.apply(email="dispatch-one@example.example",questionnaire="external",
+                 language="en",privacy_accepted=True,at=NOW())
+    ledger.apply(email="dispatch-two@example.example",questionnaire="external",
+                 language="fr",privacy_accepted=True,at=NOW())
+    actor="yaacoub@aivancity.ai"
+    ledger.approve(ids=[1,2],actor=actor,at=NOW())
+    class FakeGraph:
+        sent=[]
+        def send(self,**kwargs):
+            self.sent.append(kwargs)
+    graph=FakeGraph()
+    dispatcher=InvitationDispatcher(
+        intake=intake,ledger=ledger,sender=graph,
+        hostname="study.example.org",live_verified=True,allow_test_examples=True)
+    result=dispatcher.dispatch(actor=actor,at=NOW(),all_approved=True)
+    assert result["selected"]==2 and result["accepted"]==2
+    assert len(graph.sent)==2
+    assert all("https://study.example.org/study/#invite=" in m["body"]
+               for m in graph.sent)
+    assert "Étude" not in graph.sent[0]["subject"]
+    assert "Invitation" in graph.sent[1]["subject"]
+    with store._tx() as db:
+        assert db.execute("SELECT COUNT(*) FROM pii.invitations").fetchone()[0]==2
+    for i in (1,2):
+        p=tmp_path/f"candidate-invite-{i:06d}.txt"
+        assert p.is_file() and p.stat().st_mode&0o077==0
+    repeated=dispatcher.dispatch(actor=actor,at=NOW(),ids=[1,2])
+    assert repeated["rejected"]==2 and len(graph.sent)==2
+
+
+def test_bulk_dispatch_does_not_retry_ambiguous_graph_outcome(tmp_path):
+    from src.prototype.supervisor_recruitment import RecruitmentLedger,RecruitmentError
+    from src.prototype.supervisor_recruitment_dispatch import InvitationDispatcher
+    store,intake,_,_=stack(tmp_path)
+    tmp_path.chmod(0o700)
+    ledger=RecruitmentLedger(tmp_path)
+    ledger.apply(email="dispatch-unknown@example.example",
+                 questionnaire="external",language="en",
+                 privacy_accepted=True,at=NOW())
+    ledger.approve(ids=[1],actor="yaacoub@aivancity.ai",at=NOW())
+    class UnknownSender:
+        count=0
+        def send(self,**kwargs):
+            self.count+=1
+            raise ConnectionError("outcome unknown")
+    fake=UnknownSender()
+    dispatcher=InvitationDispatcher(
+        intake=intake,ledger=ledger,sender=fake,
+        hostname="study.example.org",live_verified=True,allow_test_examples=True)
+    assert dispatcher.dispatch(actor="yaacoub@aivancity.ai",
+                               at=NOW(),ids=[1])["uncertain"]==1
+    with pytest.raises(RecruitmentError,match="prior delivery attempt"):
+        dispatcher.dispatch(actor="yaacoub@aivancity.ai",
+                            at=NOW(),ids=[1])
+    assert fake.count==1
