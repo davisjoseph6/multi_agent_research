@@ -214,9 +214,20 @@ class SupervisorSyntheticStore:
                         phase TEXT NOT NULL,
                         action TEXT,
                         question_id TEXT,
-                        rendered_at TEXT NOT NULL
+                        rendered_at TEXT NOT NULL,
+                        resumed_after_idle INTEGER NOT NULL DEFAULT 0
                     )
                 """)
+                # Forward-only migration of an existing fictional staging DB.
+                # Preserve every invitation, answer and in-progress render ID.
+                rendered_fields={row["name"] for row in db.execute(
+                    "PRAGMA table_info(operational_rendered)"
+                )}
+                if "resumed_after_idle" not in rendered_fields:
+                    db.execute(
+                        "ALTER TABLE operational_rendered "
+                        "ADD COLUMN resumed_after_idle INTEGER NOT NULL DEFAULT 0"
+                    )
                 db.execute("""
                     CREATE TABLE IF NOT EXISTS pii.reminder_outbox(
                         learner_id TEXT NOT NULL,
@@ -379,6 +390,18 @@ class SupervisorSyntheticStore:
         language = language_row["study_language"]
         if language not in LANGUAGES:
             raise SyntheticStudyError("unknown study display language")
+        if self.operational:
+            # The browser may have been closed for several days. An item
+            # reopened after the 24h timing limit is safely re-exposed
+            # without advancing the assessment. Tag that answer so analysts
+            # can distinguish response time since reopening from continuous
+            # on-screen response time. Do not silently mix those measures.
+            render=db.execute(
+                "SELECT resumed_after_idle FROM operational_rendered "
+                "WHERE learner_id=? AND phase=?",(ref,phase),
+            ).fetchone()
+            if render is not None and render["resumed_after_idle"]>0:
+                rule_tags=(rule_tags+";" if rule_tags else "")+"TIMING_RESTART_AFTER_24H_IDLE"
         # Content identifiers must distinguish what actually appeared in
         # English or French when the participant changes languages midway.
         if (language == "fr" and isinstance(content_id,str)
