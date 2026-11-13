@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Adaptive Learning Study — expression of interest</title>
+<link href="/interest/app.css" rel="stylesheet">
+<script src="/interest/app.js" defer></script>
+</head><body><main class="shell">
+<header class="top"><div><p class="eyebrow">AIVANCITY · RESEARCH STUDY</p>
+<h1 id="title">Study interest questionnaire</h1>
+<p id="sub" class="muted">This is an expression of interest, not enrollment into the study.</p></div>
+<label for="language">Language / Langue
+<select id="language"><option value="en">English</option><option value="fr">Français</option></select></label></header>
+<section class="panel">
+<p id="group"></p><form id="apply">
+<label id="email-label" for="email">Email (required)
+<input id="email" name="email" type="email" required maxlength="254" autocomplete="email"></label>
+<label id="first-label" for="first-name">First name (optional)
+<input id="first-name" name="first_name" maxlength="100" autocomplete="given-name"></label>
+<label id="last-label" for="last-name">Family name (optional)
+<input id="last-name" name="last_name" maxlength="100" autocomplete="family-name"></label>
+<label class="row-select"><input id="privacy" type="checkbox" required>
+<span id="privacy-label">I have read the approved recruitment privacy information and agree to be contacted about this study.</span></label>
+<p class="muted" id="privacy-note">The approved institution's recruitment privacy notice must be linked here before public activation.</p>
+<button id="submit" type="submit">Submit interest</button></form>
+<p id="status" role="status" aria-live="polite"></p></section>
+<footer>Questionnaire links must be distributed personally by the supervisor. No private study token is issued by this form.</footer>
+</main></body></html>
