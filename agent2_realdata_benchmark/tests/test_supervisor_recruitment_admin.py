@@ -162,8 +162,8 @@ def test_admin_http_protected_pii_and_bilingual_public_intake(ledger,tmp_path):
         return client.post(path,json=payload,base_url="http://localhost",
                            headers={"Origin":"http://localhost",
                                     "X-Study-Request":"1",
-                                    "X-CSRF-Token":client.get_cookie("recruitment_csrf").value
-                                        if client.get_cookie("recruitment_csrf") else ""})
+                                    "X-CSRF-Token":client.get_cookie("recruitment_csrf",path="/control/").value
+                                        if client.get_cookie("recruitment_csrf",path="/control/") else ""})
     assert client.get("/control/api/overview").status_code==409
     assert client.get("/control/api/candidates").status_code==409
     assert client.get("/interest/school").status_code==200
