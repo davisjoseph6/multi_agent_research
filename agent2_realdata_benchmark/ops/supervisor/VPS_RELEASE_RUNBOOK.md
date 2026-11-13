@@ -272,6 +272,25 @@ do not reset it blindly; test credentials against `/` and rotate operator
 access using its existing operator-owned procedure, verifying the original
 demo service and its API are unchanged.
 
+
+### Resume a quiz after multi-day inactivity
+
+If a fictional participant leaves an unanswered question open for more than
+24 hours, submitting directly from the stale browser tab is refused with an
+instruction to refresh the current activity. No response is silently
+committed. Reopening the same invitation and refreshing `/study/api/item`
+returns the **same unanswered question and render identifier**, rather than
+skipping it or losing randomized order. The exposure timer is restarted
+server-side, preserving the 24-hour measurement ceiling.
+
+The resulting event is explicitly marked
+`TIMING_RESTART_AFTER_24H_IDLE` in its append-only `rule_tags`. Its
+`response_time_ms` is the time since the re-exposure, **not** the time
+elapsed across days; analysts must prespecify how paused questions enter
+timing outcomes. Brief refreshes preserve the original render timestamp
+and are not marked as interrupted. This is a behavioral/resumption safety
+fix, not approval of an institutional dropout/reminder policy.
+
 ## 4. Generate one restricted staging invitation, offline
 
 Run this **on the VPS**, as the dedicated service user:
