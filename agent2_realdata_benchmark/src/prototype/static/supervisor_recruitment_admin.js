@@ -1,7 +1,7 @@
 "use strict";
 (()=>{
 const $=id=>document.getElementById(id);
-let csrf="";
+let csrf="",sendingAvailable=false,reminderAvailable=false;
 const status=t=>$("status").textContent=t;
 function getCsrf(){
  const field=document.cookie.split("; ").find(s=>s.startsWith("recruitment_csrf="));
@@ -55,6 +55,20 @@ function display(data){
   [s.email||"—",
    [s.first_name,s.last_name].filter(Boolean).join(" ")||"—",
    s.session_no,s.step,s.status,s.updated_at].forEach(v=>tr.append(element("td",v)));
+  const reminder=document.createElement("td"),button2=document.createElement("button");
+  button2.type="button";button2.className="inline-button";
+  button2.textContent="Encourage";
+  button2.disabled=!reminderAvailable||s.status!=="active"||
+   s.step==="DONE"||s.step==="WAITING_NEXT_SESSION";
+  button2.addEventListener("click",async ()=>{
+   try{
+    const response=await api("manual-reminder",{learner_id:s.learner_id});
+    status(response.accepted===1?
+      "Message accepted by Outlook (inbox delivery not guaranteed).":
+      "No reminder sent: student is not eligible for a four-day follow-up.");
+   }catch(e){status(e.message)}
+  });
+  reminder.append(button2);tr.append(reminder);
  });
 }
 const NS="http://www.w3.org/2000/svg";
@@ -118,7 +132,16 @@ async function selectStudent(student){
  });
 }
 async function refresh(){
- const [r,p]=await Promise.all([api("overview"),api("reminder-policy")]);
+ const [r,p,cap]=await Promise.all([
+  api("overview"),api("reminder-policy"),api("capabilities")
+ ]);
+ sendingAvailable=cap.invitation_sending_available;
+ reminderAvailable=cap.manual_reminders_available;
+ $("send-selected").disabled=!sendingAvailable;
+ $("send-all").disabled=!sendingAvailable;
+ $("mail-capability").textContent=sendingAvailable?
+  "Outlook mail is available for authorized, approved applicants. Server acceptance does not prove delivery.":
+  "Outlook delivery is disabled until the signed live release and mailbox setup are verified.";
  display(r);$("auto-reminder").checked=p.automatic_reminders_enabled;
  $("dashboard").hidden=false;$("reload").hidden=false;$("login-panel").hidden=true;
  status("Researcher records updated. Contact information is confidential.");
@@ -150,6 +173,28 @@ $("approve").addEventListener("click",async ()=>{
  if(!ids.length){status("Select at least one applicant");return}
  try{const v=await api("approve",{candidate_ids:ids});
   status(v.approved+" applications marked approved; no email was sent.");await refresh();
+ }catch(e){status(e.message)}
+});
+$("send-selected").addEventListener("click",async ()=>{
+ if(!sendingAvailable)return;
+ const ids=[...document.querySelectorAll(".candidate:checked")].map(x=>Number(x.value));
+ if(!ids.length){status("Select at least one approved applicant");return}
+ if(!window.confirm("Send private study invitations to the selected approved applicants?"))return;
+ try{
+  const r=await api("send-invitations",{candidate_ids:ids,select_all:false});
+  status(r.accepted+" accepted by Outlook, "+r.uncertain+
+         " uncertain and "+r.rejected+" rejected. No secrets displayed.");
+  await refresh();
+ }catch(e){status(e.message)}
+});
+$("send-all").addEventListener("click",async ()=>{
+ if(!sendingAvailable)return;
+ if(!window.confirm("Send invitations to ALL currently approved applicants?"))return;
+ try{
+  const r=await api("send-invitations",{candidate_ids:[],select_all:true});
+  status(r.accepted+" accepted by Outlook; "+r.uncertain+
+         " delivery outcomes require manual review.");
+  await refresh();
  }catch(e){status(e.message)}
 });
 $("auto-reminder").addEventListener("change",async ()=>{
