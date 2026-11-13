@@ -78,7 +78,7 @@
    for(const event of data.points.slice(-250).reverse()){
      const tr=document.createElement("tr");
      const values=[event.x,event.session,event.action,event.concept,
-                   event.answered_at,concepts.map(c=>
+                   event.answered_at,event.response_seconds,concepts.map(c=>
                      c+": "+event.mastery[c].toFixed(3)).join(" · ")];
      for(const v of values){
        const td=document.createElement("td");
@@ -105,6 +105,18 @@
      dt.textContent=name;dd.textContent=String(value);item.append(dt,dd);dl.append(item);
    }
    section.append(title,dl);
+   const h=document.createElement("h3");
+   h.textContent="Session scoring and elapsed time (regular quiz questions)";
+   section.append(h);
+   for(const s of data.sessions||[]){
+     const p=document.createElement("p");
+     const elapsed=s.elapsed_seconds===null?"in progress":
+       s.elapsed_seconds+"s elapsed (including breaks)";
+     p.textContent="Session "+s.session+": "+s.quiz_correct+"/"+
+       s.quiz_questions+" correct · "+s.question_answer_seconds+
+       "s answering · "+elapsed;
+     section.append(p);
+   }
  }
  async function update(){
    // Do not drop a selector change while the previous poll is in progress.
