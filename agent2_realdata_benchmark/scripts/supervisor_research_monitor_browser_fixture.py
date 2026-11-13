@@ -30,16 +30,22 @@ def prepare(path):
              step TEXT,updated_at TEXT,state_json TEXT);
         CREATE TABLE events(event_id INTEGER PRIMARY KEY,learner_id TEXT,
              session_no INTEGER,action_type TEXT,concept_id TEXT,
-             bloom_level INTEGER,answered_at TEXT,phase TEXT,is_correct INTEGER);
+             bloom_level INTEGER,answered_at TEXT,phase TEXT,is_correct INTEGER,
+             question_id TEXT,response_time_ms INTEGER);
+        CREATE TABLE sessions(learner_id TEXT,session_no INTEGER,
+             started_at TEXT,ended_at TEXT,status TEXT);
         CREATE TABLE state_history(event_id INTEGER,state_json TEXT);
     """)
     first=json.dumps({"engine":{"mastery":{c:.35 for c in CONCEPTS}}})
     db.execute("INSERT INTO participants VALUES('STUDY_P001','A','active')")
     db.execute("INSERT INTO learner_state VALUES(?,?,?,?,?)",
                ("STUDY_P001",1,"QUIZ","2026-11-12T20:00:00+00:00",first))
-    db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?)",
+    db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                (1,"STUDY_P001",1,"QUESTION","C1",1,
-                "2026-11-12T20:00:00+00:00","QUIZ",1))
+                "2026-11-12T20:00:00+00:00","QUIZ",1,"QZ_C1_L1_01",4500))
+    db.execute("INSERT INTO sessions VALUES(?,?,?,?,?)",
+               ("STUDY_P001",1,"2026-11-12T19:59:00+00:00",
+                None,"in_progress"))
     db.execute("INSERT INTO state_history VALUES(1,?)",(first,))
     db.commit();db.close()
 
@@ -50,9 +56,9 @@ def add_second_answer(path):
         c:(.66 if c=="C1" else .35) for c in CONCEPTS
     }}})
     db=sqlite3.connect(path,timeout=15)
-    db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?)",
+    db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                (2,"STUDY_P001",1,"QUESTION","C1",1,
-                "2026-11-12T20:01:00+00:00","QUIZ",1))
+                "2026-11-12T20:01:00+00:00","QUIZ",1,"QZ_C1_L1_02",3700))
     db.execute("INSERT INTO state_history VALUES(2,?)",(after,))
     db.execute("UPDATE learner_state SET updated_at=?,state_json=?",
                ("2026-11-12T20:01:00+00:00",after))
