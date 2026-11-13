@@ -110,8 +110,8 @@ rollback() {
     if [[ "$status" -ne 0 && "$CHANGED" -eq 1 ]]; then
         echo "DEPLOYMENT FAILURE: restoring the previous staging release" >&2
         if [[ -n "$OLD_RELEASE" ]]; then
-            ln -s "$OLD_RELEASE" "${PREFIX}/.rollback-current.$" &&
-              mv -Tf "${PREFIX}/.rollback-current.$" "${PREFIX}/current"
+            ln -s "$OLD_RELEASE" "${PREFIX}/.rollback-current.${BASHPID}" &&
+              mv -Tf "${PREFIX}/.rollback-current.${BASHPID}" "${PREFIX}/current"
         else
             rm -f "${PREFIX}/current"
         fi
