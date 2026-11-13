@@ -6,6 +6,7 @@ The existing pseudonymous BKT dashboard remains isolated from contact PII.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from hashlib import sha256
 import hmac
 import json
 from pathlib import Path
@@ -67,6 +68,10 @@ def make_recruitment_app(
         raise ValueError("signed LIVE release required for all outbound administrative actions")
     if dispatcher is not None and not isinstance(dispatcher,InvitationDispatcher):
         raise TypeError("verified invitation dispatcher required")
+    notice_digests={
+        language:sha256(Path(path).read_bytes()).hexdigest()
+        for language,path in (privacy_notices or {}).items()
+    }
     app=Flask("supervisor_recruitment",static_folder=None)
     app.config.update(DEBUG=False,MAX_CONTENT_LENGTH=8192,
                       MAX_FORM_MEMORY_SIZE=8192)
@@ -358,6 +363,7 @@ def make_recruitment_app(
             email=data["email"],first_name=data["first_name"],
             last_name=data["last_name"],questionnaire=data["questionnaire"],
             language=data["language"],privacy_accepted=data["privacy_accepted"],
+            privacy_sha256=notice_digests[data["language"]],
             at=now(),
         )
         return jsonify(received=True,no_enrollment=True),202
