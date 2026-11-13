@@ -32,8 +32,11 @@ def make_test_db(tmp_path):
         CREATE TABLE events(
             event_id INTEGER PRIMARY KEY,learner_id TEXT,
             session_no INTEGER,action_type TEXT,concept_id TEXT,
-            bloom_level INTEGER,answered_at TEXT,phase TEXT,is_correct INTEGER);
+            bloom_level INTEGER,answered_at TEXT,phase TEXT,is_correct INTEGER,
+            question_id TEXT,response_time_ms INTEGER);
         CREATE TABLE state_history(event_id INTEGER,state_json TEXT);
+        CREATE TABLE sessions(learner_id TEXT,session_no INTEGER,
+            started_at TEXT,ended_at TEXT,status TEXT);
     """)
     first=json.dumps({"engine":{"mastery":{c:.4 for c in CONCEPTS}}})
     after=json.dumps({"engine":{"mastery":{
@@ -42,9 +45,12 @@ def make_test_db(tmp_path):
     db.execute("INSERT INTO participants VALUES('STUDY_P001','A','active')")
     db.execute("INSERT INTO learner_state VALUES(?,?,?,?,?)",
                ("STUDY_P001",1,"QUIZ","2026-11-12T20:00:00+00:00",after))
-    db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?)",
+    db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                (1,"STUDY_P001",1,"QUESTION","C1",1,
-                "2026-11-12T20:00:00+00:00","QUIZ",1))
+                "2026-11-12T20:00:00+00:00","QUIZ",1,"QZ_C1_L1_01",5300))
+    db.execute("INSERT INTO sessions VALUES(?,?,?,?,?)",
+               ("STUDY_P001",1,"2026-11-12T19:59:00+00:00",
+                None,"in_progress"))
     db.execute("INSERT INTO state_history VALUES(1,?)",(after,))
     db.commit();db.close()
     return path
@@ -105,6 +111,16 @@ def test_live_mastery_curve_and_participants_are_pseudonymous_and_read_only(tmp_
     assert response.status_code==200
     assert response.json["arm"]=="A"
     assert len(response.json["points"])==1
+    assert response.json["points"][0]["response_seconds"]==5.3
+    assert response.json["sessions"][0]["quiz_correct"]==1
+    assert response.json["sessions"][0]["question_answer_seconds"]==5.3
+    timing=client.get("/admin/api/question-timings.csv",headers=auth(),base_url=BASE)
+    assert timing.status_code==200
+    assert "5.3" in timing.get_data(as_text=True)
+    summary=client.get("/admin/api/session-metrics.csv",headers=auth(),base_url=BASE)
+    assert summary.status_code==200
+    assert "STUDY_P001" in summary.get_data(as_text=True)
+    assert "email" not in summary.get_data(as_text=True)
     assert response.json["points"][0]["mastery"]["C1"]==.53
     assert len(response.json["points"][0]["mastery"])==8
     assert response.json["x_axis"].startswith("Scored")
