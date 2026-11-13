@@ -178,7 +178,7 @@ def test_admin_http_protected_pii_and_bilingual_public_intake(ledger,tmp_path):
         notice.write_bytes(b"%PDF-1.4\n% fake fictional test-only notice\n")
         notices[language]=notice
     app=make_recruitment_app(
-        ledger,public_intake_enabled=True,
+        ledger,public_intake_enabled=True,live_verified=True,
         research_db=research,contacts_db=contacts,
         privacy_notices=notices,intake_rate_secret=b"test-only-example-key-"+b"x"*32,
     )
@@ -350,3 +350,16 @@ def test_rate_limit_keeps_raw_ip_private_and_rejects_abuse(ledger):
     assert ledger.check_intake_rate(
         remote_ip="192.0.2.5",secret=b"x"*32,at=T+timedelta(days=1),
     ) is True
+
+
+def test_public_intake_is_forbidden_without_separately_verified_live_release(ledger,tmp_path):
+    notices={}
+    for lang in ("en","fr"):
+        p=tmp_path/f"notice_{lang}.pdf"
+        p.write_bytes(b"%PDF-1.4\n")
+        notices[lang]=p
+    with pytest.raises(ValueError,match="signed LIVE"):
+        make_recruitment_app(
+            ledger,public_intake_enabled=True,
+            privacy_notices=notices,intake_rate_secret=b"x"*32,
+        )
