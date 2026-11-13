@@ -6,7 +6,7 @@ from pathlib import Path
 from src.prototype.supervisor_content import SupervisorBank
 from src.prototype.supervisor_operational_intake import OperationalIntake
 from src.prototype.supervisor_operational_scheduler import reconcile
-from src.prototype.supervisor_synthetic_store import SupervisorSyntheticStore
+from src.prototype.supervisor_synthetic_store import SupervisorSyntheticStore, iso
 
 DATA=Path(__file__).resolve().parents[1]/"data"/"supervisor_20261111"
 T=datetime(2026,11,12,12,tzinfo=timezone.utc)
