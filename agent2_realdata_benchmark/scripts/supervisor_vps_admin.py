@@ -193,7 +193,14 @@ def main():
                        validity_days=args.validity_days,
                        allow_example=(mode=="staging"))
     link=f"https://{host}/study/#invite={token}"
-    write_private(args.output,link)
+    try:
+        write_private(args.output,link)
+    except BaseException:
+        # File creation can still fail after preflight (quota, permissions,
+        # filesystem error). Do not leave an inaccessible, unusable contact
+        # invitation permanently stranded in the private database.
+        intake.cancel_unclaimed_private_file_failure(token)
+        raise
     print("Private invitation file created (mode 0600); no token printed.")
     if args.send:
         deliver(args.issue,link,mode=mode)

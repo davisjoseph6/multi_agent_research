@@ -85,6 +85,7 @@ jobs:
           node --check src/prototype/static/supervisor_fictional_copy.js
           bash -n ops/supervisor/install_staging.sh
           bash -n ops/supervisor/run_safe_encrypted_backup.sh
+          bash -n ops/supervisor/staging_infrastructure_smoke.sh
           bash -n ops/supervisor/test_release_directory_access.sh
       - name: Reproduce and fix the 200/CHDIR failure as a second Linux user
         run: sudo bash ops/supervisor/test_release_directory_access.sh

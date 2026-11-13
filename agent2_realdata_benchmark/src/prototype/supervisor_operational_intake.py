@@ -79,6 +79,28 @@ class OperationalIntake:
             )
         return token
 
+    def cancel_unclaimed_private_file_failure(self, token: str) -> None:
+        """Offline only: undo a brand-new invite if secret-file creation failed.
+
+        Only a still-unclaimed, not-yet-distributed capability is eligible.
+        Registered, consented and screened invitations cannot be revoked by
+        this narrow compensation path. Never call from a participant route.
+        """
+        digest=self.digest(token)
+        with self.store._tx() as db:
+            row=db.execute(
+                "SELECT state FROM pii.invitations WHERE token_hash=?",
+                (digest,),
+            ).fetchone()
+            if row is None or row["state"]!="invited":
+                raise SyntheticStudyError("private file failure cleanup cannot change active invitation")
+            changed=db.execute(
+                "DELETE FROM pii.invitations WHERE token_hash=? AND state='invited'",
+                (digest,),
+            )
+            if changed.rowcount!=1:
+                raise SyntheticStudyError("new invitation changed during file failure cleanup")
+
     def rotate_registered_test(self, email: str, *, new_token: str,
                                at: datetime) -> str:
         """Rotate an existing registered .example fixture without losing progress.

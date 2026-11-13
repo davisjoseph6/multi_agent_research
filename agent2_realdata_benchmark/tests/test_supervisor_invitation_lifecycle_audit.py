@@ -106,3 +106,38 @@ def test_cli_one_day_invitation_is_optional_and_does_not_send(tmp_path):
     assert intake.status(token,at=until-timedelta(seconds=1))["stage"]=="invited"
     with pytest.raises(SyntheticStudyError,match="expired"):
         intake.status(token,at=until+timedelta(seconds=1))
+
+
+def test_failed_offline_invite_file_write_leaves_no_unclaimable_email(tmp_path,monkeypatch):
+    """Failure after token insertion must not strand a contact or leak a link."""
+    import sys
+    from scripts import supervisor_vps_admin as admin
+    store,intake,_=fixture(tmp_path)
+    recipient="failed-write@example.example"
+    monkeypatch.setattr(admin,"load",lambda:(intake,"staging"))
+    monkeypatch.setenv("SUPERVISOR_VPS_HOST","demo.selfhealing-edu.fr")
+    def fail_write(*_):
+        raise OSError("injected private filesystem failure")
+    monkeypatch.setattr(admin,"write_private",fail_write)
+    output=tmp_path/"never-written.txt"
+    monkeypatch.setattr(sys,"argv",[
+        "supervisor_vps_admin","--issue",recipient,"--output",str(output)])
+    with pytest.raises(OSError,match="filesystem failure"):
+        admin.main()
+    with store._tx() as db:
+        assert db.execute(
+            "SELECT COUNT(*) FROM pii.invitations WHERE email=?",
+            (recipient,),
+        ).fetchone()[0]==0
+    assert not output.exists()
+    # The staff operator can retry safely with the same intended recipient.
+    new=intake.issue(recipient,at=T,allow_example=True)
+    assert intake.status(new,at=T)["stage"]=="invited"
+
+
+def test_failed_file_compensation_cannot_delete_consented_or_registered_invite(tmp_path):
+    store,intake,token=fixture(tmp_path)
+    intake.consent(token,checks=[True]*5,optional=False,language="en",at=T)
+    with pytest.raises(SyntheticStudyError,match="cleanup cannot"):
+        intake.cancel_unclaimed_private_file_failure(token)
+    assert intake.status(token,at=T)["stage"]=="consented"
