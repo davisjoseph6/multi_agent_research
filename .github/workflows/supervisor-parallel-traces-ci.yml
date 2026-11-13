@@ -6,6 +6,9 @@ on:
     paths:
       - 'agent2_realdata_benchmark/data/supervisor_20261111/**'
       - 'agent2_realdata_benchmark/src/prototype/supervisor_*.py'
+      - 'agent2_realdata_benchmark/src/prototype/templates/supervisor_vps.html'
+      - 'agent2_realdata_benchmark/src/prototype/static/supervisor_vps.*'
+      - 'agent2_realdata_benchmark/scripts/supervisor_vps_browser_playwright.cjs'
       - 'agent2_realdata_benchmark/src/prototype/templates/supervisor_research_monitor.html'
       - 'agent2_realdata_benchmark/src/prototype/static/supervisor_research_monitor.*'
       - 'agent2_realdata_benchmark/scripts/supervisor_research_monitor_wsgi.py'
@@ -29,6 +32,9 @@ on:
     paths:
       - 'agent2_realdata_benchmark/data/supervisor_20261111/**'
       - 'agent2_realdata_benchmark/src/prototype/supervisor_*.py'
+      - 'agent2_realdata_benchmark/src/prototype/templates/supervisor_vps.html'
+      - 'agent2_realdata_benchmark/src/prototype/static/supervisor_vps.*'
+      - 'agent2_realdata_benchmark/scripts/supervisor_vps_browser_playwright.cjs'
       - 'agent2_realdata_benchmark/src/prototype/templates/supervisor_research_monitor.html'
       - 'agent2_realdata_benchmark/src/prototype/static/supervisor_research_monitor.*'
       - 'agent2_realdata_benchmark/scripts/supervisor_research_monitor_wsgi.py'
