@@ -10,9 +10,15 @@ An entirely separate LIVE installation uses the service account
 ijcai-supervisor-live, /srv/ijcai-supervisor-live/current for exact Git
 source, /var/lib/ijcai-supervisor-live for private research state,
 and /etc/ijcai-supervisor-live for root-controlled approvals and secrets.
-The LIVE study listens only on 127.0.0.1:8888 and public interest forms on
-127.0.0.1:8889. Caddy proxies ONLY /study/* and /interest/* on formally
-approved non-demo DNS. Researcher /control/ is SSH-tunnel-only.
+The LIVE study listens only on 127.0.0.1:8888, public interest forms on
+127.0.0.1:8889, and a **separate private control-plane process** on
+127.0.0.1:8890. Caddy proxies ONLY /study/* and /interest/* on formally
+approved non-demo DNS. Researcher /control/ is SSH-tunnel-only at 8890.
+The private instance cannot serve interest forms. To reach it locally use
+`ssh -N -L 8890:127.0.0.1:8890 -i ~/.ssh/ijcai_preview_ed25519 davis@31.70.172.140`
+then open `http://127.0.0.1:8890/control/` using the separate LIVE account
+credentials generated in the private `initial-admin-secrets` folder.
+Never reuse the STAGING bootstrap passwords or open port 8890 externally.
 
 ## Private document replacement
 
@@ -203,8 +209,12 @@ The root installer provides two distinct subcommands:
 
     sudo bash install_live_services.sh prepare /home/davis/ijcai-live.bundle FULL_SHA
 
-PREPARE installs separate LIVE code, venv, private directories, dedicated
-service account and DISABLED systemd units. It does not change Caddy or
+PREPARE installs separate LIVE code, venv, **empty separate SQLite research,
+contacts and administrator databases**, dedicated service account and four
+NEW isolated LIVE administrator credentials in `initial-admin-secrets` under
+0700 state, plus DISABLED systemd units. Transfer the four one-time passwords
+privately; never print or copy them into chat, and destroy the originals
+once secure individual handoff is complete. It does not change Caddy or
 start real enrollment or mail. After final institutional records, DNS,
 password/key ownership and backups are independently verified, the authorized
 operator completes signed LIVE document activation, runs:
