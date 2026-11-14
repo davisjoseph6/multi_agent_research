@@ -16,7 +16,7 @@ STUDY=ijcai-supervisor-live-study
 ADMIN=ijcai-supervisor-live-recruitment
 CONTROL=ijcai-supervisor-live-control
 CADDY=/etc/caddy/Caddyfile
-SNIPPET="$PRIVATE/Caddyfile.fragment"
+SNIPPET=/etc/caddy/ijcai-supervisor-live.caddy
 exec 9>/run/lock/ijcai-supervisor-live-install.lock
 flock -n 9 || { echo "Another release installation is in progress" >&2; exit 2; }
 
@@ -213,10 +213,10 @@ ss -ltn | grep -q '127.0.0.1:8890 '
 [[ "$(curl --silent --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:8890/control/api/overview)" == 409 ]] || {
   echo "Private live admin must reject anonymous PII access" >&2;exit 2;
 }
-if grep -Fq 'import /etc/ijcai-supervisor-live/Caddyfile.fragment' "$CADDY"; then
+if grep -Fq 'import /etc/caddy/ijcai-supervisor-live.caddy' "$CADDY"; then
   echo "Caddy import already exists; validating recognized exact path."
 else
-  printf '\nimport /etc/ijcai-supervisor-live/Caddyfile.fragment\n' >> "$CADDY"
+  printf '\nimport /etc/caddy/ijcai-supervisor-live.caddy\n' >> "$CADDY"
   changed=1
 fi
 caddy validate --config "$CADDY"
