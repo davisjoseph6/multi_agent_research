@@ -20,7 +20,9 @@ from src.prototype.supervisor_recruitment_dispatch import InvitationDispatcher
 from src.prototype.supervisor_operational_intake import OperationalIntake
 from src.prototype.supervisor_synthetic_store import SupervisorSyntheticStore
 from src.prototype.supervisor_content import SupervisorBank
-from src.prototype.supervisor_graph_mail import GraphMailSender
+from src.prototype.supervisor_mail_providers import (
+    build_mail_router, EncryptedRefreshVault, MailDeliveryJournal,
+)
 from scripts.supervisor_vps_wsgi import BANK
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -85,12 +87,24 @@ def make_wsgi_app():
     if mode=="live":
         if os.environ.get("SUPERVISOR_MAIL_TRANSPORT")!="microsoft_graph":
             raise RuntimeError("institutionally authorized Microsoft Graph transport required")
-        mailer=GraphMailSender(
-            tenant_id=os.environ["SUPERVISOR_GRAPH_TENANT_ID"],
-            client_id=os.environ["SUPERVISOR_GRAPH_CLIENT_ID"],
-            client_secret=os.environ["SUPERVISOR_GRAPH_CLIENT_SECRET"],
-            sender_email=os.environ["SUPERVISOR_GRAPH_SENDER_EMAIL"],
-            live_release_verified=True,
+        if os.environ.get("SUPERVISOR_MAIL_TRANSPORT") != "provider_router":
+            raise RuntimeError("signed, provider-neutral email route configuration required")
+        vault=None
+        if os.environ.get("SUPERVISOR_MAIL_VAULT_DIR"):
+            vault=EncryptedRefreshVault(
+                os.environ["SUPERVISOR_MAIL_VAULT_DIR"],
+                os.environ["SUPERVISOR_MAIL_VAULT_KEY_FILE"],
+            )
+        journal=MailDeliveryJournal(
+            os.environ["SUPERVISOR_MAIL_AUDIT_DB"],
+            os.environ["SUPERVISOR_MAIL_AUDIT_KEY_FILE"],
+        )
+        mailer=build_mail_router(
+            config_file=os.environ["SUPERVISOR_MAIL_CONFIG"],
+            approval_file=os.environ["SUPERVISOR_MAIL_APPROVAL"],
+            approval_signature=os.environ["SUPERVISOR_MAIL_APPROVAL_SIGNATURE"],
+            institution_key=os.environ["SUPERVISOR_INSTITUTION_PUBLIC_KEY"],
+            release_commit=commit,vault=vault,journal=journal,
         )
         study_host=os.environ.get("SUPERVISOR_VPS_HOST","")
         if not study_host or "demo" in study_host:
