@@ -1,0 +1,58 @@
+name: IJCAI signed LIVE install PREPARE-only smoke (no enrollment)
+on:
+  pull_request:
+    paths:
+      - 'agent2_realdata_benchmark/ops/supervisor/**'
+      - 'agent2_realdata_benchmark/scripts/supervisor_doc_bundle_cli.py'
+      - 'agent2_realdata_benchmark/src/prototype/supervisor_*.py'
+      - '.github/workflows/supervisor-live-prepare-only-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  private-live-preparation:
+    name: Isolated VPS install dry-rehearsal (never activate)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: agent2_realdata_benchmark
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create an exact remote-tracking-only Git bundle
+        run: |
+          set -Eeuo pipefail
+          SHA="$(git rev-parse HEAD)"
+          REF=refs/remotes/origin/research/ijcai2027-supervisor-consent-gdpr-20261112
+          git update-ref "$REF" "$SHA"
+          git bundle create /tmp/ijcai-test-only-live.bundle "$REF"
+          git bundle list-heads /tmp/ijcai-test-only-live.bundle
+          git bundle verify /tmp/ijcai-test-only-live.bundle
+          echo "$SHA" > /tmp/ijcai-test-only-commit
+      - name: PREPARE separate empty LIVE storage and disabled units as root
+        run: |
+          set -Eeuo pipefail
+          SHA="$(cat /tmp/ijcai-test-only-commit)"
+          sudo bash ops/supervisor/install_live_services.sh prepare             /tmp/ijcai-test-only-live.bundle "$SHA"
+          test "$(sudo git -C /srv/ijcai-supervisor-live/current rev-parse HEAD)" = "$SHA"
+          sudo test -d /var/lib/ijcai-supervisor-live/document_registry/versions
+          sudo test ! -e /var/lib/ijcai-supervisor-live/document_registry/current
+          sudo find /var/lib/ijcai-supervisor-live/document_registry/versions             -mindepth 2 -maxdepth 2 -name manifest.json -print -quit |
+            grep -q .
+          for unit in ijcai-supervisor-live-study ijcai-supervisor-live-recruitment                       ijcai-supervisor-live-control ijcai-supervisor-live-reminders.timer; do
+            if systemctl is-active --quiet "$unit"; then
+              echo "FAIL: unexpectedly active $unit" >&2
+              exit 2
+            fi
+          done
+          sudo test ! -f /etc/ijcai-supervisor-live/live.env
+          echo "PASS: empty independent databases, pending PDF manifest, stopped LIVE units."
+      - name: Verify password identities are isolated and intake is disabled
+        run: |
+          set -Eeuo pipefail
+          cd /srv/ijcai-supervisor-live/current/agent2_realdata_benchmark
+          sudo runuser -u ijcai-supervisor-live --             /srv/ijcai-supervisor-live/venv/bin/python             -m scripts.supervisor_recruitment_cli             --state-dir /var/lib/ijcai-supervisor-live --counts
+          sudo test -f /var/lib/ijcai-supervisor-live/supervisor_operational_study.sqlite3
+          sudo test -f /var/lib/ijcai-supervisor-live/supervisor_operational_contacts.sqlite3
+          sudo test ! -e /etc/caddy/ijcai-supervisor-live.caddy
+          echo "PASS: no public routes, mail credentials or participant enrollment activated."
