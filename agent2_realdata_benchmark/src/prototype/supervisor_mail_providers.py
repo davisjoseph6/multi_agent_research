@@ -17,6 +17,7 @@ from hashlib import sha256
 import hmac
 import json
 import os
+import secrets
 from pathlib import Path
 import re
 import sqlite3
@@ -266,15 +267,95 @@ class DelegatedOAuthSender:
             raise MailDeliveryError(f"{self.provider} declined send ({code})")
 
 
+class MailDeliveryJournal:
+    """Pseudonymous append-only operational receipts, no email/body/token.
+
+    Explicit message keys prohibit duplicate invitation sends, including
+    when the HTTP response is uncertain. Reconciliation is manual.
+    """
+    def __init__(self, dbfile: str | Path, keyfile: str | Path):
+        self.path = Path(dbfile)
+        if (not self.path.is_absolute() or self.path.is_symlink()
+                or not self.path.parent.is_dir()
+                or self.path.parent.stat().st_mode & 0o077):
+            raise MailConfigurationError("private mail audit DB parent must be 0700")
+        self.key = private_file(keyfile).read_bytes().strip()
+        if len(self.key) < 32:
+            raise MailConfigurationError("HMAC audit key too short")
+        with self._connect() as db:
+            db.execute("""CREATE TABLE IF NOT EXISTS mail_receipts(
+                message_key TEXT PRIMARY KEY,
+                sender_id TEXT NOT NULL,
+                recipient_hmac TEXT NOT NULL,
+                state TEXT NOT NULL CHECK(state IN ('dispatching','accepted','uncertain')),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )""")
+        os.chmod(self.path, 0o600)
+
+    @contextmanager
+    def _connect(self):
+        db = sqlite3.connect(self.path, timeout=15)
+        db.execute("PRAGMA busy_timeout=15000")
+        try:
+            yield db
+            db.commit()
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def reserve(self, *, sender_id: str, to: str, key: str | None = None) -> str:
+        marker = (key if key is not None else secrets.token_hex(24))
+        if not isinstance(marker, str) or not 1 <= len(marker) <= 240:
+            raise MailConfigurationError("invalid audit message key")
+        hashed = hmac.new(self.key, canonical_email(to).encode("utf-8"),
+                          "sha256").hexdigest()
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as db:
+            try:
+                db.execute("INSERT INTO mail_receipts VALUES(?,?,?,?,?,?)",
+                           (marker,sender_id,hashed,"dispatching",now,now))
+            except sqlite3.IntegrityError:
+                # The prior request may have succeeded. Never send again.
+                raise MailDeliveryUnknown("duplicate mail attempt blocked; reconcile manually") from None
+        return marker
+
+    def finalize(self, key: str, *, accepted: bool) -> None:
+        when = datetime.now(timezone.utc).isoformat()
+        with self._connect() as db:
+            result = db.execute(
+                "UPDATE mail_receipts SET state=?, updated_at=? WHERE message_key=? "
+                "AND state='dispatching'",
+                ("accepted" if accepted else "uncertain",when,key))
+            if result.rowcount != 1:
+                raise MailDeliveryUnknown("mail receipt state conflict; reconciliation needed")
+
+
 class MailRoute:
-    """One provider and one exact approved mailbox, immutable at runtime."""
-    def __init__(self, *, sender, provider: str, sender_email: str):
+    """One approved mailbox; audit never contains private invitation URLs."""
+    def __init__(self, *, sender, provider: str, sender_email: str,
+                 journal: MailDeliveryJournal | None = None, identifier: str = ""):
         self.sender = sender
         self.provider = provider
         self.email = canonical_email(sender_email)
+        self.journal = journal
+        self.identifier = identifier
 
-    def send(self, *, to: str, subject: str, body: str):
-        return self.sender.send(to=to, subject=subject, body=body)
+    def send(self, *, to: str, subject: str, body: str,
+             delivery_key: str | None = None):
+        marker = (self.journal.reserve(sender_id=self.identifier,to=to,key=delivery_key)
+                  if self.journal else None)
+        try:
+            value = self.sender.send(to=to, subject=subject, body=body)
+        except Exception:
+            if marker:
+                self.journal.finalize(marker, accepted=False)
+            raise
+        if marker:
+            self.journal.finalize(marker, accepted=True)
+        return value
 
 
 class MailRouter:
@@ -357,7 +438,8 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
 def build_mail_router(*, config_file: str | Path, approval_file: str | Path,
                       approval_signature: str | Path, institution_key: str | Path,
                       release_commit: str, vault: EncryptedRefreshVault | None = None,
-                      transport=None, token_transport=None) -> MailRouter:
+                      transport=None, token_transport=None,
+                      journal: MailDeliveryJournal | None = None) -> MailRouter:
     config = verify_signed_mail_policy(
         config_file, approval_file, approval_signature, institution_key,
         release_commit=release_commit,
@@ -384,5 +466,6 @@ def build_mail_router(*, config_file: str | Path, approval_file: str | Path,
             with vault.exclusive():
                 vault.load(provider, item["email"])
         routes[key] = MailRoute(sender=source, provider=provider,
-                                sender_email=item["email"])
+                                sender_email=item["email"],journal=journal,
+                                identifier=key)
     return MailRouter(routes, config["default"], by_actor=config.get("by_actor", {}))
