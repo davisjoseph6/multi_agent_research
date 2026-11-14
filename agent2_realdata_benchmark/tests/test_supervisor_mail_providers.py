@@ -172,8 +172,7 @@ def _sign(root,record):
     manifest=root/"policy.json"
     sig=root/"policy.sig"
     manifest.write_text(json.dumps(record))
-    for path in (key,pub,manifest):
-        path.chmod(0o600)
+    manifest.chmod(0o600)
     subprocess.run(["openssl","genpkey","-algorithm","RSA","-out",str(key),
                     "-pkeyopt","rsa_keygen_bits:2048"],check=True,capture_output=True)
     subprocess.run(["openssl","pkey","-in",str(key),
