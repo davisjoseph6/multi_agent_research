@@ -18,7 +18,9 @@ import secrets
 import sqlite3
 
 from .supervisor_content import SupervisorBank
+from .supervisor_i18n import LANGUAGES, localize_public, validate_french_bank
 from .supervisor_trace_engine import SupervisorTraceEngine, SESSION_BLOCKS
+from .supervisor_recovery_content import CONTENT_VERSION, recovery_resource
 
 GROUPS = ("A", "B", "C")
 FORMS = ("PRETEST", "QUIZ", "POSTTEST", "SURVEY",
@@ -42,15 +44,24 @@ class SyntheticStudyError(ValueError):
 class SupervisorSyntheticStore:
     """Bank-pinned, synthetic-only participant state and append-only audit log."""
 
-    def __init__(self, folder: str | Path, *, bank: SupervisorBank):
+    def __init__(self, folder: str | Path, *, bank: SupervisorBank,
+                 operational: bool = False):
+        # Default is the original, strictly fictional, reference-harness
+        # behavior. The separately gated VPS service may opt into a
+        # real-contact-capable storage schema; no API is enabled by this flag.
+        if type(operational) is not bool:
+            raise SyntheticStudyError("explicit operational boolean required")
+        self.operational = operational
         self.folder = Path(folder)
         if not self.folder.is_dir() or self.folder.is_symlink():
             raise SyntheticStudyError("existing nonsymlink private directory required")
         if not isinstance(bank, SupervisorBank):
             raise TypeError("supervisor bank is required")
         self.bank = bank
-        self.research = self.folder / "supervisor_fictional_study.sqlite3"
-        self.contacts = self.folder / "supervisor_fictional_contacts.sqlite3"
+        validate_french_bank(bank)  # missing translation fails closed
+        prefix = "supervisor_operational" if self.operational else "supervisor_fictional"
+        self.research = self.folder / f"{prefix}_study.sqlite3"
+        self.contacts = self.folder / f"{prefix}_contacts.sqlite3"
         if self.research.is_symlink() or self.contacts.is_symlink():
             raise SyntheticStudyError("symlinked databases refused")
         with self._tx() as db:
@@ -68,6 +79,9 @@ class SupervisorSyntheticStore:
                 registered_at TEXT NOT NULL,
                 consent_version TEXT NOT NULL,
                 consent_at TEXT NOT NULL,
+                consent_lang TEXT NOT NULL DEFAULT 'en',
+                study_language TEXT NOT NULL DEFAULT 'en' CHECK(study_language IN ('en','fr')),
+                open_data_consent INTEGER NOT NULL DEFAULT 0,
                 econ_course INTEGER NOT NULL,
                 screening_score INTEGER NOT NULL,
                 eligible INTEGER NOT NULL CHECK(eligible=1),
@@ -77,6 +91,23 @@ class SupervisorSyntheticStore:
                 missed_sessions INTEGER NOT NULL DEFAULT 0,
                 status_changed_at TEXT NOT NULL,
                 config_version TEXT NOT NULL REFERENCES config(config_version)
+              );
+              CREATE TABLE IF NOT EXISTS screening_log (
+                timestamp TEXT NOT NULL,
+                score INTEGER NOT NULL CHECK(score BETWEEN 6 AND 8),
+                eligible INTEGER NOT NULL CHECK(eligible=0)
+              );
+              CREATE TABLE IF NOT EXISTS deletion_log (
+                learner_id TEXT NOT NULL,
+                deleted_at TEXT NOT NULL,
+                channel TEXT NOT NULL CHECK(channel IN ('website','email'))
+              );
+              CREATE TABLE IF NOT EXISTS collection_status (
+                one INTEGER PRIMARY KEY CHECK(one=1),
+                closed_at TEXT
+              );
+              CREATE TABLE IF NOT EXISTS erasure_authorization (
+                one INTEGER PRIMARY KEY CHECK(one=1)
               );
               CREATE TABLE IF NOT EXISTS sessions (
                 learner_id TEXT NOT NULL REFERENCES participants(learner_id),
@@ -115,6 +146,7 @@ class SupervisorSyntheticStore:
                 answer_given TEXT,
                 is_correct INTEGER,
                 content_id TEXT,
+                display_language TEXT CHECK(display_language IN ('en','fr')),
                 free_text TEXT,
                 mastery_before REAL,
                 mastery_after REAL,
@@ -148,18 +180,20 @@ class SupervisorSyntheticStore:
                 BEFORE UPDATE ON events BEGIN
                   SELECT RAISE(ABORT,'events append-only');
                 END;
-              CREATE TRIGGER IF NOT EXISTS no_event_delete
-                BEFORE DELETE ON events BEGIN
-                  SELECT RAISE(ABORT,'events append-only');
-                END;
+              DROP TRIGGER IF EXISTS no_event_delete;
+              CREATE TRIGGER no_event_delete
+                BEFORE DELETE ON events
+                WHEN NOT EXISTS(SELECT one FROM erasure_authorization)
+                BEGIN SELECT RAISE(ABORT,'events append-only'); END;
               CREATE TRIGGER IF NOT EXISTS no_history_update
                 BEFORE UPDATE ON state_history BEGIN
                   SELECT RAISE(ABORT,'history append-only');
                 END;
-              CREATE TRIGGER IF NOT EXISTS no_history_delete
-                BEFORE DELETE ON state_history BEGIN
-                  SELECT RAISE(ABORT,'history append-only');
-                END;
+              DROP TRIGGER IF EXISTS no_history_delete;
+              CREATE TRIGGER no_history_delete
+                BEFORE DELETE ON state_history
+                WHEN NOT EXISTS(SELECT one FROM erasure_authorization)
+                BEGIN SELECT RAISE(ABORT,'history append-only'); END;
             """)
             db.executescript("""
               CREATE TABLE IF NOT EXISTS pii.contacts (
@@ -170,6 +204,106 @@ class SupervisorSyntheticStore:
                 reminders_sent TEXT NOT NULL DEFAULT '[]'
               );
             """)
+            if self.operational:
+                # Invitations, including email addresses, remain in the
+                # attached private contacts database, not research events.
+                db.execute("""
+                    CREATE TABLE IF NOT EXISTS operational_rendered(
+                        learner_id TEXT PRIMARY KEY REFERENCES participants(learner_id),
+                        render_id TEXT NOT NULL UNIQUE,
+                        phase TEXT NOT NULL,
+                        action TEXT,
+                        question_id TEXT,
+                        rendered_at TEXT NOT NULL,
+                        resumed_after_idle INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+                # Forward-only migration of an existing fictional staging DB.
+                # Preserve every invitation, answer and in-progress render ID.
+                rendered_fields={row["name"] for row in db.execute(
+                    "PRAGMA table_info(operational_rendered)"
+                )}
+                if "resumed_after_idle" not in rendered_fields:
+                    db.execute(
+                        "ALTER TABLE operational_rendered "
+                        "ADD COLUMN resumed_after_idle INTEGER NOT NULL DEFAULT 0"
+                    )
+                db.execute("""
+                    CREATE TABLE IF NOT EXISTS pii.reminder_outbox(
+                        learner_id TEXT NOT NULL,
+                        session_no INTEGER NOT NULL,
+                        kind TEXT NOT NULL CHECK(kind IN ('visit_reminder')),
+                        scheduled_for TEXT NOT NULL,
+                        status TEXT NOT NULL CHECK(status IN ('pending','sent')),
+                        attempts INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        sent_at TEXT,
+                        PRIMARY KEY(learner_id,session_no,kind,scheduled_for)
+                    )
+                """)
+                db.execute("""
+                    CREATE TABLE IF NOT EXISTS pii.inactivity_outbox(
+                        learner_id TEXT NOT NULL,
+                        activity_at TEXT NOT NULL,
+                        kind TEXT NOT NULL CHECK(kind IN ('automatic','manual')),
+                        slot TEXT NOT NULL,
+                        state TEXT NOT NULL CHECK(state IN ('dispatching','accepted','uncertain')),
+                        at TEXT NOT NULL,
+                        accepted_at TEXT,
+                        PRIMARY KEY(learner_id,activity_at,kind,slot)
+                    )
+                """)
+                db.execute("""
+                    CREATE TABLE IF NOT EXISTS pii.invitations(
+                        token_hash TEXT PRIMARY KEY,
+                        email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                        expires_at TEXT NOT NULL,
+                        state TEXT NOT NULL CHECK(state IN
+                            ('invited','consented','screened','registered')),
+                        consent_lang TEXT,
+                        consent_at TEXT,
+                        optional INTEGER,
+                        answers_json TEXT,
+                        learner_id TEXT
+                    )
+                """)
+                db.execute("""
+                    CREATE TABLE IF NOT EXISTS pii.consent_document_history(
+                        learner_id TEXT PRIMARY KEY,
+                        bundle_sha256 TEXT NOT NULL,
+                        information_sha256 TEXT NOT NULL,
+                        document_version TEXT NOT NULL,
+                        captured_at TEXT NOT NULL
+                    )
+                """)
+                fields={r["name"] for r in db.execute("PRAGMA pii.table_info(invitations)")}
+                for field in ("document_bundle_sha256","information_sha256",
+                              "document_version"):
+                    if field not in fields:
+                        db.execute("ALTER TABLE pii.invitations ADD COLUMN "+field+" TEXT")
+            db.execute(
+                "INSERT OR IGNORE INTO collection_status(one,closed_at) VALUES(1,NULL)"
+            )
+            participant_fields = {row["name"] for row in db.execute(
+                "PRAGMA table_info(participants)"
+            )}
+            if "consent_lang" not in participant_fields:
+                db.execute("ALTER TABLE participants ADD COLUMN consent_lang "
+                           "TEXT NOT NULL DEFAULT 'en'")
+            if "open_data_consent" not in participant_fields:
+                db.execute("ALTER TABLE participants ADD COLUMN open_data_consent "
+                           "INTEGER NOT NULL DEFAULT 0")
+            if "study_language" not in participant_fields:
+                db.execute("ALTER TABLE participants ADD COLUMN study_language "
+                           "TEXT NOT NULL DEFAULT 'en' CHECK(study_language IN ('en','fr'))")
+            event_fields = {row["name"] for row in db.execute(
+                "PRAGMA table_info(events)"
+            )}
+            if "display_language" not in event_fields:
+                # Legacy event rows remain NULL (unknown): do not fabricate
+                # the language in which a historic question was displayed.
+                db.execute("ALTER TABLE events ADD COLUMN display_language "
+                           "TEXT CHECK(display_language IN ('en','fr'))")
             row = db.execute(
                 "SELECT files_json FROM config WHERE config_version=?",
                 ("supervisor_20261111_v1",),
@@ -207,6 +341,7 @@ class SupervisorSyntheticStore:
         db.execute("PRAGMA foreign_keys=ON")
         db.execute("PRAGMA busy_timeout=15000")
         db.execute("ATTACH DATABASE ? AS pii", (str(self.contacts),))
+        db.execute("PRAGMA pii.secure_delete=ON")
         db.execute("BEGIN IMMEDIATE")
         try:
             yield db
@@ -217,11 +352,11 @@ class SupervisorSyntheticStore:
         finally:
             db.close()
 
-    @staticmethod
-    def _ref(ref: str):
-        if (not isinstance(ref, str) or
-                not re.fullmatch(r"SYN_SUPERVISOR_P\d{3,8}", ref)):
-            raise SyntheticStudyError("fictional learner reference required")
+    def _ref(self, ref: str):
+        prefix = "STUDY_P" if self.operational else "SYN_SUPERVISOR_P"
+        if (not isinstance(ref, str) or not re.fullmatch(
+                re.escape(prefix) + r"\d{3,8}", ref)):
+            raise SyntheticStudyError("learner reference is invalid")
 
     def _authenticated(self, db, ref: str, token: str):
         self._ref(ref)
@@ -237,7 +372,7 @@ class SupervisorSyntheticStore:
         status = db.execute(
             "SELECT status FROM participants WHERE learner_id=?", (ref,)
         ).fetchone()
-        if status is None or status["status"] in ("withdrawn", "removed"):
+        if status is None or status["status"] in ("withdrawn", "removed", "expired"):
             raise SyntheticStudyError("fictional participant is inactive")
 
     def _state(self, db, ref):
@@ -274,6 +409,31 @@ class SupervisorSyntheticStore:
         ).fetchone()
         if current:
             raise SyntheticStudyError("duplicate request ID rejected")
+        language_row = db.execute(
+            "SELECT study_language FROM participants WHERE learner_id=?",
+            (ref,),
+        ).fetchone()
+        language = language_row["study_language"]
+        if language not in LANGUAGES:
+            raise SyntheticStudyError("unknown study display language")
+        if self.operational:
+            # The browser may have been closed for several days. An item
+            # reopened after the 24h timing limit is safely re-exposed
+            # without advancing the assessment. Tag that answer so analysts
+            # can distinguish response time since reopening from continuous
+            # on-screen response time. Do not silently mix those measures.
+            render=db.execute(
+                "SELECT resumed_after_idle FROM operational_rendered "
+                "WHERE learner_id=? AND phase=?",(ref,phase),
+            ).fetchone()
+            if render is not None and render["resumed_after_idle"]>0:
+                rule_tags=(rule_tags+";" if rule_tags else "")+"TIMING_RESTART_AFTER_24H_IDLE"
+        # Content identifiers must distinguish what actually appeared in
+        # English or French when the participant changes languages midway.
+        if (language == "fr" and isinstance(content_id,str)
+                and content_id.startswith(CONTENT_VERSION + "_")
+                and not content_id.endswith("_fr")):
+            content_id += "_fr"
         db.execute(
             """UPDATE learner_state SET updated_at=?,session_no=?,step=?,
                step_index=?,pending_recovery=?,state_json=? WHERE learner_id=?""",
@@ -286,15 +446,15 @@ class SupervisorSyntheticStore:
                 learner_id,session_no,request_id,shown_at,answered_at,
                 response_time_ms,phase,block_index,mode,action_type,
                 question_id,concept_id,bloom_level,options_shown,answer_given,
-                is_correct,content_id,free_text,mastery_before,mastery_after,
+                is_correct,content_id,display_language,free_text,mastery_before,mastery_after,
                 D_before,D_after,bloom_after,rule_tags,trigger,
                 recovery_attempt,recovery_outcome
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (ref, state["session"], request_id, iso(shown_at),
              iso(answered_at), ms, phase, block_index, mode, action,
              question_id, concept, level, options_shown, choice,
              None if correct is None else int(correct),
-             content_id, free_text, before, after, D_before, D_after,
+             content_id, language, free_text, before, after, D_before, D_after,
              state["engine"]["bloom"][concept] if concept and state.get("engine") else None,
              rule_tags, trigger, recovery_attempt, recovery_outcome),
         )
@@ -307,7 +467,11 @@ class SupervisorSyntheticStore:
     def register(self, *, contact_email: str,
                  econ_course: bool, screening_answers: dict[str, str],
                  consent_version: str, consent_given: bool,
-                 age: int | None, program: str, at: datetime) -> dict:
+                 age: int | None, program: str, at: datetime,
+                 consent_lang: str = "en",
+                 open_data_consent: bool = False,
+                 consent_at: datetime | None = None,
+                 invitation_token: str | None = None) -> dict:
         """Eligible fictional candidates alone consume the A/B/C rotation."""
         if (consent_given is not True or not isinstance(consent_version, str)
                 or not consent_version.strip()):
@@ -319,31 +483,74 @@ class SupervisorSyntheticStore:
         if not eligible:
             return {"eligible": False, "screening_score": score,
                     "group_assigned": False, "synthetic_only": True}
-        if (not isinstance(contact_email, str)
-                or not re.fullmatch(
-                    r"[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.test",
-                    contact_email, flags=re.IGNORECASE)):
-            raise SyntheticStudyError("only invented .test email accounts permitted")
+        if not isinstance(contact_email, str) or not re.fullmatch(
+                r"[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}",
+                contact_email, flags=re.IGNORECASE,
+        ) or len(contact_email) > 254:
+            raise SyntheticStudyError("invalid contact email")
+        if self.operational:
+            if contact_email.lower().endswith(".test"):
+                raise SyntheticStudyError("operational intake cannot use test email")
+            if (not isinstance(invitation_token,str) or len(invitation_token)<40
+                    or len(invitation_token)>256 or not re.fullmatch(
+                        r"[A-Za-z0-9_-]+",invitation_token)):
+                raise SyntheticStudyError("verified invitation token required")
+        elif not contact_email.lower().endswith(".test") or invitation_token is not None:
+            raise SyntheticStudyError("only invented .test contacts in fictional mode")
         if age is not None and (
                 type(age) is not int or not 18 <= age <= 120):
             raise SyntheticStudyError("invalid fictional age")
         if not isinstance(program, str) or len(program) > 160:
             raise SyntheticStudyError("invalid fictional academic program")
+        if consent_lang not in ("en", "fr") or type(open_data_consent) is not bool:
+            raise SyntheticStudyError("explicit consent language and optional choice required")
+        if age is None or age > 99:
+            raise SyntheticStudyError("fictional age must be between 18 and 99")
+        if not isinstance(program, str) or not program.strip():
+            raise SyntheticStudyError("academic program required")
+        consent_clicked = iso(consent_at if consent_at is not None else at)
         now = iso(at)
-        token = secrets.token_urlsafe(40)
+        token = invitation_token if self.operational else secrets.token_urlsafe(40)
         with self._tx() as db:
-            ordinal = db.execute("SELECT COUNT(*) FROM participants").fetchone()[0]
-            ref = f"SYN_SUPERVISOR_P{ordinal + 1:03d}"
+            if db.execute(
+                "SELECT closed_at FROM collection_status WHERE one=1"
+            ).fetchone()["closed_at"] is not None:
+                raise SyntheticStudyError("data collection is closed")
+            if db.execute(
+                "SELECT 1 FROM pii.contacts WHERE email=? COLLATE NOCASE",
+                (contact_email,),
+            ).fetchone():
+                raise SyntheticStudyError(
+                    "This email is already registered. Use the link sent to you by email."
+                )
+            if self.operational:
+                invitation = db.execute(
+                    "SELECT * FROM pii.invitations WHERE token_hash=?",
+                    (hashlib.sha256(token.encode()).hexdigest(),),
+                ).fetchone()
+                if (not invitation or invitation["state"] != "screened"
+                        or invitation["email"].casefold() != contact_email.casefold()
+                        or invitation["consent_lang"] != consent_lang
+                        or invitation["consent_at"] != consent_clicked
+                        or invitation["optional"] != int(open_data_consent)
+                        or invitation["answers_json"] != dump(screening_answers)
+                        or invitation["expires_at"] < now):
+                    raise SyntheticStudyError("invitation or consent is not verified")
+            ordinal = (db.execute("SELECT COUNT(*) FROM participants").fetchone()[0]
+                       + db.execute("SELECT COUNT(*) FROM deletion_log").fetchone()[0])
+            prefix = "STUDY_P" if self.operational else "SYN_SUPERVISOR_P"
+            ref = f"{prefix}{ordinal + 1:03d}"
             group = GROUPS[ordinal % 3]
             db.execute(
                 """INSERT INTO participants(
                    learner_id,grp,registered_at,consent_version,consent_at,
+                   consent_lang,study_language,open_data_consent,
                    econ_course,screening_score,eligible,age,program,status,
                    missed_sessions,status_changed_at,config_version
-                 ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (ref, group, now, consent_version, now, int(econ_course),
-                 score, 1, age, program, "active", 0, now,
-                 "supervisor_20261111_v1"),
+                 ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (ref, group, now, consent_version, consent_clicked, consent_lang,
+                 consent_lang, int(open_data_consent), int(econ_course), score, 1, age,
+                 program, "active", 0, now, "supervisor_20261111_v1"),
             )
             db.execute(
                 "INSERT INTO pii.contacts(learner_id,email,token_hash,token_created_at)"
@@ -351,6 +558,24 @@ class SupervisorSyntheticStore:
                 (ref, contact_email,
                  hashlib.sha256(token.encode()).hexdigest(), now),
             )
+            if self.operational:
+                db.execute(
+                    "UPDATE pii.invitations SET state='registered', learner_id=? "
+                    "WHERE token_hash=?",
+                    (ref,hashlib.sha256(token.encode()).hexdigest()),
+                )
+                provenance=db.execute(
+                    "SELECT document_bundle_sha256,information_sha256,document_version "
+                    "FROM pii.invitations WHERE token_hash=?",
+                    (hashlib.sha256(token.encode()).hexdigest(),),
+                ).fetchone()
+                if provenance and provenance["document_bundle_sha256"]:
+                    db.execute(
+                        "INSERT INTO pii.consent_document_history VALUES(?,?,?,?,?)",
+                        (ref,provenance["document_bundle_sha256"],
+                         provenance["information_sha256"],
+                         provenance["document_version"],now),
+                    )
             for i, offset in enumerate((0, 4, 8), 1):
                 db.execute(
                     "INSERT INTO sessions(learner_id,session_no,scheduled_for,"
@@ -388,13 +613,29 @@ class SupervisorSyntheticStore:
                 "fictional_private_token": token,
                 "synthetic_only": True}
 
+    def set_study_language(self, ref: str, token: str, language: str) -> None:
+        """Persist display language without altering signed consent language."""
+        if language not in LANGUAGES:
+            raise SyntheticStudyError("language must be en or fr")
+        with self._tx() as db:
+            self._authenticated(db, ref, token)
+            db.execute(
+                "UPDATE participants SET study_language=? WHERE learner_id=?",
+                (language, ref),
+            )
+
     def progress(self, ref: str, token: str) -> dict:
         with self._tx() as db:
             self._authenticated(db, ref, token)
             state = self._state(db, ref)
+            participant = db.execute(
+                "SELECT study_language FROM participants WHERE learner_id=?",
+                (ref,),
+            ).fetchone()
         return {
             "phase": state["phase"], "session": state["session"],
-            "index": state["index"], "synthetic_only": True,
+            "index": state["index"], "study_language": participant["study_language"],
+            "synthetic_only": True,
             "human_enrollment_authorized": False,
         }
 
@@ -403,11 +644,17 @@ class SupervisorSyntheticStore:
         with self._tx() as db:
             self._authenticated(db, ref, token)
             state = self._state(db, ref)
+            participant = db.execute(
+                "SELECT study_language FROM participants WHERE learner_id=?",
+                (ref,),
+            ).fetchone()
+            language = participant["study_language"]
         if state["phase"] in ("PRETEST", "POSTTEST"):
             form = state["phase"].lower()
             item = self.bank.forms[form][state["index"]]
             return dict(kind="question", phase=state["phase"],
-                        **item.public(), synthetic_only=True)
+                        **localize_public(item.public(), language=language),
+                        synthetic_only=True)
         if state["phase"] == "QUIZ":
             engine = SupervisorTraceEngine.restore(state["engine"])
             step = engine.next_action()
@@ -415,20 +662,32 @@ class SupervisorSyntheticStore:
                 return dict(kind="block_complete", synthetic_only=True)
             if step["qid"] != "—":
                 item = self.bank.get(step["qid"], form="practice")
-                options = item.public()["options"]
+                public = localize_public(item.public(), language=language)
+                options = public["options"]
                 if step["action"] == "DROP_2":
                     distractor = next(k for k in "ABCD"
                                       if k != item.correct_answer)
                     options = {k: options[k]
                                for k in "ABCD"
                                if k in (distractor, item.correct_answer)}
-                return dict(kind="question" if step["action"] == "QUESTION"
-                            else "recovery", action=step["action"],
-                            question_id=item.question_id,
-                            question_text=item.question_text,
-                            options=options, synthetic_only=True)
+                response = dict(kind="question" if step["action"] == "QUESTION"
+                                else "recovery", action=step["action"],
+                                question_id=item.question_id,
+                                question_text=public["question_text"],
+                                options=options, language=language,
+                                synthetic_only=True)
+                if step["action"] == "SOCRATIC_HINT":
+                    response["resource"] = recovery_resource(
+                        step["concept"], "SOCRATIC_HINT",
+                        question_text=public["question_text"],
+                        language=language,
+                    )
+                return response
             return dict(kind="recovery", action=step["action"],
                         content_status="REQUIRES_INDEPENDENT_REVIEW",
+                        resource=recovery_resource(
+                            step["concept"],step["action"],language=language,
+                        ), language=language,
                         synthetic_only=True)
         return dict(kind=state["phase"].lower(), synthetic_only=True)
 
@@ -473,7 +732,8 @@ class SupervisorSyntheticStore:
 
     def answer_quiz(self, ref: str, token: str, *,
                     request_id: str, item_id: str | None, choice: str | None,
-                    shown_at: datetime, answered_at: datetime) -> dict:
+                    shown_at: datetime, answered_at: datetime,
+                    free_text: list[str] | None = None) -> dict:
         with self._tx() as db:
             self._authenticated(db, ref, token)
             state = self._state(db, ref)
@@ -486,6 +746,20 @@ class SupervisorSyntheticStore:
             concept = step["concept"]
             before, D_before = engine.mastery[concept], engine.degradation
             action = step["action"]
+            # Optional for old deterministic fixture calls. Browser Socratic
+            # re-attempts send two non-empty typed reflections, which are
+            # stored together in the existing free_text audit field.
+            if free_text is not None and (
+                action != "SOCRATIC_HINT" or type(free_text) is not list
+                or len(free_text) != 2 or any(
+                    type(s) is not str or not 1 <= len(s.strip()) <= 500
+                    for s in free_text
+                )
+            ):
+                raise SyntheticStudyError(
+                    "only a Socratic re-attempt accepts two brief reflections"
+                )
+            saved_reflection = dump([s.strip() for s in free_text]) if free_text is not None else None
             if action in ("QUESTION", "DROP_2", "SOCRATIC_HINT"):
                 if type(choice) is not str or choice not in "ABCD":
                     raise SyntheticStudyError("A/B/C/D answer required")
@@ -535,12 +809,18 @@ class SupervisorSyntheticStore:
                 recovery_attempt=completed_step.get("recovery_attempt", ""),
                 recovery_outcome=completed_step.get("recovery_outcome", ""),
                 content_id=(
-                    "UNREVIEWED_RESOURCE_" + action
-                    if action in ("CONCEPT_SUMMARY", "WORKED_EXAMPLE")
+                    f"{CONTENT_VERSION}_{concept}_{action}"
+                    if action in ("CONCEPT_SUMMARY", "WORKED_EXAMPLE", "SOCRATIC_HINT")
                     else None
                 ),
+                free_text=saved_reflection,
             )
-        return {"accepted": True, "synthetic_only": True}
+        # Practice and graded recovery only: reveal correctness AFTER the
+        # response is committed, without exposing any question answer key.
+        # Independent pretest/posttest and screening remain feedback-blind.
+        return {"accepted": True, "synthetic_only": True,
+                "previous_correct": correct if correct is not None else None,
+                "feedback_phase": "QUIZ"}
 
     def submit_survey(self, ref: str, token: str, *,
                       values: tuple[int, int, int, int, int, int],
@@ -564,6 +844,35 @@ class SupervisorSyntheticStore:
                 "WHERE learner_id=? AND session_no=?",
                 (iso(at), ref, session),
             )
+            if session < 3:
+                # A learner may pause a quiz or finish a visit late. The
+                # original D0/D4/D8 dates cannot force the next visit to
+                # start less than three full days after the preceding one
+                # actually finished. Respect an existing later approved
+                # schedule; only move earlier scheduled visits forward.
+                next_session=db.execute(
+                    "SELECT scheduled_for,status FROM sessions "
+                    "WHERE learner_id=? AND session_no=?",
+                    (ref,session+1),
+                ).fetchone()
+                if (next_session is None or next_session["status"]!="scheduled"):
+                    raise SyntheticStudyError("upcoming session not available")
+                earliest=at + timedelta(days=3)
+                planned=datetime.fromisoformat(next_session["scheduled_for"])
+                if planned < earliest:
+                    db.execute(
+                        "UPDATE sessions SET scheduled_for=? "
+                        "WHERE learner_id=? AND session_no=? AND status='scheduled'",
+                        (iso(earliest),ref,session+1),
+                    )
+                    # Old pending messages refer to superseded dates and
+                    # must not be sent. Retain sent records for private audit.
+                    db.execute(
+                        "DELETE FROM pii.reminder_outbox "
+                        "WHERE learner_id=? AND session_no=? "
+                        "AND status='pending' AND scheduled_for!=?",
+                        (ref,session+1,iso(earliest)),
+                    )
             if session == 3:
                 state["phase"] = "DONE"
                 db.execute(
@@ -583,7 +892,7 @@ class SupervisorSyntheticStore:
         return {"accepted": True, "session_completed": session,
                 "synthetic_only": True}
 
-    def open_next_session(self, ref: str, token: str, at: datetime):
+    def open_next_session(self, ref: str, token: str, at: datetime, *, staging_preview: bool = False):
         with self._tx() as db:
             self._authenticated(db, ref, token)
             state = self._state(db, ref)
@@ -597,8 +906,25 @@ class SupervisorSyntheticStore:
             ).fetchone()
             if not next_session or next_session["status"] != "scheduled":
                 raise SyntheticStudyError("next visit not scheduled")
-            if iso(at) < next_session["scheduled_for"]:
-                raise SyntheticStudyError("next session date has not arrived")
+            preview_early = iso(at) < next_session["scheduled_for"]
+            if preview_early:
+                if not (staging_preview is True and self.operational):
+                    raise SyntheticStudyError("next session date has not arrived")
+                # Only explicitly invited reserved fictional test identities
+                # may bypass the schedule in the STAGING reviewer route.
+                identity = db.execute(
+                    "SELECT email FROM pii.contacts WHERE learner_id=?",
+                    (ref,),
+                ).fetchone()
+                if (identity is None or not identity["email"].lower().endswith(".example")):
+                    raise SyntheticStudyError("review-only fictional contact required")
+                updated = db.execute(
+                    "UPDATE sessions SET scheduled_for=? "
+                    "WHERE learner_id=? AND session_no=? AND status='scheduled'",
+                    (iso(at), ref, next_n),
+                )
+                if updated.rowcount != 1:
+                    raise SyntheticStudyError("next visit changed during review")
             engine = SupervisorTraceEngine.restore(state["engine"])
             engine.new_session(next_n)
             state.update(
@@ -615,7 +941,8 @@ class SupervisorSyntheticStore:
                 "WHERE learner_id=? AND session_no=?",
                 (iso(at),ref,next_n),
             )
-        return {"session_started": next_n, "synthetic_only": True}
+        return {"session_started": next_n, "synthetic_only": True,
+                "staging_preview_advance": bool(preview_early)}
 
     def mark_missed(self, ref: str, token: str, *,
                     at: datetime, reschedule_for: datetime | None):
@@ -653,6 +980,10 @@ class SupervisorSyntheticStore:
                     "WHERE learner_id=? AND session_no=?",
                     (ref,n),
                 )
+                db.execute(
+                    "UPDATE pii.contacts SET token_hash=? WHERE learner_id=?",
+                    (hashlib.sha256(secrets.token_bytes(48)).hexdigest(), ref),
+                )
         return {"missed_count": misses,
                 "removed": misses >= 2, "synthetic_only": True}
 
@@ -666,3 +997,191 @@ class SupervisorSyntheticStore:
                     (ref,),
                 )
             ]
+
+
+    def log_screening_exclusion(self, score: int, *, at: datetime) -> None:
+        """Anonymously record only an excluded 6..8 score and its time."""
+        if type(score) is not int or not 6 <= score <= 8:
+            raise SyntheticStudyError("only excluded screening results can be logged")
+        with self._tx() as db:
+            if db.execute(
+                "SELECT closed_at FROM collection_status WHERE one=1"
+            ).fetchone()["closed_at"] is not None:
+                raise SyntheticStudyError("data collection is closed")
+            db.execute(
+                "INSERT INTO screening_log(timestamp,score,eligible) VALUES(?,?,0)",
+                (iso(at),score),
+            )
+
+    def withdraw(self, ref: str, token: str, *,
+                 delete: bool, at: datetime, channel: str = "website") -> dict:
+        """Atomic fictional erasure or stop/keep; no external mail delivery.
+
+        The confirmation address is for the isolated trusted preview worker
+        only. No real send is performed, and a real verified sender is a
+        separate deployment gate.
+        """
+        if type(delete) is not bool or channel not in ("website","email"):
+            raise SyntheticStudyError("explicit withdrawal and channel required")
+        with self._tx() as db:
+            self._authenticated(db,ref,token)
+            row=db.execute(
+                "SELECT email FROM pii.contacts WHERE learner_id=?",(ref,)
+            ).fetchone()
+            if row is None or (not self.operational and
+                               not row["email"].lower().endswith(".test")):
+                raise SyntheticStudyError("only fictional contact confirmation allowed")
+            recipient=row["email"]
+            if delete:
+                db.execute("INSERT INTO erasure_authorization(one) VALUES(1)")
+                try:
+                    if self.operational:
+                        db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
+                                   (ref,))
+                        db.execute("DELETE FROM pii.consent_document_history WHERE learner_id=?",
+                                   (ref,))
+                        db.execute("DELETE FROM pii.reminder_outbox WHERE learner_id=?",
+                                   (ref,))
+                        db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
+                                   (ref,))
+                    for name in ("state_history","events","surveys",
+                                 "learner_state","sessions"):
+                        db.execute(f"DELETE FROM {name} WHERE learner_id=?",(ref,))
+                    db.execute("DELETE FROM pii.contacts WHERE learner_id=?",(ref,))
+                    db.execute("DELETE FROM participants WHERE learner_id=?",(ref,))
+                finally:
+                    db.execute("DELETE FROM erasure_authorization")
+                db.execute(
+                    "INSERT INTO deletion_log(learner_id,deleted_at,channel) "
+                    "VALUES(?,?,?)",(ref,iso(at),channel),
+                )
+            else:
+                db.execute(
+                    "UPDATE participants SET status='withdrawn',"
+                    "status_changed_at=? WHERE learner_id=?",(iso(at),ref),
+                )
+                if self.operational:
+                    db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
+                               (ref,))
+                    db.execute("DELETE FROM pii.reminder_outbox WHERE learner_id=?",
+                               (ref,))
+                    db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
+                               (ref,))
+                db.execute(
+                    "UPDATE pii.contacts SET token_hash=? WHERE learner_id=?",
+                    (hashlib.sha256(secrets.token_bytes(48)).hexdigest(),ref),
+                )
+        return {
+            "withdrawn":True, "data_deleted":delete,
+            "fictional_confirmation_recipient":recipient,
+            "real_email_sent":False,"synthetic_only":True,
+        }
+
+    def offline_admin_withdraw(self, ref: str, *, delete: bool,
+                               at: datetime, channel: str = "email") -> dict:
+        """Offline request after independently verified owner identity.
+
+        Staff must separately verify the sender and record institutional
+        authorization. Never expose this method as a public HTTP route.
+        """
+        self._ref(ref)
+        if type(delete) is not bool or channel != "email":
+            raise SyntheticStudyError("offline email-forwarded withdrawal required")
+        with self._tx() as db:
+            row=db.execute(
+                "SELECT email FROM pii.contacts WHERE learner_id=?",(ref,)
+            ).fetchone()
+            if row is None or (not self.operational and
+                               not row["email"].lower().endswith(".test")):
+                raise SyntheticStudyError("fictional contact record required")
+            recipient=row["email"]
+            status=db.execute(
+                "SELECT status FROM participants WHERE learner_id=?",(ref,)
+            ).fetchone()
+            if status is None or status["status"] in ("withdrawn","removed"):
+                raise SyntheticStudyError("already inactive")
+            if delete:
+                db.execute("INSERT INTO erasure_authorization(one) VALUES(1)")
+                try:
+                    if self.operational:
+                        db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
+                                   (ref,))
+                        db.execute("DELETE FROM pii.consent_document_history WHERE learner_id=?",
+                                   (ref,))
+                        db.execute("DELETE FROM pii.reminder_outbox WHERE learner_id=?",
+                                   (ref,))
+                        db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
+                                   (ref,))
+                    for name in ("state_history","events","surveys",
+                                 "learner_state","sessions"):
+                        db.execute(f"DELETE FROM {name} WHERE learner_id=?",(ref,))
+                    db.execute("DELETE FROM pii.contacts WHERE learner_id=?",(ref,))
+                    db.execute("DELETE FROM participants WHERE learner_id=?",(ref,))
+                finally:
+                    db.execute("DELETE FROM erasure_authorization")
+                db.execute(
+                    "INSERT INTO deletion_log(learner_id,deleted_at,channel) "
+                    "VALUES(?,?,?)",(ref,iso(at),channel),
+                )
+            else:
+                db.execute(
+                    "UPDATE participants SET status='withdrawn',status_changed_at=? "
+                    "WHERE learner_id=?",(iso(at),ref),
+                )
+                if self.operational:
+                    db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
+                               (ref,))
+                    db.execute("DELETE FROM pii.reminder_outbox WHERE learner_id=?",
+                               (ref,))
+                    db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
+                               (ref,))
+                db.execute(
+                    "UPDATE pii.contacts SET token_hash=? WHERE learner_id=?",
+                    (hashlib.sha256(secrets.token_bytes(48)).hexdigest(),ref),
+                )
+        return {"withdrawn":True,"data_deleted":delete,
+                "fictional_confirmation_recipient":recipient,
+                "real_email_sent":False,"synthetic_only":True}
+
+    def points_export(self) -> list[dict]:
+        """Operator-only local export; no participant-facing HTTP endpoint."""
+        with self._tx() as db:
+            rows=db.execute(
+                "SELECT c.email,p.status_changed_at "
+                "FROM participants p JOIN pii.contacts c "
+                "ON p.learner_id=c.learner_id "
+                "WHERE p.status='completed' ORDER BY p.learner_id",
+            ).fetchall()
+            return [
+                {"email":r["email"],"completed_at":r["status_changed_at"]}
+                for r in rows if self.operational or r["email"].lower().endswith(".test")
+            ]
+
+    def close_collection(self) -> dict:
+        """Wipe fictional PII; separate backup purge must be verified."""
+        with self._tx() as db:
+            row=db.execute(
+                "SELECT closed_at FROM collection_status WHERE one=1"
+            ).fetchone()
+            if row["closed_at"] is not None:
+                raise SyntheticStudyError("data collection already closed")
+            if self.operational:
+                active=db.execute(
+                    "SELECT COUNT(*) FROM participants WHERE status='active'"
+                ).fetchone()[0]
+                if active:
+                    raise SyntheticStudyError(
+                        "cannot purge operational contacts while learners remain active"
+                    )
+            count=db.execute("SELECT COUNT(*) FROM pii.contacts").fetchone()[0]
+            db.execute("DELETE FROM pii.contacts")
+            if self.operational:
+                db.execute("DELETE FROM pii.invitations")
+                db.execute("DELETE FROM pii.reminder_outbox")
+            db.execute(
+                "UPDATE collection_status SET closed_at=? WHERE one=1",
+                (datetime.now(timezone.utc).isoformat(),),
+            )
+        return {"fictional_contacts_deleted":count,
+                "research_preserved":True,"backups_deleted":False,
+                "synthetic_only":True}

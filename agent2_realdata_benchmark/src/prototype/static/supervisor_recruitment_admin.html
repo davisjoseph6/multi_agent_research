@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Study coordination — Research team</title>
+<link rel="stylesheet" href="/control/app.css">
+<script src="/control/app.js" defer></script></head>
+<body>
+<main class="shell">
+<header class="top">
+ <div><p class="eyebrow">AIVANCITY · RESEARCH OPERATIONS</p>
+ <h1>Study coordination</h1><p class="muted">Private administrative workspace — not the participant portal</p></div>
+ <button id="reload" type="button" hidden>Refresh overview</button>
+</header>
+<p role="status" id="status" aria-live="polite"></p>
+<section id="login-panel" class="panel">
+ <h2>Researcher sign in</h2><p class="muted">Use your individually assigned researcher email and temporary password.</p>
+ <form id="login">
+ <label>Email address<input id="email" type="email" autocomplete="username" required></label>
+ <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
+ <button type="submit">Sign in</button>
+ </form>
+</section>
+<section id="password-panel" class="panel" hidden>
+ <h2>Set your private password</h2><p>Temporary credentials must be replaced before viewing student records.</p>
+ <form id="password-form">
+ <label>Current temporary password<input id="current" type="password" required autocomplete="current-password"></label>
+ <label>New password (18 characters minimum)<input id="replacement" type="password" required minlength="18" autocomplete="new-password"></label>
+ <button type="submit">Change password</button>
+ </form>
+</section>
+<div id="dashboard" hidden>
+ <div class="metrics" id="metrics">
+  <article><small>Potential applicants</small><strong id="potential-count">—</strong></article>
+  <article><small>Active students</small><strong id="active-count">—</strong></article>
+  <article><small>Completed students</small><strong id="completed-count">—</strong></article>
+  <article><small>Incomplete students</small><strong id="incomplete-count">—</strong></article>
+ </div>
+ <section class="panel"><div class="section-head"><div><h2>Application questionnaire submissions</h2>
+ <p class="muted">Identifiable intake records · private to the authorized research team</p></div>
+ <div class="action-buttons">
+  <button id="approve" type="button">Approve selected</button>
+  <button id="send-selected" type="button" disabled>Send selected invitations</button>
+  <button id="send-all" type="button" disabled>Send all approved</button>
+ </div></div>
+ <div class="scroll"><table><thead><tr>
+ <th><label class="row-select"><input id="all" type="checkbox"> Select all</label></th>
+ <th>Email</th><th>Name (optional)</th><th>Questionnaire</th><th>Status</th><th>Received (UTC)</th>
+ </tr></thead><tbody id="applicants"></tbody></table></div>
+ <p class="muted" id="mail-capability">Invitations can only be sent after the signed live release, Microsoft Graph mailbox setup, and approved recruitment intake are enabled.</p>
+ </section>
+ <section class="panel"><h2>Registered students and current progress</h2>
+ <div class="scroll"><table><thead><tr>
+ <th>Student</th><th>Email</th><th>Optional name</th><th>Session</th><th>Current stage</th><th>Status</th><th>Last activity (UTC)</th><th>Encouragement</th>
+ </tr></thead><tbody id="students"></tbody></table></div></section>
+ <section class="panel">
+  <h2>Individual mastery and inter-question timing</h2>
+  <p class="muted">Select a student above. Mastery estimates are observational and do not change randomization or recovery decisions.</p>
+  <p id="selected-student" aria-live="polite">No student selected</p>
+  <div class="chart-wrap">
+    <svg id="mastery-chart" viewBox="0 0 950 370" role="img" aria-label="BKT mastery progression" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+  <div id="chart-legend" class="legend"></div>
+  <h3>Time between consecutive question answers</h3>
+  <p class="muted">Decimal values; intervals include breaks, instructions, and interventions (different from answer latency).</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Session</th><th>Phase</th><th>Question</th>
+    <th>Milliseconds</th><th>Seconds</th><th>Hours</th><th>Days</th></tr></thead>
+    <tbody id="intervals"></tbody></table></div>
+ </section>
+ <section class="panel"><h2>Reminder settings</h2>
+ <label class="row-select"><input id="auto-reminder" type="checkbox"> Automatic reminders enabled (policy setting only; mail transport not yet connected)</label>
+ <p class="muted">The application must never send a recruitment questionnaire automatically; only the supervisor sends those links.</p>
+ </section>
+ <section class="panel"><h2>Research monitoring</h2>
+ <p>The existing pseudonymous mastery-progression dashboard remains separately protected at <code>127.0.0.1:8790</code> via SSH. This workspace is the identity-restricted administrative view.</p>
+ </section>
+</div>
+<footer>Research-only records · Do not share contact lists or private invitation URLs.</footer>
+</main></body></html>

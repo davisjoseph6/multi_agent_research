@@ -1,0 +1,42 @@
+{
+  "schema": "IJCAI2027_MAIL_ROUTES_V1",
+  "draft_only": true,
+  "default": "not-configured",
+  "routes": {
+    "institutional_primary": {
+      "provider": "graph_application",
+      "email": "davis.joseph@aivancity.education",
+      "tenant": "<ENTRA_TENANT_GUID>",
+      "client_id": "<ENTRA_CLIENT_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/graph-client-secret"
+    },
+    "colleague_wiam": {
+      "provider": "graph_application",
+      "email": "wiam.belouard@aivancity.education",
+      "tenant": "<AUTHORIZED_TENANT_GUID>",
+      "client_id": "<APPROVED_APP_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/wiam-secret"
+    },
+    "colleague_sara": {
+      "provider": "graph_application",
+      "email": "sara.elkardi@aivancity.education",
+      "tenant": "<AUTHORIZED_TENANT_GUID>",
+      "client_id": "<APPROVED_APP_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/sara-secret"
+    },
+    "gmail_personal": {
+      "provider": "gmail_delegated",
+      "email": "<VERIFIED_GMAIL_ADDRESS>",
+      "client_id": "<GOOGLE_OAUTH_CLIENT_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/google-client-secret"
+    },
+    "outlook_personal": {
+      "provider": "graph_delegated",
+      "email": "<VERIFIED_OUTLOOK_MAILBOX_NOT_A_GMAIL_ALIAS>",
+      "tenant": "consumers",
+      "client_id": "<MS_OAUTH_CLIENT_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/microsoft-delegated-secret"
+    }
+  },
+  "by_actor": {}
+}

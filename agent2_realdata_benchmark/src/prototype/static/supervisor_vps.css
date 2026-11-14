@@ -1,0 +1,83 @@
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#14233a;background:#f4f7fb}
+*{box-sizing:border-box}body{margin:0;padding:1rem}main.portal{width:min(100%,820px);margin:0 auto;background:white;border:1px solid #dce4ee;border-radius:12px;padding:clamp(1rem,3vw,2rem);box-shadow:0 2px 14px #10263a15}
+h1{font-size:clamp(1.45rem,3vw,2rem);margin:0 0 0.3rem}h2{font-size:1.3rem;margin:1.2rem 0}h3{font-size:1.06rem}p,li{line-height:1.55}
+header,footer{border-bottom:1px solid #dce4ee;padding-bottom:1rem}footer{border-bottom:0;border-top:1px solid #dce4ee;margin-top:2rem;padding-top:1rem}
+section[hidden],fieldset[hidden],div[hidden],p[hidden],button[hidden]{display:none!important}
+label{display:block;padding:.5rem 0;line-height:1.5;cursor:pointer}
+label input[type=radio],label input[type=checkbox]{width:1.15rem;height:1.15rem;vertical-align:middle;margin-right:.75rem}
+button,input,select,textarea{font:inherit}
+button{margin:.4rem .4rem .4rem 0;padding:.65rem 1rem;border-radius:.45rem;border:1px solid #20559e;background:#225aa5;color:white;font-weight:600;cursor:pointer;min-height:2.75rem}
+button:hover{background:#174277}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid #f5af32;outline-offset:3px}
+button[disabled]{opacity:.45;cursor:not-allowed}input[type=number],select,textarea{max-width:100%;padding:.55rem;border:1px solid #667994;border-radius:.35rem}
+textarea{width:100%;min-height:6.5rem}fieldset{margin:1rem 0;padding:1rem;border:1px solid #b9c8da;border-radius:.55rem}legend{font-weight:700;padding:0 .5rem}
+#info-copy pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;line-height:1.55;background:#f2f6fb;border:1px solid #d5e1ec;padding:1rem;border-radius:.35rem}
+.warning{background:#fff5d6;border:2px solid #b28112;border-radius:.4rem;padding:.75rem}
+#error{color:#a3272b;font-weight:700}#notice{color:#175b36;font-weight:700}
+#question,#screen-prompt{font-size:1.1rem;line-height:1.6;font-weight:600}
+#progress{font-size:.9rem;color:#40546b}#previous-result{font-size:1.1rem;padding:1rem;border-radius:.5rem;border:2px solid;margin:1rem 0;font-weight:700}
+#previous-result.correct{color:#125a36;border-color:#239153;background:#e8f7ef}#previous-result.incorrect{color:#9b2024;border-color:#c34545;background:#ffeded}
+#previous-result-icon{font-size:1.4rem;vertical-align:middle}#teaching{background:#f4f8ff;padding:1rem;border:1px solid #b7cff1;border-radius:.5rem}
+#surveys label{display:flex;align-items:center;justify-content:space-between;gap:1rem;border-bottom:1px solid #e1e9f0}
+@media(max-width:480px){body{padding:0}main.portal{border:0;border-radius:0}button{width:100%}#surveys label{align-items:flex-start;flex-direction:column}}
+
+/* Supervisor-review accessibility and responsive presentation */
+.brand{display:flex;align-items:center;min-height:3rem;margin-bottom:.8rem}
+.brand img{display:block;max-width:min(240px,65vw);max-height:68px;object-fit:contain}
+.brand img[hidden],.brand-wordmark[hidden]{display:none}
+.brand-wordmark{font-weight:800;font-size:1.6rem;letter-spacing:-.055em;color:#213b61}
+.study-note{padding:.75rem 1rem;background:#eef4fc;border-left:4px solid #245fa1;
+ border-radius:.25rem;line-height:1.5}
+.study-rule{padding:.8rem 1rem;border:1px solid #aa8430;border-radius:.35rem;
+ background:#fff7df;font-weight:600}
+.hint{font-size:.88rem;color:#41566e;line-height:1.55;margin:.15rem 0 1rem}
+#info-copy{max-width:100%;overflow-wrap:anywhere;line-height:1.65}
+#info-copy h1{font-size:1.5rem;margin:1.15rem 0 .7rem}
+#info-copy h2{font-size:1.2rem;color:#1a477c;margin:1.5rem 0 .35rem}
+#info-copy h3{font-size:1.07rem;margin:1.1rem 0 .3rem}
+#info-copy section{margin-bottom:.7rem}
+#info-copy p{margin:.45rem 0 .8rem}
+#info-copy pre{white-space:pre-wrap;overflow-wrap:anywhere}
+progress{display:block;width:100%;max-width:100%;height:1rem;accent-color:#215aa4;margin:.5rem 0 1rem}
+#phase-intro{margin-top:.8rem}
+#answer-feedback{padding:.9rem 1rem;margin:1rem 0;border-radius:.5rem;border:2px solid #23599a}
+#answer-feedback.correct{background:#e9f8f0;border-color:#2b895b;color:#124c34}
+#answer-feedback.incorrect{background:#fff3f2;border-color:#c34647;color:#812327}
+#answer-feedback h3{margin:.2rem 0 .6rem}
+#answer-feedback p{margin:.3rem 0 .65rem}
+#choices label.correct-option{border:2px solid #228552;border-radius:.45rem;
+ background:#edf9f2;padding:.65rem;font-weight:700}
+#choices label.incorrect-option{border:2px solid #bf454b;border-radius:.45rem;
+ background:#fff1f1;padding:.65rem}
+#choices input[disabled]{opacity:.8}
+.scale{display:grid;grid-template-columns:1fr 2fr 1fr auto;
+ gap:.75rem;align-items:center;margin:1rem 0 1.5rem}
+.scale input[type=range]{width:100%;accent-color:#225aa5;min-width:0;touch-action:pan-y}
+.scale span{font-size:.9rem;line-height:1.3}
+.scale output{min-width:2.4rem;padding:.35rem;border-radius:.35rem;
+ text-align:center;border:1px solid #b3c3d6;font-weight:800}
+#surveys h3{margin:.2rem 0 .4rem}
+#surveys p{font-size:1.12rem;font-weight:600}
+#session-summary section,#finished-summary section{padding:.4rem 0;border-bottom:1px solid #d5e1ed}
+#session-summary h3,#finished-summary h3{margin:.4rem 0}
+#session-summary p,#finished-summary p{margin:.3rem 0}
+@media(max-width:520px){
+ .scale{grid-template-columns:1fr 1fr;gap:.65rem}
+ .scale input[type=range]{grid-column:1 / -1;grid-row:1}
+ .scale output{grid-column:1 / -1;grid-row:3;justify-self:center}
+ .scale span:nth-child(1){grid-column:1;grid-row:2}
+ .scale span:nth-child(3){grid-column:2;grid-row:2;text-align:right}
+ main.portal{padding:1rem}
+ .brand{padding-top:.4rem}
+}
+
+/* Four-part study roadmap: clearly distinguish current, completed and upcoming. */
+.session-parts{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+ gap:.45rem;margin:1rem 0;padding:0}
+.session-parts[hidden]{display:none!important}
+.session-parts li{padding:.65rem .45rem;border:1px solid #d0dae5;border-radius:.4rem;
+ background:#f6f8fa;color:#44566e;text-align:center;font-size:.9rem;line-height:1.35}
+.session-parts li.active{border:2px solid #245fa1;background:#e9f2ff;
+ color:#103f72;font-weight:750}
+.session-parts li.complete{border-color:#71a78a;background:#eef8f1;color:#1e5f3a}
+.session-parts li.later{border-style:dashed;background:#f8f9fb;color:#52647a}
+@media(max-width:560px){.session-parts{grid-template-columns:repeat(2,minmax(0,1fr))}}
