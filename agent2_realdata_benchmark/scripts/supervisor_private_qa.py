@@ -20,6 +20,7 @@ from html import escape
 import json
 from pathlib import Path
 import secrets
+import signal
 import stat
 from tempfile import TemporaryDirectory
 
@@ -290,6 +291,11 @@ def main():
     args = parser.parse_args()
     if args.port in FORBIDDEN_PORTS:
         parser.error("would conflict with production or staging")
+    # Graceful SIGTERM (including browser CI shutdown) must not strand a
+    # temporary file containing the tester's real school/Gmail address.
+    def shutdown_on_signal(_signal_number, _frame):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, shutdown_on_signal)
     with TemporaryDirectory(prefix="ijcai-qa-self-acceptance-") as tmp:
         sandbox = new_private_suite(Path(tmp),
             (args.school_email, args.external_email), port=args.port)
@@ -305,6 +311,8 @@ def main():
                              threaded=True)
         try:
             server.serve_forever()
+        except KeyboardInterrupt:
+            pass
         finally:
             server.server_close()
 
