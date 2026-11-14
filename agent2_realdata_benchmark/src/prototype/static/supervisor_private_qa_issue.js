@@ -32,6 +32,7 @@
    for(const entry of result.links){
     const li=document.createElement("li"),a=document.createElement("a");
     a.href=entry.test_link;
+    a.dataset.email=entry.email;
     a.textContent="Open test invitation for candidate ID "+entry.candidate_id+" ("+entry.email+")";
     a.rel="noreferrer noopener";
     li.append(a);el("qa-links").append(li);
