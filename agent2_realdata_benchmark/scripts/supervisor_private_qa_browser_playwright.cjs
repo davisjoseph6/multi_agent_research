@@ -118,10 +118,14 @@ async function main(){
   // creates a genuine 409 from the study. This is why the operational browser
   // test waits for actual legal-copy completion, not only page visibility.
   await school.waitForFunction(()=>
-   document.querySelectorAll("#consent-required input.required").length===5 &&
+   document.querySelectorAll("#consent-required input.required").length===6 &&
    !document.querySelector("#start-consent").disabled &&
    document.querySelectorAll("#info-copy h2").length>5);
-  for(let i=0;i<5;i++)
+  // The institutional school-email variant includes a sixth mandatory
+  // declaration about conditional AI points. External/Gmail consent has five.
+  const requiredCount=await school.locator("#consent-required input.required").count();
+  assert.equal(requiredCount,6);
+  for(let i=0;i<requiredCount;i++)
    await school.locator("#consent-required input.required").nth(i).check();
   const consentPromise=school.waitForResponse(respond("consent"));
   const screeningPromise=school.waitForResponse(respond("screening"));
