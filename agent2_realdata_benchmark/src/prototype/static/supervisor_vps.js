@@ -689,9 +689,24 @@
  $("language").addEventListener("change",async()=>{
    if(busy){$("language").value=lang;return}
    const desired=$("language").value;
+   // Translated consent replaces checkbox nodes asynchronously. Until
+   // that completes, block stale selections and premature submission.
+   const updatingConsent=!$("information").hidden;
+   if(updatingConsent){
+     $("start-consent").disabled=true;
+     $("consent-required").disabled=true;
+     $("consent-optional").disabled=true;
+   }
    busy=true;error("");
    try{await changeLanguage(desired)}
-   finally{busy=false}
+   finally{
+     if(updatingConsent){
+       $("consent-required").disabled=false;
+       $("consent-optional").disabled=false;
+       $("start-consent").disabled=false;
+     }
+     busy=false;
+   }
  });
  async function reply(choice,reflection=null){
    if(busy)return;
