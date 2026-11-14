@@ -96,6 +96,23 @@ def test_passwordless_school_and_gmail_questionnaires_are_private_QA_only(suite)
     }).status_code == 403
 
 
+def test_duplicate_school_questionnaire_returns_same_internal_candidate(suite):
+    browser = suite["interest"].test_client()
+    first = submit(browser, SCHOOL, "school")
+    duplicate = submit(browser, SCHOOL.upper(), "school")
+    assert first.status_code == duplicate.status_code == 202
+    records = suite["ledger"].candidates()
+    assert len(records) == 1
+    assert records[0]["email"] == SCHOOL
+    assert records[0]["application_count"] == 2
+    # A questionnaire submission is never itself a randomized study ID.
+    assert records[0]["approved_for_invitation"] == 0
+    assert records[0]["invitation_status"] == "potential"
+    with suite["store"]._tx() as db:
+        assert db.execute("SELECT COUNT(*) FROM participants").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM pii.invitations").fetchone()[0] == 0
+
+
 def test_qa_researcher_approves_then_issues_two_separate_token_flows(suite):
     applicants = suite["interest"].test_client()
     assert submit(applicants, SCHOOL, "school").status_code == 202
