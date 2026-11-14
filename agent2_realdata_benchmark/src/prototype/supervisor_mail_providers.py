@@ -32,7 +32,7 @@ import fcntl
 from cryptography.fernet import Fernet, InvalidToken
 
 from .supervisor_graph_mail import GraphMailSender, GraphMailError
-from .supervisor_recruitment import canonical_email
+from .supervisor_recruitment import canonical_email, ADMIN_EMAILS
 
 
 class MailConfigurationError(RuntimeError):
@@ -441,16 +441,25 @@ class MailRouter:
     cannot introduce a sender missing from the institutional approval index.
     """
     def __init__(self, routes: dict[str, MailRoute], default: str, *,
-                 by_actor: dict[str, str] | None = None):
+                 by_actor: dict[str, str] | None = None,
+                 allowed_actors: dict[str, frozenset[str]] | None = None):
         if not routes or default not in routes:
             raise MailConfigurationError("explicit authorized default mail route required")
         self.routes, self.default = dict(routes), default
         self.by_actor = {canonical_email(k): v for k,v in (by_actor or {}).items()}
         if any(v not in routes for v in self.by_actor.values()):
             raise MailConfigurationError("actor route is not authorized")
+        self.allowed_actors = allowed_actors
+        if allowed_actors is not None and any(k not in routes for k in allowed_actors):
+            raise MailConfigurationError("signed actor scope refers to nonexistent sender")
 
     def for_actor(self, actor: str) -> MailRoute:
-        return self.routes[self.by_actor.get(canonical_email(actor), self.default)]
+        staff = canonical_email(actor)
+        route = self.by_actor.get(staff, self.default)
+        if (self.allowed_actors is not None and
+            staff not in self.allowed_actors.get(route, frozenset())):
+            raise MailConfigurationError("administrator lacks explicit signed sender permission")
+        return self.routes[route]
 
     def send(self, *, to: str, subject: str, body: str):
         return self.routes[self.default].send(to=to, subject=subject, body=body)
@@ -458,7 +467,8 @@ class MailRouter:
 
 def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
                               signature_path: str | Path, public_key_path: str | Path,
-                              *, release_commit: str) -> dict:
+                              *, release_commit: str,
+                              include_actor_authorizations: bool = False):
     """Read two private JSONs and verify institutional sign-off over mailbox scope.
 
     The institutional public key must have been verified out-of-band. Config
@@ -487,6 +497,7 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
         raise MailConfigurationError("mail default not configured")
     if not config["routes"]:
         raise MailConfigurationError("no authorized mail senders")
+    authorized_staff = {}
     for key, definition in config["routes"].items():
         grant = policy["senders"].get(key)
         if not isinstance(grant, dict) or not isinstance(definition, dict):
@@ -500,6 +511,15 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
                 or not HEX.fullmatch(grant["owner_evidence_sha256"])):
             raise MailConfigurationError("mailbox owner/institution authorization missing")
         canonical_email(definition["email"])
+        # Human-operated sends MUST have exact consent from the mailbox or
+        # domain owner in the independently signed sender authorization file.
+        # Staff role grants only access to the app, never send-as rights.
+        actors = grant.get("authorized_actors", [])
+        if (type(actors) is not list or
+            any(type(actor) is not str or actor not in ADMIN_EMAILS
+                for actor in actors) or len(set(actors)) != len(actors)):
+            raise MailConfigurationError("signed staff sender authorization invalid")
+        authorized_staff[key] = frozenset(actors)
         alias = definition.get("from_alias")
         if alias is not None:
             # The OAuth identity remains the *real* Gmail account. Merely
@@ -560,6 +580,11 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
     actor_routes = config.get("by_actor", {})
     if not isinstance(actor_routes, dict) or any(v not in config["routes"] for v in actor_routes.values()):
         raise MailConfigurationError("unapproved actor route")
+    for actor, route in actor_routes.items():
+        if actor not in ADMIN_EMAILS or actor not in authorized_staff.get(route, frozenset()):
+            raise MailConfigurationError("actor route lacks explicit signed owner authorization")
+    if include_actor_authorizations:
+        return config, authorized_staff
     return config
 
 
@@ -568,9 +593,9 @@ def build_mail_router(*, config_file: str | Path, approval_file: str | Path,
                       release_commit: str, vault: EncryptedRefreshVault | None = None,
                       transport=None, token_transport=None,
                       journal: MailDeliveryJournal | None = None) -> MailRouter:
-    config = verify_signed_mail_policy(
+    config, signed_staff = verify_signed_mail_policy(
         config_file, approval_file, approval_signature, institution_key,
-        release_commit=release_commit,
+        release_commit=release_commit, include_actor_authorizations=True,
     )
     routes = {}
     for key, item in config["routes"].items():
@@ -602,4 +627,5 @@ def build_mail_router(*, config_file: str | Path, approval_file: str | Path,
         routes[key] = MailRoute(sender=source, provider=provider,
                                 sender_email=item["email"],journal=journal,
                                 identifier=key)
-    return MailRouter(routes, config["default"], by_actor=config.get("by_actor", {}))
+    return MailRouter(routes, config["default"], by_actor=config.get("by_actor", {}),
+                      allowed_actors=signed_staff)
