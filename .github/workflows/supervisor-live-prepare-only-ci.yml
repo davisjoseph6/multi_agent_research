@@ -19,6 +19,8 @@ jobs:
         working-directory: agent2_realdata_benchmark
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # An install bundle MUST include all parent commits.
       - name: Create an exact remote-tracking-only Git bundle
         run: |
           set -Eeuo pipefail
