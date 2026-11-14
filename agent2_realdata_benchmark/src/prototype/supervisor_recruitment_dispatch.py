@@ -106,7 +106,15 @@ class InvitationDispatcher:
                 "\n\nPlease review the participant information and provide consent before beginning."
             )
             try:
-                self.sender.send(to=email,subject=subject,body=body)
+                # A mailbox choice is authorized by a separately signed
+                # sender policy, never by the caller's researcher role.
+                provider=(self.sender.for_actor(actor)
+                          if hasattr(self.sender,"for_actor") else self.sender)
+                if hasattr(provider,"journal"):
+                    provider.send(to=email,subject=subject,body=body,
+                                  delivery_key=f"study-invite:{cid}")
+                else:
+                    provider.send(to=email,subject=subject,body=body)
             except Exception:
                 self.ledger.finish_mail(
                     candidate_id=cid,accepted=False,actor=actor,at=at)
