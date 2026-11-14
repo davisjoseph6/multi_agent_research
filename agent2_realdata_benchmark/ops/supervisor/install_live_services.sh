@@ -71,8 +71,15 @@ RecruitmentLedger(folder)
     runuser -u "$APPUSER" -- "$PY" -m scripts.supervisor_recruitment_cli \
       --state-dir "$STATE" --bootstrap-all \
       --output-dir "$STATE/initial-admin-secrets"
+    # Create a private versioned, UNSIGNED 16-category document placeholder.
+    # The documents remain pending until real PDFs and authentic signatures
+    # arrive. No draft can authorize enrollment or outbound mail.
+    install -d -o "$APPUSER" -g "$APPUSER" -m 0700 "$STATE/document_intake_empty"
+    runuser -u "$APPUSER" -- "$PY" -m scripts.supervisor_doc_bundle_cli \
+      --registry "$STATE/document_registry" --commit "$SHA" \
+      --draft-source "$STATE/document_intake_empty"
   )
-  echo "EMPTY separate LIVE DBs initialized; four NEW live administrator bootstrap secrets stored privately."
+  echo "EMPTY LIVE DBs and PENDING 16-document draft created; four NEW live administrator bootstrap secrets stored privately."
   for name in study recruitment control; do
     if [[ "$name" == study ]]; then
       PORT=8888
