@@ -40,7 +40,10 @@ def _new_private_file(path: Path, content: str):
         raise MailConfigurationError("private absolute path with existing parent required")
     if path.parent.stat().st_mode & 0o077:
         raise MailConfigurationError("OAuth session parent must be mode 0700")
-    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    except FileExistsError:
+        raise MailConfigurationError("OAuth session destination must be unoccupied") from None
     with os.fdopen(fd,"w",encoding="utf-8") as stream:
         stream.write(content)
 
