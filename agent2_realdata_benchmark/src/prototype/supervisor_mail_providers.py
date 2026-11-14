@@ -529,6 +529,7 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
             label = definition.get("api_key_label")
             if (type(label) is not str or len(label) < 8 or
                 label != grant.get("api_key_label") or
+                definition.get("api_key_file") != grant.get("api_key_file") or
                 grant.get("sender_domain_authenticated") is not True):
                 raise MailConfigurationError("unsigned domain API credential or sender")
             evidence = grant.get("domain_evidence_file")
