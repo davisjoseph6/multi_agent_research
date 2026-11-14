@@ -36,7 +36,19 @@
       "tenant": "consumers",
       "client_id": "<MS_OAUTH_CLIENT_ID>",
       "client_secret_file": "/etc/ijcai-supervisor-live/mail/microsoft-delegated-secret"
+    },
+    "gmail_verified_domain_alias": {
+      "provider": "gmail_delegated",
+      "email": "<ACTUAL_GMAIL_OAUTH_OWNER>",
+      "from_alias": "private_quiz@selfhealing-edu.fr",
+      "client_id": "<GOOGLE_OAUTH_CLIENT_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/google-client-secret"
     }
   },
-  "by_actor": {}
+  "by_actor": {
+    "wiam.belouard@aivancity.education": "gmail_verified_domain_alias",
+    "sara.elkardi@aivancity.education": "gmail_verified_domain_alias",
+    "davis.joseph@aivancity.education": "gmail_verified_domain_alias"
+  },
+  "warning": "DRAFT ONLY. Default remains not-configured. These actor selections do NOT grant mail authorization. Central Gmail owner must explicitly consent to staff use; verified From alias needs domain authorization and independently signed accepted evidence. Starting January 2027, third-party Gmail send-as support changes; use a domain-native provider for long-term service."
 }
