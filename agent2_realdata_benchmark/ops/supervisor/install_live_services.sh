@@ -39,11 +39,15 @@ if [[ "$MODE" == prepare ]]; then
   install -d -o "$APPUSER" -g "$APPUSER" -m 0700 "$STATE/document_registry"
   install -d -o root -g "$APPUSER" -m 0750 "$PRIVATE" "$PRIVATE/approvals" "$PRIVATE/mail"
   RELEASE="$PREFIX/releases/$SHA"
-  [[ ! -e "$RELEASE" ]] || { echo "Release already prepared; do not overwrite" >&2; exit 2; }
-  git clone --quiet --no-local "$BUNDLE" "$RELEASE"
-  git -C "$RELEASE" checkout --quiet --detach "$SHA"
-  [[ "$(git -C "$RELEASE" rev-parse HEAD)" == "$SHA" ]] || exit 2
-  [[ -z "$(git -C "$RELEASE" status --porcelain)" ]] || exit 2
+  # The transfer bundle advertises refs/remotes/origin/... only. Plain
+  # 'git clone' can claim an empty repository and leave this exact failed
+  # checkout behind. Never delete an existing checkout or participant data.
+  HELPER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/materialize_live_bundle.sh"
+  [[ -f "$HELPER" && ! -L "$HELPER" ]] || {
+    echo "Pinned bundle materialization helper not present" >&2; exit 2;
+  }
+  bash "$HELPER" "$BUNDLE" "$SHA" "$RELEASE" \
+    refs/remotes/origin/research/ijcai2027-supervisor-consent-gdpr-20261112
   chmod 0755 "$RELEASE"
   python3 -m venv "$PREFIX/venv"
   "$PY" -m pip install --disable-pip-version-check --quiet \
