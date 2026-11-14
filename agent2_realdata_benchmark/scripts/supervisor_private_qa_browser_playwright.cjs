@@ -113,10 +113,22 @@ async function main(){
   assert.equal((await staffContext.request.get(base+"/control/api/capabilities")).status(),200);
   // One of two QA test students now exercises the actual operational quiz;
   // the other proves Gmail applicant onboarding without any student password.
+  // The bilingual consent checklist is hydrated asynchronously. Checking
+  // boxes against the placeholder DOM before the required statements arrive
+  // creates a genuine 409 from the study. This is why the operational browser
+  // test waits for actual legal-copy completion, not only page visibility.
+  await school.waitForFunction(()=>
+   document.querySelectorAll("#consent-required input.required").length===5 &&
+   !document.querySelector("#start-consent").disabled &&
+   document.querySelectorAll("#info-copy h2").length>5);
   for(let i=0;i<5;i++)
    await school.locator("#consent-required input.required").nth(i).check();
+  const consentPromise=school.waitForResponse(respond("consent"));
   const screeningPromise=school.waitForResponse(respond("screening"));
   await school.locator("#start-consent").click();
+  const consentReply=await consentPromise;
+  assert.equal(consentReply.status(),200,
+   "QA staging consent API declined the explicit complete checklist");
   const screening=await (await screeningPromise).json();
   assert.equal(screening.questions.length,8);
   for(let i=0;i<8;i++){
