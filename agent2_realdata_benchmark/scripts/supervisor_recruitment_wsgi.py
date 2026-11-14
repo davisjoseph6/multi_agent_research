@@ -24,6 +24,7 @@ from src.prototype.supervisor_mail_providers import (
     build_mail_router, EncryptedRefreshVault, MailDeliveryJournal,
 )
 from scripts.supervisor_vps_wsgi import BANK
+from src.prototype.supervisor_release_documents import verify_current
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -62,24 +63,17 @@ def make_wsgi_app():
             raise RuntimeError("staging source marker mismatch")
     privacy_notices=None
     if mode=="live":
-        privacy_notices={}
-        public_key=Path(os.environ["SUPERVISOR_INSTITUTION_PUBLIC_KEY"])
-        if not public_key.is_file() or public_key.is_symlink():
-            raise RuntimeError("trusted institutional signing key required")
-        for language in ("en","fr"):
-            document=Path(os.environ[f"SUPERVISOR_RECRUITMENT_NOTICE_{language.upper()}"])
-            signature=Path(os.environ[f"SUPERVISOR_RECRUITMENT_NOTICE_SIGNATURE_{language.upper()}"])
-            if (not document.is_absolute() or document.suffix.lower()!=".pdf"
-                    or not document.is_file() or document.is_symlink()
-                    or not signature.is_file() or signature.is_symlink()):
-                raise RuntimeError("approved bilingual recruitment notice and signature required")
-            check=subprocess.run([
-                "openssl","dgst","-sha256","-verify",str(public_key),
-                "-signature",str(signature),str(document)],
-                capture_output=True,text=True,timeout=10,check=False)
-            if check.returncode!=0:
-                raise RuntimeError("institutional bilingual recruitment notice signature invalid")
-            privacy_notices[language]=document
+        bundle=verify_current(
+            registry_root=os.environ["SUPERVISOR_DOC_BUNDLE_ROOT"],
+            release_commit=commit,
+            public_key=os.environ["SUPERVISOR_INSTITUTION_PUBLIC_KEY"],
+        )
+        # Institutionally signed manifest binds all bilingual privacy PDF
+        # hashes, so no single unapproved notice can be substituted.
+        privacy_notices={
+            language:bundle.file(f"recruitment_privacy_{language}")
+            for language in ("en","fr")
+        }
     ledger=RecruitmentLedger(root)
     dispatcher=None
     mailer=None
