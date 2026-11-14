@@ -15,7 +15,9 @@ import ssl
 
 from scripts.supervisor_vps_admin import load
 from src.prototype.supervisor_operational_scheduler import reconcile
-from src.prototype.supervisor_graph_mail import GraphMailSender
+from src.prototype.supervisor_mail_providers import (
+    build_mail_router, EncryptedRefreshVault, MailDeliveryJournal,
+)
 from src.prototype.supervisor_recruitment import RecruitmentLedger
 from src.prototype.supervisor_inactivity_worker import reconcile_inactivity
 
@@ -68,16 +70,25 @@ def main():
         return
     # The same independently signed LIVE gate was just evaluated by load().
     if args.send:
-        if os.environ.get("SUPERVISOR_MAIL_TRANSPORT")!="microsoft_graph":
-            parser.error("Graph mail API, not legacy SMTP, required in LIVE mode")
-        graph=GraphMailSender(
-            tenant_id=os.environ["SUPERVISOR_GRAPH_TENANT_ID"],
-            client_id=os.environ["SUPERVISOR_GRAPH_CLIENT_ID"],
-            client_secret=os.environ["SUPERVISOR_GRAPH_CLIENT_SECRET"],
-            sender_email=os.environ["SUPERVISOR_GRAPH_SENDER_EMAIL"],
-            live_release_verified=True,
+        if os.environ.get("SUPERVISOR_MAIL_TRANSPORT") != "provider_router":
+            parser.error("signed provider-neutral mail routes required in LIVE mode")
+        vault=(EncryptedRefreshVault(
+            os.environ["SUPERVISOR_MAIL_VAULT_DIR"],
+            os.environ["SUPERVISOR_MAIL_VAULT_KEY_FILE"],
+        ) if os.environ.get("SUPERVISOR_MAIL_VAULT_DIR") else None)
+        journal=MailDeliveryJournal(
+            os.environ["SUPERVISOR_MAIL_AUDIT_DB"],
+            os.environ["SUPERVISOR_MAIL_AUDIT_KEY_FILE"],
         )
-        callback=graph.send
+        router=build_mail_router(
+            config_file=os.environ["SUPERVISOR_MAIL_CONFIG"],
+            approval_file=os.environ["SUPERVISOR_MAIL_APPROVAL"],
+            approval_signature=os.environ["SUPERVISOR_MAIL_APPROVAL_SIGNATURE"],
+            institution_key=os.environ["SUPERVISOR_INSTITUTION_PUBLIC_KEY"],
+            release_commit=os.environ["SUPERVISOR_VPS_COMMIT"],
+            vault=vault,journal=journal,
+        )
+        callback=router.send
     else:
         callback=None
     if args.manual_ref:
