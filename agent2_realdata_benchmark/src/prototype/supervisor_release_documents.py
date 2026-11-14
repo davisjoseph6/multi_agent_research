@@ -145,7 +145,20 @@ def revise(root: str | Path, *, release_commit: str, source_dir: str | Path):
     registry=_folder(Path(root))
     prior=current_version(registry)
     if prior is None:
-        raise DocumentReleaseError("no previous version to revise")
+        # A genuine approval is expected to arrive AFTER several draft
+        # iterations. Select the most recent private candidate without
+        # activating it or retroactively marking any draft approved.
+        versions=registry/"versions"
+        if versions.is_dir() and not versions.is_symlink():
+            candidates=sorted(
+                (p for p in versions.iterdir()
+                 if p.is_dir() and not p.is_symlink() and
+                 (p/"manifest.json").is_file()),
+                key=lambda p:p.name)
+            prior=candidates[-1] if candidates else None
+        if prior is None:
+            raise DocumentReleaseError("no previous draft version to revise")
+    prior=_folder(prior)
     # Existing historical revisions are never overwritten or mutated.
     return _candidate(registry,release_commit=release_commit,
                       sources=Path(source_dir),previous=prior)
