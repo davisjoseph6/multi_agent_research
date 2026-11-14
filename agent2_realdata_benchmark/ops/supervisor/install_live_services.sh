@@ -14,6 +14,7 @@ PY="$PREFIX/venv/bin/python"
 ENV="$PRIVATE/live.env"
 STUDY=ijcai-supervisor-live-study
 ADMIN=ijcai-supervisor-live-recruitment
+CONTROL=ijcai-supervisor-live-control
 CADDY=/etc/caddy/Caddyfile
 SNIPPET="$PRIVATE/Caddyfile.fragment"
 exec 9>/run/lock/ijcai-supervisor-live-install.lock
@@ -26,7 +27,8 @@ if [[ "$MODE" == prepare ]]; then
   [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Full Git SHA required" >&2; exit 2; }
   [[ -f "$BUNDLE" && ! -L "$BUNDLE" ]] || { echo "Locally uploaded Git bundle missing" >&2; exit 2; }
   [[ ! -e /etc/systemd/system/${STUDY}.service &&
-     ! -e /etc/systemd/system/${ADMIN}.service ]] || {
+     ! -e /etc/systemd/system/${ADMIN}.service &&
+     ! -e /etc/systemd/system/${CONTROL}.service ]] || {
     echo "An existing LIVE service exists; use a separately reviewed rollback/upgrade process" >&2;exit 2;
   }
   id "$APPUSER" >/dev/null 2>&1 || useradd --system --no-create-home \
@@ -47,15 +49,22 @@ if [[ "$MODE" == prepare ]]; then
   "$PY" -m pip install --disable-pip-version-check --quiet \
     Flask==3.1.3 gunicorn==23.0.0 cryptography==50.0.2
   ln -s "releases/$SHA" "$PREFIX/current"
-  for name in study recruitment; do
+  for name in study recruitment control; do
     if [[ "$name" == study ]]; then
       PORT=8888
       WSGI='scripts.supervisor_vps_wsgi:make_wsgi_app()'
       UNIT="$STUDY"
-    else
+      CONTROL_ENV=0
+    elif [[ "$name" == recruitment ]]; then
       PORT=8889
       WSGI='scripts.supervisor_recruitment_wsgi:make_wsgi_app()'
       UNIT="$ADMIN"
+      CONTROL_ENV=0
+    else
+      PORT=8890
+      WSGI='scripts.supervisor_recruitment_wsgi:make_wsgi_app()'
+      UNIT="$CONTROL"
+      CONTROL_ENV=1
     fi
     cat > "/etc/systemd/system/${UNIT}.service" <<UNITFILE
 [Unit]
@@ -68,6 +77,7 @@ User=$APPUSER
 Group=$APPUSER
 WorkingDirectory=$PREFIX/current/agent2_realdata_benchmark
 EnvironmentFile=$ENV
+Environment=SUPERVISOR_RECRUITMENT_CONTROL_ONLY=$CONTROL_ENV
 ExecStart=$PREFIX/venv/bin/gunicorn --bind 127.0.0.1:$PORT --workers 2 --threads 4 --timeout 45 --access-logfile /dev/null '$WSGI'
 Restart=on-failure
 RestartSec=5
@@ -165,8 +175,8 @@ rollback(){
   trap - EXIT
   if [[ "$status" -ne 0 ]]; then
     echo "FAILED: deactivating LIVE services and restoring Caddy; STAGING untouched" >&2
-    systemctl stop "$STUDY" "$ADMIN" >/dev/null 2>&1 || true
-    systemctl disable "$STUDY" "$ADMIN" >/dev/null 2>&1 || true
+    systemctl stop "$STUDY" "$ADMIN" "$CONTROL" >/dev/null 2>&1 || true
+    systemctl disable "$STUDY" "$ADMIN" "$CONTROL" >/dev/null 2>&1 || true
     if [[ "$changed" -eq 1 ]]; then
       cp -a "$BACKUP" "$CADDY"
       caddy validate --config "$CADDY" || true
@@ -176,18 +186,32 @@ rollback(){
   exit "$status"
 }
 trap rollback EXIT
-systemctl enable --now "$STUDY" "$ADMIN"
+systemctl enable --now "$STUDY" "$ADMIN" "$CONTROL"
 for _ in {1..25}; do
   systemctl is-active --quiet "$STUDY" && systemctl is-active --quiet "$ADMIN" &&
-  ss -ltn | grep -q '127.0.0.1:8888 ' && ss -ltn | grep -q '127.0.0.1:8889 ' && break
+  systemctl is-active --quiet "$CONTROL" &&
+  ss -ltn | grep -q '127.0.0.1:8888 ' &&
+  ss -ltn | grep -q '127.0.0.1:8889 ' &&
+  ss -ltn | grep -q '127.0.0.1:8890 ' && break
   sleep 1
 done
 systemctl is-active --quiet "$STUDY"
 systemctl is-active --quiet "$ADMIN"
+systemctl is-active --quiet "$CONTROL"
 ss -ltn | grep -q '127.0.0.1:8888 '
 ss -ltn | grep -q '127.0.0.1:8889 '
+ss -ltn | grep -q '127.0.0.1:8890 '
 [[ "$(curl --silent --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:8889/control/)" == 403 ]] || {
   echo "Private dashboard direct HTTP must be blocked" >&2;exit 2;
+}
+[[ "$(curl --silent --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:8890/control/)" == 200 ]] || {
+  echo "Private live admin port 8890 is not ready" >&2;exit 2;
+}
+[[ "$(curl --silent --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:8890/interest/school)" == 404 ]] || {
+  echo "Private live admin must NOT expose interest forms" >&2;exit 2;
+}
+[[ "$(curl --silent --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:8890/control/api/overview)" == 409 ]] || {
+  echo "Private live admin must reject anonymous PII access" >&2;exit 2;
 }
 if grep -Fq 'import /etc/ijcai-supervisor-live/Caddyfile.fragment' "$CADDY"; then
   echo "Caddy import already exists; validating recognized exact path."
