@@ -113,17 +113,25 @@ def make_wsgi_app():
             intake=intake,ledger=ledger,sender=mailer,
             hostname=study_host,live_verified=True,
         )
+    # The public application serves ONLY /interest/* via Caddy HTTPS.
+    # The researcher control instance is a different systemd process bound
+    # to SSH-only 127.0.0.1:8890: it requires localhost host headers,
+    # serves NO intake forms, and still enforces all signed LIVE gates.
+    control_only=os.environ.get("SUPERVISOR_RECRUITMENT_CONTROL_ONLY","0")=="1"
+    if control_only and mode!="live":
+        raise RuntimeError("private control mode is reserved for signed LIVE releases")
     return make_recruitment_app(
         ledger,
-        hostname=host,proxy_mode=mode=="live",
-        public_intake_enabled=mode=="live",
+        hostname="localhost" if control_only else host,
+        proxy_mode=mode=="live" and not control_only,
+        public_intake_enabled=mode=="live" and not control_only,
         research_db=root/"supervisor_operational_study.sqlite3",
         contacts_db=root/"supervisor_operational_contacts.sqlite3",
         dispatcher=dispatcher,inactivity_sender=mailer,
         operational_store=store,live_verified=mode=="live",
-        privacy_notices=privacy_notices,
+        privacy_notices=None if control_only else privacy_notices,
         intake_rate_secret=(
             os.environ["SUPERVISOR_INTAKE_RATE_SECRET"].encode("utf-8")
-            if mode=="live" else None
+            if mode=="live" and not control_only else None
         ),
     )
