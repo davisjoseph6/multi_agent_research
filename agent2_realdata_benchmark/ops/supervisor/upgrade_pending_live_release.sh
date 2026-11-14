@@ -36,9 +36,15 @@ done
 [[ -L "$PREFIX/current" && ! -L "$PREFIX/releases" &&
    -d "$PREFIX/releases" && ! -L "$STATE" &&
    -d "$STATE/document_registry/versions" &&
+   -d "$STATE/document_intake_empty" &&
    ! -e "$STATE/document_registry/current" &&
-   ! -e "$PRIVATE/live.env" &&
-   ! -e /etc/caddy/ijcai-supervisor-live.caddy ]] || {
+   ! -L "$STATE/document_registry/current" &&
+   ! -e "$PRIVATE/live.env" && ! -L "$PRIVATE/live.env" &&
+   ! -e /etc/caddy/ijcai-supervisor-live.caddy &&
+   ! -L /etc/caddy/ijcai-supervisor-live.caddy &&
+   -f /etc/systemd/system/ijcai-supervisor-live-study.service &&
+   -f /etc/systemd/system/ijcai-supervisor-live-recruitment.service &&
+   -f /etc/systemd/system/ijcai-supervisor-live-control.service ]] || {
   echo "Not a safely pending and unactivated LIVE installation" >&2
   exit 2
 }
@@ -76,7 +82,19 @@ runuser -u "$USER" -- bash -c '
     --commit "$4" \
     --draft-source "$3/document_intake_empty"
 ' bash "$PREFIX/releases/$SHA" "$PREFIX/venv/bin/python" "$STATE" "$SHA"
-TEMP="$PREFIX/.pending-current.$$"
+# A simultaneous manual service start between the initial check and the
+# symlink switch must still cause the upgrade to fail closed.
+for unit in ijcai-supervisor-live-study.service \
+            ijcai-supervisor-live-recruitment.service \
+            ijcai-supervisor-live-control.service \
+            ijcai-supervisor-live-reminders.timer; do
+  if systemctl is-active --quiet "$unit" ||
+     systemctl is-enabled --quiet "$unit"; then
+    echo "LIVE service state changed during upgrade; refusing switch" >&2
+    exit 2
+  fi
+done
+TEMP="$PREFIX/.pending-current.$"
 [[ ! -e "$TEMP" && ! -L "$TEMP" ]] || {
   echo "Unexpected transient link exists" >&2; exit 2
 }
