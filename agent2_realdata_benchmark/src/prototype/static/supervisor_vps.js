@@ -257,16 +257,35 @@
    const result=await api("consent-copy",{language:lang});
    const r=await fetch("/study/info/"+lang,{cache:"no-store"});
    if(!r.ok)throw Error("Information sheet unavailable");
-   const page=new DOMParser().parseFromString(await r.text(),"text/html");
-   const content=page.querySelector("main");
-   if(!content)throw Error("Information sheet is missing");
-   $("info-copy").replaceChildren();
-   // Trusted same-origin, version-controlled sheet: keep semantic headings,
-   // paragraph spacing, bold words and links instead of printing raw Markdown.
-   for(const element of content.children){
-     if(["H1","H2","H3","P","SECTION","UL","OL","PRE","A"].includes(element.tagName))
-       $("info-copy").append(document.importNode(element,true));
-   }
+   const media=(r.headers.get("content-type")||"").toLowerCase();
+   if(media.includes("application/pdf")){
+     // LIVE information sheets are institution-signed, versioned PDFs.
+     // Do not attempt to parse binary bytes as HTML. X-Frame-Options:DENY
+     // also means embedding the PDF in a frame is intentionally forbidden.
+     const prompt=document.createElement("p");
+     prompt.textContent=lang==="fr"?
+       "Lisez la notice d'information officielle en PDF avant de donner votre consentement.":
+       "Read the official PDF participant information sheet before giving consent.";
+     const link=document.createElement("a");
+     link.href="/study/info/"+lang;
+     link.target="_blank";
+     link.rel="noopener noreferrer";
+     link.textContent=lang==="fr"?
+       "Ouvrir la notice d'information (PDF)":
+       "Open participant information sheet (PDF)";
+     $("info-copy").replaceChildren(prompt,link);
+     if(r.body)await r.body.cancel();
+   }else if(media.includes("text/html")){
+     const page=new DOMParser().parseFromString(await r.text(),"text/html");
+     const content=page.querySelector("main");
+     if(!content)throw Error("Information sheet is missing");
+     $("info-copy").replaceChildren();
+     // Staging review HTML is version-controlled but NOT approved for LIVE.
+     for(const element of content.children){
+       if(["H1","H2","H3","P","SECTION","UL","OL","PRE","A"].includes(element.tagName))
+         $("info-copy").append(document.importNode(element,true));
+     }
+   }else throw Error("Unsupported information sheet format");
    const field=$("consent-required");field.replaceChildren();
    const legend=document.createElement("legend");
    legend.textContent=t("required");field.append(legend);
