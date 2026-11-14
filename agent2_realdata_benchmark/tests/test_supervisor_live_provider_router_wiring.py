@@ -40,3 +40,14 @@ def test_live_release_and_public_intake_still_fail_closed():
     assert "public_intake_enabled=mode==\"live\" and not control_only" in source
     assert "privacy_notices=None if control_only else privacy_notices" in source
     assert 'if control_only and mode!="live":' in source
+
+
+def test_researcher_portal_does_not_assume_every_sender_is_outlook():
+    static = ROOT / "src/prototype/static/supervisor_recruitment_admin.js"
+    ui = static.read_text(encoding="utf-8")
+    assert "accepted by the email provider" in ui
+    assert "authorized email provider" in ui
+    assert "Outlook" not in ui
+    service = (ROOT / "src/prototype/supervisor_recruitment_web.py").read_text(encoding="utf-8")
+    assert "signed live invitation sending is not configured" in service
+    assert "signed live reminder sender is not configured" in service
