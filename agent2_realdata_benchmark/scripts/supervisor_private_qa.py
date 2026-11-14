@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 import hmac
 from html import escape
 import json
+import os
 from pathlib import Path
 import secrets
 import signal
@@ -146,10 +147,11 @@ def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
                          at=datetime.now(timezone.utc))
         passwords[email] = password
         path = credential_dir / (email.replace("@", "_at_") + ".txt")
-        with path.open("x", encoding="utf-8") as output:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                     0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as output:
             output.write("QA ONLY (not your LIVE password)\n"
                          f"Account: {email}\nTemporary password: {password}\n")
-        path.chmod(0o600)
 
     study = make_supervisor_vps_app(
         intake, hostname="qa.localhost", proxy_mode=False,
