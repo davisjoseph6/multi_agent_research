@@ -48,6 +48,7 @@ def files(root: Path, *, verified=True, sender=DOMAIN_SENDER):
                 "owner_authorized":True,"institutional_scope_verified":True,
                 "owner_evidence_file":str(auth),"owner_evidence_sha256":digest(auth),
                 "api_key_label":"owner-domain-v1",
+                "api_key_file":str(api),
                 "sender_domain_authenticated":verified,
                 "domain_evidence_file":str(domain),
                 "domain_evidence_sha256":digest(domain),
