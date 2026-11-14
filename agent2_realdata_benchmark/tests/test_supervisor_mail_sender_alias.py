@@ -83,6 +83,8 @@ def signed(secret: Path, *, alias=ALIAS, grant_alias=ALIAS, allowed=True):
                    check=True,capture_output=True)
     subprocess.run(["openssl","dgst","-sha256","-sign",str(key),
                     "-out",str(signature),str(record)],check=True,capture_output=True)
+    pub.chmod(0o600)
+    signature.chmod(0o600)
     return config, record, signature, pub
 
 
