@@ -48,9 +48,14 @@ grep -qx 'SUPERVISOR_VPS_MODE=live' "$ENV_FILE" || {
 grep -qx "SUPERVISOR_VPS_ROOT=$STATE" "$ENV_FILE" || {
   echo "LIVE state directory mismatch" >&2; exit 2;
 }
-grep -qx 'SUPERVISOR_MAIL_TRANSPORT=microsoft_graph' "$ENV_FILE" || {
-  echo "Microsoft Graph transport not configured" >&2; exit 2;
+grep -qx 'SUPERVISOR_MAIL_TRANSPORT=provider_router' "$ENV_FILE" || {
+  echo "Signed provider-neutral mail router is not configured" >&2; exit 2;
 }
+for required in SUPERVISOR_MAIL_CONFIG SUPERVISOR_MAIL_APPROVAL SUPERVISOR_MAIL_APPROVAL_SIGNATURE SUPERVISOR_MAIL_AUDIT_DB SUPERVISOR_MAIL_AUDIT_KEY_FILE SUPERVISOR_DOC_BUNDLE_ROOT; do
+  grep -q "^${required}=" "$ENV_FILE" || {
+    echo "Required live environment setting missing: $required" >&2; exit 2;
+  }
+done
 if [[ -e "$SERVICE" || -e "$TIMER" ]]; then
   echo "Existing timer or service present; review it manually before replacement" >&2
   exit 2
@@ -64,7 +69,7 @@ runuser -u "$ACCOUNT" -- bash -c '
   source "$1"
   set +a
   cd "$2"
-  "$3" -c "from scripts.supervisor_vps_admin import load; load()"
+  "$3" -c "from scripts.supervisor_vps_admin import load; from scripts.supervisor_recruitment_wsgi import make_wsgi_app; load(); make_wsgi_app()"
 ' bash "$ENV_FILE" "$WORK" "$PY"
 # systemd timer creates a new process each hour. Persistent=true catches
 # missed schedule windows on VPS reboot. The worker handles idempotency in SQLite.
