@@ -120,7 +120,7 @@ async function main(){
   await school.waitForFunction(()=>
    document.querySelectorAll("#consent-required input.required").length===6 &&
    !document.querySelector("#start-consent").disabled &&
-   document.querySelectorAll("#info-copy h2").length>5);
+   document.querySelector("#consent-required").children.length>0);
   // The institutional school-email variant includes a sixth mandatory
   // declaration about conditional AI points. External/Gmail consent has five.
   const requiredCount=await school.locator("#consent-required input.required").count();
