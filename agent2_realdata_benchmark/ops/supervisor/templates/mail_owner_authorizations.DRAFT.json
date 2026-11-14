@@ -32,6 +32,20 @@
       "tenant": "<APPROVED_ENTRA_TENANT_GUID>",
       "client_id": "<SIGNED_SCOPED_ENTRA_APP_ID>",
       "owner_evidence_file": "/etc/ijcai-supervisor-live/mail/owner-consent-colleague_sara.pdf"
+    },
+    "gmail_verified_domain_alias": {
+      "provider": "gmail_delegated",
+      "email": "<ACTUAL_GMAIL_OAUTH_OWNER>",
+      "client_id": "<GOOGLE_OAUTH_CLIENT_ID>",
+      "owner_authorized": false,
+      "institutional_scope_verified": false,
+      "owner_evidence_file": "/etc/ijcai-supervisor-live/mail/owner-consent-gmail-verified-domain-alias.pdf",
+      "owner_evidence_sha256": null,
+      "from_alias": "private_quiz@selfhealing-edu.fr",
+      "alias_verified_by_owner": false,
+      "alias_domain_authorized": false,
+      "alias_evidence_file": "/etc/ijcai-supervisor-live/mail/alias-verification-private-quiz.pdf",
+      "alias_evidence_sha256": null
     }
   },
   "warning": "DRAFT ONLY. Independently verify explicit owner consent, Exchange/Microsoft Graph rights, and sign this exact JSON using an authenticated institutional key. This unsigned file cannot configure LIVE mail."
