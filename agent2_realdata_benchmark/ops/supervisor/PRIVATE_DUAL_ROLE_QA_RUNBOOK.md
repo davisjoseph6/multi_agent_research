@@ -107,9 +107,52 @@ Official provider references:
 - https://learn.microsoft.com/en-us/exchange/permissions-exo/application-rbac
 - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/send
 
+## One harmless real email to yourself (owner-side OAuth canary)
+
+This is **separate** from questionnaire invitations, LIVE service startup and
+institutional release signatures. It sends only one generic, non-research
+test message from the authenticated mailbox **to that same mailbox**, never
+on behalf of another person. The sender must first perform the documented
+local OAuth flow in `LIVE_PROVIDER_AND_DOCUMENT_RUNBOOK.md`; there is no
+ChatGPT account connection. Do not use your school colleague's mailbox.
+
+For a Gmail owner, register and authorize a Google OAuth client with only
+`gmail.send`; for a personal Outlook mailbox, use delegated Graph `Mail.Send`.
+A Gmail alias for Microsoft sign-in is **not** a Graph Outlook mailbox.
+The Google and Microsoft administrative actions have to be performed by
+their actual owners and, where relevant, their institutional admins.
+
+After the owner-only OAuth refresh grant has been safely stored and the
+Fernet key exists in a separate protected local directory, run from the
+exact checked-out repository (replace paths/client ID locally, not in chat):
+
+    python -m scripts.supervisor_mail_owner_canary \
+      --provider gmail_delegated \
+      --sender YOUR_OWN_GMAIL \
+      --client-id YOUR_REGISTERED_GOOGLE_OAUTH_CLIENT_ID \
+      --vault-dir "$HOME/.ijcai_oauth_private/vault" \
+      --vault-key-file "$HOME/.ijcai_oauth_private/mail.key" \
+      --receipt-file "$HOME/.ijcai_oauth_private/mail-canary-first.json"
+
+That is an OFFLINE vault/identity preflight; **no email is sent**.
+To send exactly one owner-to-self test message, add
+`--send --confirm-own-mailbox` to the same command using a *new,
+nonexistent* receipt file. Never blindly rerun after a timeout:
+the 0600 receipt intentionally blocks uncertain duplicate sends.
+A success is provider acceptance only; inspect the Sent Items and actual
+inbox independently. The command never sends an invitation token,
+questionnaire, participant PII, recruitment material or research data.
+
+For `graph_delegated`, supply the genuine Outlook-hosted mailbox and
+Microsoft app client ID, plus `--tenant consumers` for a personal
+Microsoft account. DO NOT specify a `@gmail.com` Microsoft sign-in alias
+as a Graph mail sender. Neither delegated canary supports Microsoft Graph
+application-only Send As; that requires separate approved tenant/Exchange
+mailbox scoping and the LIVE signed sender router.
+
 ## Automatic checks
 
-    python -m pytest -q tests/test_supervisor_private_qa.py
+    python -m pytest -q tests/test_supervisor_private_qa.py tests/test_supervisor_mail_owner_canary.py
 
 GitHub CI also runs the candidate's trace oracle, Chromium study journeys and
 offline release tests. A green source CI result is not proof that the user's
