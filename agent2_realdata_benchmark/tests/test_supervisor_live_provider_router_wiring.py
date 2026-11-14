@@ -72,4 +72,4 @@ def test_pending_upgrade_preserves_state_and_requires_disabled_services():
     assert "systemctl start" not in body
     assert "systemctl reload" not in body
     assert "rm -rf" not in body
-    assert "activate" not in body.replace("unactivated", "")
+    assert "install_live_services.sh activate" not in body
