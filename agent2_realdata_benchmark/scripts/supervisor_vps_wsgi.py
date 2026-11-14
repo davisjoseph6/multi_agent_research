@@ -17,6 +17,7 @@ from src.prototype.supervisor_content import SupervisorBank
 from src.prototype.supervisor_operational_intake import OperationalIntake
 from src.prototype.supervisor_content_approval import verify_signed_content_approval
 from src.prototype.supervisor_synthetic_store import SupervisorSyntheticStore
+from src.prototype.supervisor_release_documents import verify_current
 from src.prototype.supervisor_vps_web import make_supervisor_vps_app
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -103,10 +104,18 @@ def make_wsgi_app():
     if not programs:
         raise RuntimeError("at least one institutionally chosen program required")
     release_ok=_release_verified(commit) if mode=="live" else False
+    document_bundle=(
+        verify_current(
+            registry_root=os.environ["SUPERVISOR_DOC_BUNDLE_ROOT"],
+            release_commit=commit,
+            public_key=os.environ["SUPERVISOR_INSTITUTION_PUBLIC_KEY"],
+        ) if mode=="live" else None
+    )
     store=SupervisorSyntheticStore(root,bank=SupervisorBank(BANK),operational=True)
     intake=OperationalIntake(
         store,programs=programs,
         inactivity_days=7 if mode=="live" else None,
+        document_bundle=document_bundle,
     )
     app=make_supervisor_vps_app(
         intake,hostname=host,proxy_mode=True,release_mode=mode,

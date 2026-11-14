@@ -27,7 +27,8 @@ _TOKEN = re.compile(r"[A-Za-z0-9_-]{40,256}\Z")
 class OperationalIntake:
     def __init__(self, store: SupervisorSyntheticStore, *,
                  programs: tuple[str, ...],
-                 inactivity_days: int | None = None):
+                 inactivity_days: int | None = None,
+                 document_bundle=None):
         if not isinstance(store, SupervisorSyntheticStore) or not store.operational:
             raise TypeError("separately configured operational database required")
         if not programs or any(type(v) is not str or not v.strip()
@@ -38,6 +39,7 @@ class OperationalIntake:
         if inactivity_days is not None and inactivity_days != 7:
             raise ValueError("only explicit seven-day policy is supported")
         self.inactivity_days = inactivity_days
+        self.document_bundle = document_bundle
 
     def _enforce_idle_expiry(self, db, row, *, at: datetime) -> None:
         """LIVE-only 7-day expiry of an unfinished, active session.
@@ -275,7 +277,7 @@ class OperationalIntake:
             row=self._record(db,token,at=at)
             if row["state"] != "invited":
                 raise SyntheticStudyError("consent is not the next stage")
-            statements, _, version, _ = required_for_recipient(
+            statements, _, version, eligible = required_for_recipient(
                 language,row["email"]
             )
             if len(checks)!=len(statements):
@@ -285,6 +287,17 @@ class OperationalIntake:
                 "consent_at=?,optional=? WHERE token_hash=?",
                 (language,iso(at),int(optional),self.digest(token)),
             )
+            if self.document_bundle is not None:
+                variant="school" if eligible else "external"
+                key="participant_information_"+variant+"_"+language
+                db.execute(
+                    "UPDATE pii.invitations SET document_bundle_sha256=?,"
+                    "information_sha256=?,document_version=? WHERE token_hash=?",
+                    (self.document_bundle.manifest_sha256,
+                     self.document_bundle.digest(key),
+                     self.document_bundle.bundle_id,
+                     self.digest(token)),
+                )
         return dict(stage="screening",consent_version=version)
 
     def screening(self, token: str, *, answers: dict[str,str],
