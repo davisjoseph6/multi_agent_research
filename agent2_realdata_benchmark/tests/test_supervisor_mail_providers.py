@@ -179,6 +179,7 @@ def _sign(root,record):
                     "-pubout","-out",str(pub)],check=True,capture_output=True)
     subprocess.run(["openssl","dgst","-sha256","-sign",str(key),"-out",str(sig),
                     str(manifest)],check=True,capture_output=True)
+    pub.chmod(0o600)
     sig.chmod(0o600)
     return manifest,sig,pub
 
