@@ -193,11 +193,19 @@ class DelegatedOAuthSender:
     """
     def __init__(self, *, provider: str, sender: str, client_id: str,
                  client_secret_path: str | None, vault: EncryptedRefreshVault,
-                 tenant: str | None = None, transport=None, token_transport=None):
+                 tenant: str | None = None, transport=None, token_transport=None,
+                 from_alias: str | None = None):
         if provider not in ("graph_delegated", "gmail_delegated"):
             raise MailConfigurationError("unsupported delegated provider")
         self.provider = provider
         self.sender = canonical_email(sender)
+        # Send-as aliases are allowed only for the owner-granted Gmail API.
+        # The independent signed route must bind an accepted alias and its
+        # evidence; Gmail itself additionally enforces that it is verified.
+        if from_alias is not None and provider != "gmail_delegated":
+            raise MailConfigurationError("send-as alias requires Gmail delegated provider")
+        self.outbound_from = (canonical_email(from_alias) if from_alias is not None
+                              else self.sender)
         if provider == "graph_delegated" and self.sender.endswith("@gmail.com"):
             raise MailConfigurationError(
                 "a Microsoft login alias at gmail.com is not a verified Outlook mailbox")
@@ -252,7 +260,7 @@ class DelegatedOAuthSender:
             expected = 202
         else:
             mail = EmailMessage()
-            mail["From"] = self.sender
+            mail["From"] = self.outbound_from
             mail["To"] = recipient
             mail["Subject"] = subject
             mail.set_content(body)
@@ -424,6 +432,29 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
                 or not HEX.fullmatch(grant["owner_evidence_sha256"])):
             raise MailConfigurationError("mailbox owner/institution authorization missing")
         canonical_email(definition["email"])
+        alias = definition.get("from_alias")
+        if alias is not None:
+            # The OAuth identity remains the *real* Gmail account. Merely
+            # editing JSON cannot delegate its privileges to an arbitrary
+            # vanity-domain address; signed owner and alias evidence are
+            # mandatory and verified before any LIVE service starts.
+            if definition["provider"] != "gmail_delegated":
+                raise MailConfigurationError("signed send-as aliases require Gmail")
+            alias = canonical_email(alias)
+            if (grant.get("from_alias") != alias or
+                grant.get("alias_verified_by_owner") is not True or
+                grant.get("alias_domain_authorized") is not True or
+                not isinstance(grant.get("alias_evidence_file"),str) or
+                not isinstance(grant.get("alias_evidence_sha256"),str) or
+                not HEX.fullmatch(grant["alias_evidence_sha256"])):
+                raise MailConfigurationError("signed send-as alias approval missing")
+            evidence_path = private_file(grant["alias_evidence_file"])
+            evidence_bytes = evidence_path.read_bytes()
+            if (not evidence_bytes.startswith(b"%PDF-") or
+                sha256(evidence_bytes).hexdigest() != grant["alias_evidence_sha256"]):
+                raise MailConfigurationError("send-as alias verification evidence mismatch")
+        elif grant.get("from_alias") is not None:
+            raise MailConfigurationError("signed alias cannot be omitted from route")
         # Signed grants must bind the actual Entra/Google OAuth CLIENT, not
         # only a human-readable sender address. Repointing a signed mailbox
         # scope to a different app/tenant requires fresh institutional review.
@@ -472,7 +503,8 @@ def build_mail_router(*, config_file: str | Path, approval_file: str | Path,
             source = DelegatedOAuthSender(
                 provider=provider, sender=item["email"], client_id=item["client_id"],
                 tenant=item.get("tenant"), client_secret_path=item.get("client_secret_file"),
-                vault=vault, transport=transport, token_transport=token_transport
+                vault=vault, transport=transport, token_transport=token_transport,
+                from_alias=item.get("from_alias")
             )
             # Fail before accepting live deployment if an account has not
             # explicitly consented and installed its refresh grant.
