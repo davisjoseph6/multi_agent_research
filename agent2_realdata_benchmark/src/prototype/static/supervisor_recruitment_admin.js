@@ -64,7 +64,7 @@ function display(data){
    try{
     const response=await api("manual-reminder",{learner_id:s.learner_id});
     status(response.accepted===1?
-      "Message accepted by Outlook (inbox delivery not guaranteed).":
+      "Message accepted by the authorized email provider (inbox delivery not guaranteed).":
       "No reminder sent: student is not eligible for a four-day follow-up.");
    }catch(e){status(e.message)}
   });
@@ -140,8 +140,8 @@ async function refresh(){
  $("send-selected").disabled=!sendingAvailable;
  $("send-all").disabled=!sendingAvailable;
  $("mail-capability").textContent=sendingAvailable?
-  "Outlook mail is available for authorized, approved applicants. Server acceptance does not prove delivery.":
-  "Outlook delivery is disabled until the signed live release and mailbox setup are verified.";
+  "Authorized email delivery is available for approved applicants. Provider acceptance does not prove delivery.":
+  "Email delivery is disabled until the signed live release and sender authorization are verified.";
  display(r);$("auto-reminder").checked=p.automatic_reminders_enabled;
  $("dashboard").hidden=false;$("reload").hidden=false;$("login-panel").hidden=true;
  status("Researcher records updated. Contact information is confidential.");
@@ -182,7 +182,7 @@ $("send-selected").addEventListener("click",async ()=>{
  if(!window.confirm("Send private study invitations to the selected approved applicants?"))return;
  try{
   const r=await api("send-invitations",{candidate_ids:ids,select_all:false});
-  status(r.accepted+" accepted by Outlook, "+r.uncertain+
+  status(r.accepted+" accepted by the email provider, "+r.uncertain+
          " uncertain and "+r.rejected+" rejected. No secrets displayed.");
   await refresh();
  }catch(e){status(e.message)}
@@ -192,7 +192,7 @@ $("send-all").addEventListener("click",async ()=>{
  if(!window.confirm("Send invitations to ALL currently approved applicants?"))return;
  try{
   const r=await api("send-invitations",{candidate_ids:[],select_all:true});
-  status(r.accepted+" accepted by Outlook; "+r.uncertain+
+  status(r.accepted+" accepted by the email provider; "+r.uncertain+
          " delivery outcomes require manual review.");
   await refresh();
  }catch(e){status(e.message)}
