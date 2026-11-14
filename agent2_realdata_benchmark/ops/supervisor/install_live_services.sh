@@ -49,6 +49,26 @@ if [[ "$MODE" == prepare ]]; then
   "$PY" -m pip install --disable-pip-version-check --quiet \
     Flask==3.1.3 gunicorn==23.0.0 cryptography==50.0.2
   ln -s "releases/$SHA" "$PREFIX/current"
+  # Initialize EMPTY, independently scoped LIVE databases. Never import or
+  # copy the staging researcher identities, invitations or study progress.
+  # Initial staff passwords are separate secrets, not reused from staging.
+  install -d -o "$APPUSER" -g "$APPUSER" -m 0700 "$STATE/initial-admin-secrets"
+  (
+    cd "$RELEASE/agent2_realdata_benchmark"
+    runuser -u "$APPUSER" -- "$PY" -c '
+from pathlib import Path
+from src.prototype.supervisor_content import SupervisorBank
+from src.prototype.supervisor_synthetic_store import SupervisorSyntheticStore
+from src.prototype.supervisor_recruitment import RecruitmentLedger
+folder=Path("/var/lib/ijcai-supervisor-live")
+SupervisorSyntheticStore(folder,bank=SupervisorBank(Path("data/supervisor_20261111")),operational=True)
+RecruitmentLedger(folder)
+'
+    runuser -u "$APPUSER" -- "$PY" -m scripts.supervisor_recruitment_cli \
+      --state-dir "$STATE" --bootstrap-all \
+      --output-dir "$STATE/initial-admin-secrets"
+  )
+  echo "EMPTY separate LIVE DBs initialized; four NEW live administrator bootstrap secrets stored privately."
   for name in study recruitment control; do
     if [[ "$name" == study ]]; then
       PORT=8888
