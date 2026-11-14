@@ -73,6 +73,26 @@ def test_placeholder_snapshot_is_pending_and_cannot_be_activated(tmp_path):
     assert not list(version.glob("*.sig"))
 
 
+def test_pending_draft_can_accept_final_pdfs_before_any_activation(tmp_path):
+    registry,source=_prepare(tmp_path)
+    first=new_draft(registry,release_commit=COMMIT,source_dir=source)
+    assert not (registry/"current").exists()
+    update=tmp_path/"final_pdf_updates"
+    update.mkdir(mode=0o700)
+    p=update/"privacy_participant_fr.pdf"
+    p.write_bytes(b"%PDF-1.7\\nFinal draft fixture\\n%%EOF\\n")
+    p.chmod(0o600)
+    second=revise(registry,release_commit=COMMIT,source_dir=update)
+    assert second != first
+    old=json.loads((first/"manifest.json").read_text())
+    new=json.loads((second/"manifest.json").read_text())
+    assert new["supersedes"]==first.name
+    assert new["decision"]=="pending"
+    assert all(record["status"]=="pending" for record in new["documents"].values())
+    assert new["documents"]["privacy_participant_fr"]["sha256"] != old["documents"]["privacy_participant_fr"]["sha256"]
+    assert not (registry/"current").exists()
+
+
 def test_signed_document_refresh_preserves_previous_revision_and_blocks_tampering(tmp_path):
     registry,source=_prepare(tmp_path)
     v1=new_draft(registry,release_commit=COMMIT,source_dir=source)
