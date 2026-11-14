@@ -154,9 +154,14 @@ def test_QA_refuses_real_reserved_production_ports(tmp_path):
 
 def test_dispatcher_no_PUBLIC_paths_or_mail(suite):
     app = Client(suite["app"], Response)
-    assert app.get("/").status_code == 404
-    assert app.get("/control/api/overview").status_code == 409
-    assert app.get("/interest/school").status_code == 200
-    assert app.get("/study/health").json["enrollment_authorized"] is False
-    assert app.get("/unrecognized").status_code == 404
-    assert app.get("/interest/api/apply").status_code == 405
+    # Werkzeug's bare WSGI Client does not assign REMOTE_ADDR. Supply the
+    # exact localhost address used by the real socket so this verifies the
+    # underlying auth checks rather than being rejected by the transport gate.
+    def get(path):
+        return app.get(path, environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert get("/").status_code == 404
+    assert get("/control/api/overview").status_code == 409
+    assert get("/interest/school").status_code == 200
+    assert get("/study/health").json["enrollment_authorized"] is False
+    assert get("/unrecognized").status_code == 404
+    assert get("/interest/api/apply").status_code == 405
