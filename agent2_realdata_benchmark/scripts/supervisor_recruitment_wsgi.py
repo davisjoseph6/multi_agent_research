@@ -2,8 +2,8 @@
 
 No public questionnaire or email delivery in staging. LIVE can be enabled
 ONLY after the same cryptographic institutional and content approval check
-used by the participant /study/ WSGI, plus a reviewed privacy notice and
-individually configured Microsoft/Outlook mailbox permissions.
+used by the participant /study/ WSGI, signed English/French recruitment
+privacy PDFs, and a separately signed provider-neutral mailbox policy.
 
 Do not add this service to the existing Caddy public routes automatically.
 """
@@ -53,8 +53,9 @@ def make_wsgi_app():
             raise RuntimeError("LIVE recruitment checkout is modified")
         if not _release_verified(commit):
             raise RuntimeError("institutional signed LIVE release required")
-        if not os.environ.get("SUPERVISOR_APPROVED_RECRUITMENT_NOTICE"):
-            raise RuntimeError("approved public recruitment privacy notice required")
+        # The 16-file signed bundle below is the authoritative source for
+        # English/French recruitment privacy PDFs. Do not require an
+        # unrelated legacy environment marker that cannot prove approval.
         if host in ("localhost","demo.selfhealing-edu.fr") or "demo" in host:
             raise RuntimeError("non-demo canonical recruitment domain required")
     else:
@@ -79,8 +80,9 @@ def make_wsgi_app():
     mailer=None
     store=None
     if mode=="live":
-        if os.environ.get("SUPERVISOR_MAIL_TRANSPORT")!="microsoft_graph":
-            raise RuntimeError("institutionally authorized Microsoft Graph transport required")
+        # A single approved provider-neutral route is required; Graph
+        # application, Graph delegated and Gmail delegated are choices
+        # *inside* the cryptographically verified router, not transports.
         if os.environ.get("SUPERVISOR_MAIL_TRANSPORT") != "provider_router":
             raise RuntimeError("signed, provider-neutral email route configuration required")
         vault=None
