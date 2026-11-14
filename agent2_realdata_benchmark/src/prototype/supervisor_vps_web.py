@@ -167,6 +167,13 @@ def make_supervisor_vps_app(intake: OperationalIntake, *,
         # approved/versioned consent migration before using that candidate.
         if release_mode=="staging" and not eligible:
             filename="info_sheet_"+language+"_v1.1_nonreward_20261113_review.html"
+        if release_mode=="live":
+            if intake.document_bundle is None:
+                raise SyntheticStudyError("signed participant document bundle required")
+            variant="school" if eligible else "external"
+            key=f"participant_information_{variant}_{language}"
+            return send_file(intake.document_bundle.file(key),
+                             mimetype="application/pdf")
         path=ROOT.parents[1]/"content"/"consent"/filename
         return send_file(path,mimetype="text/html")
 
