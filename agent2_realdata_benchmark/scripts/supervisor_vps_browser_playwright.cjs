@@ -57,10 +57,18 @@ assert.equal(
       assert.doesNotMatch(await page.locator("#study-roadmap").innerText(),/three parts/i);
       assert.equal(await page.locator("#info-copy h2").count()>5,true);
       if(isFrench){
+        const translatedConsent=page.waitForResponse(respond("consent-copy"));
         await page.locator("#language").selectOption("fr");
+        const translated=await translatedConsent;
+        assert.equal(translated.status(),200);
+        // A translated heading appears BEFORE the async legal statements.
+        // Wait for completed DOM and enabled controls, not just the title.
         await page.waitForFunction(()=>
           document.querySelector("#info-title").textContent
-          .includes("consentement"));
+          .includes("consentement") &&
+          !document.querySelector("#start-consent").disabled &&
+          !document.querySelector("#consent-required").disabled &&
+          document.querySelectorAll("#consent-required input.required").length===5);
       }
       assert.equal(await page.locator("#consent-required input.required").count(),5);
       for(let i=0;i<5;i++){
