@@ -25,7 +25,7 @@ import signal
 import stat
 from tempfile import TemporaryDirectory
 
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request, Response, send_file
 from werkzeug.serving import make_server
 
 from src.prototype.supervisor_content import SupervisorBank
@@ -41,76 +41,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BANK = ROOT / "data" / "supervisor_20261111"
 FORBIDDEN_PORTS = {8077, 8788, 8790, 8791, 8888, 8889, 8890}
 QA_TITLE = "IJCAI PRIVATE SELF-ACCEPTANCE REHEARSAL — NOT A REAL STUDY"
-INTEREST_HTML = """<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>IJCAI QA — Interest questionnaire</title>
-</head><body>
-<h1>Private QA questionnaire — NOT real research enrollment</h1>
-<p>This is a software test using draft information only. No institutionally
-approved study participation or consent is recorded. Records are destroyed
-when the isolated QA process ends.</p>
-<form id="interest-form">
-<label>Email (the one explicitly permitted for this rehearsal)
-<input id="email" type="email" required autocomplete="email"></label>
-<label>First name (optional)<input id="first-name" maxlength="100"></label>
-<label>Last name (optional)<input id="last-name" maxlength="100"></label>
-<label>Language <select id="language"><option value="en">English</option>
-<option value="fr">Français</option></select></label>
-<label><input type="checkbox" id="ack" required>
-I understand this is ONLY a private software rehearsal, not a real RCT.</label>
-<button type="submit">Submit rehearsal application</button>
-</form><p id="status" role="status"></p>
-<script src="/interest/qa.js"></script></body></html>"""
-INTEREST_JS = """'use strict';
-(()=>{
- const el=id=>document.getElementById(id);
- el('interest-form').addEventListener('submit',async e=>{
-  e.preventDefault();
-  el('status').textContent='';
-  const questionnaire=location.pathname.endsWith('/school')?'school':'external';
-  const payload={email:el('email').value,first_name:el('first-name').value,
-    last_name:el('last-name').value,language:el('language').value,
-    questionnaire,qa_acknowledged:el('ack').checked};
-  try{
-   const r=await fetch('/interest/api/apply',{method:'POST',
-    credentials:'same-origin',cache:'no-store',
-    headers:{'Content-Type':'application/json','X-Study-Request':'1'},
-    body:JSON.stringify(payload)});
-   if(!r.ok)throw Error('rejected');
-   el('status').textContent='QA application saved. Sign into the private researcher page to approve it.';
-  }catch(_){el('status').textContent='QA application rejected; verify your allowlisted address.'}
- });
-})();"""
-ISSUE_HTML = """<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Private QA link issuance</title></head><body>
-<h1>Test-only private invitation</h1>
-<p>First sign in at <a href="/control/">Researcher dashboard</a>,
-change the temporary QA password, and approve a test applicant.
-This does NOT send mail or enroll a participant in the released study.</p>
-<form id="issue-form"><label>Approved candidate ID
-<input id="candidate" type="number" min="1" required></label>
-<button type="submit">Issue one QA link</button></form>
-<p id="status" role="status"></p><a id="qa-link" href="#" hidden>Open private test invitation</a>
-<script src="/control/qa.js"></script></body></html>"""
-ISSUE_JS = """'use strict';(()=>{
- const el=id=>document.getElementById(id);
- const csrf=()=>{const a=document.cookie.split('; ').find(s=>s.startsWith('recruitment_csrf='));
-  return a?decodeURIComponent(a.slice(a.indexOf('=')+1)):''};
- el('issue-form').addEventListener('submit',async e=>{
-  e.preventDefault();el('qa-link').hidden=true;
-  try{
-   const r=await fetch('/control/api/qa-issue',{
-    method:'POST',credentials:'same-origin',cache:'no-store',
-    headers:{'Content-Type':'application/json','X-Study-Request':'1','X-CSRF-Token':csrf()},
-    body:JSON.stringify({candidate_id:Number(el('candidate').value)})});
-   if(!r.ok)throw Error('denied');
-   const d=await r.json();el('qa-link').href=d.test_link;
-   el('qa-link').hidden=false;
-   el('status').textContent='QA-only private link created; no mail was sent.';
-  }catch(_){el('status').textContent='Denied. Log in, change password, approve the candidate, then use a new ID.'}
- });
-})();"""
+QA_STATIC = ROOT / "src" / "prototype" / "static"
 
 
 def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
@@ -196,11 +127,17 @@ def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
     def interest_form(kind):
         if kind not in ("school", "external"):
             return "", 404
-        return Response(INTEREST_HTML, mimetype="text/html")
+        return send_file(QA_STATIC / "supervisor_private_qa_interest.html")
 
     @interest.get("/interest/qa.js")
     def interest_js():
-        return Response(INTEREST_JS, mimetype="application/javascript")
+        return send_file(QA_STATIC / "supervisor_private_qa_interest.js",
+                         mimetype="application/javascript")
+
+    @interest.get("/interest/qa.css")
+    def interest_css():
+        return send_file(QA_STATIC / "supervisor_private_qa_interest.css",
+                         mimetype="text/css")
 
     @interest.post("/interest/api/apply")
     def apply():
@@ -228,14 +165,14 @@ def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
 
     @control.get("/control/qa/")
     def qa_issue_page():
-        return Response(ISSUE_HTML, mimetype="text/html")
+        return send_file(QA_STATIC / "supervisor_private_qa_issue.html")
 
     @control.get("/control/qa.js")
     def qa_issue_js():
-        return Response(ISSUE_JS, mimetype="application/javascript")
+        return send_file(QA_STATIC / "supervisor_private_qa_issue.js",
+                         mimetype="application/javascript")
 
-    @control.post("/control/api/qa-issue")
-    def qa_issue():
+    def qa_actor():
         actor = ledger.authenticate(
             cookie=request.cookies.get("recruitment_admin_session", ""),
             at=datetime.now(timezone.utc),
@@ -243,25 +180,55 @@ def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
         )
         if actor["must_change_password"]:
             raise RecruitmentError("temporary password must be changed")
+        return actor["email"]
+
+    def issue_qa_candidate(candidate: dict, actor_email: str) -> dict:
+        if (not candidate["approved_for_invitation"]
+                or candidate["email"] not in permitted
+                or candidate["invitation_status"] != "potential"):
+            raise RecruitmentError("not a new approved QA candidate")
+        address = candidate["email"]
+        cid = candidate["candidate_id"]
+        now = datetime.now(timezone.utc)
+        token = intake.issue(address, at=now,
+                             allow_example=address.endswith(".example"))
+        ledger.mark_prepared(candidate_id=cid, actor=actor_email, at=now)
+        return {"candidate_id": cid, "email": address,
+                "test_link": f"http://127.0.0.1:{port}/study/#invite={token}"}
+
+    @control.post("/control/api/qa-issue")
+    def qa_issue():
+        actor_email = qa_actor()
         data = request.get_json(silent=True)
         if (type(data) is not dict or set(data) != {"candidate_id"}
                 or type(data["candidate_id"]) is not int
                 or data["candidate_id"] < 1):
             raise RecruitmentError("invalid candidate")
-        cid = data["candidate_id"]
-        candidates = ledger.selected_for_invitation(ids=[cid])
-        if (len(candidates) != 1
-                or not candidates[0]["approved_for_invitation"]
-                or candidates[0]["email"] not in permitted
-                or candidates[0]["invitation_status"] != "potential"):
-            raise RecruitmentError("not a new approved QA candidate")
-        address = candidates[0]["email"]
-        now = datetime.now(timezone.utc)
-        token = intake.issue(address, at=now,
-                             allow_example=address.endswith(".example"))
-        ledger.mark_prepared(candidate_id=cid, actor=actor["email"], at=now)
+        candidates = ledger.selected_for_invitation(ids=[data["candidate_id"]])
+        if len(candidates) != 1:
+            raise RecruitmentError("unknown QA candidate")
         return jsonify(qa_only=True, mail_sent=False,
-                       test_link=f"http://127.0.0.1:{port}/study/#invite={token}")
+                       **issue_qa_candidate(candidates[0], actor_email))
+
+    @control.post("/control/api/qa-issue-all")
+    def qa_issue_all():
+        actor_email = qa_actor()
+        data = request.get_json(silent=True)
+        if type(data) is not dict or data != {"confirm": True}:
+            raise RecruitmentError("explicit QA bulk issuance confirmation required")
+        # A deliberately tiny, owner-controlled QA cohort. Do not enable
+        # arbitrary PII bulk export or mail in this test-only route.
+        candidates = ledger.selected_for_invitation(all_approved=True)
+        if len(candidates) > len(permitted):
+            raise RecruitmentError("unexpected QA candidate cohort")
+        links = []
+        for candidate in candidates:
+            if candidate["email"] not in permitted:
+                raise RecruitmentError("unexpected QA recipient")
+            if candidate["invitation_status"] == "potential":
+                links.append(issue_qa_candidate(candidate, actor_email))
+        return jsonify(qa_only=True, mail_sent=False, issued=len(links),
+                       links=links)
 
     def dispatch(environ, start_response):
         path = environ.get("PATH_INFO", "")
@@ -306,6 +273,7 @@ def main():
         print("QA researcher password (run in SECOND local terminal):",flush=True)
         print("  cat "+str(sandbox["credential_dir"] / "davis.joseph_at_aivancity.education.txt"),flush=True)
         print("Do not post temporary QA passwords or copy LIVE administrator secrets into chat.",flush=True)
+        print("Old QA passwords expire whenever this disposable server restarts.",flush=True)
         print("QA school form: http://127.0.0.1:%d/interest/school" % args.port, flush=True)
         print("QA external form: http://127.0.0.1:%d/interest/external" % args.port, flush=True)
         print("QA researcher sign-in: http://127.0.0.1:%d/control/" % args.port, flush=True)
