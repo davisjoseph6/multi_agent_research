@@ -81,6 +81,12 @@ async function main(){
   await admin.locator("#password-form button").click();
   await admin.locator("#dashboard").waitFor({state:"visible"});
   assert.equal(await admin.locator(".candidate").count(),2);
+  const visibleIds=await admin.locator("#applicants tr").evaluateAll(rows=>
+    rows.length===2 && rows.every(row=>{
+      const checkbox=row.querySelector("input.candidate");
+      return checkbox && row.querySelector("td").textContent.includes("ID "+checkbox.value);
+    }));
+  assert(visibleIds,"researchers must see candidate IDs without developer tools");
   const applicants=await admin.locator("#applicants tr").evaluateAll(rows=>rows.map(r=>({
     id:r.querySelector(".candidate").value,
     email:r.querySelectorAll("td")[1].textContent.trim()
