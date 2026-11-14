@@ -14,6 +14,10 @@ def test_live_scripts_parse_and_prepare_does_not_send():
     assert "/srv/ijcai-supervisor-live" in script
     assert "/var/lib/ijcai-supervisor-live" in script
     assert "127.0.0.1:8888" in script and "127.0.0.1:8889" in script
+    assert "127.0.0.1:8890" in script
+    assert "SUPERVISOR_RECRUITMENT_CONTROL_ONLY" in script
+    assert '8890/control/api/overview' in script
+    assert '8890/interest/school' in script
     assert "scripts.supervisor_live_readiness" in script
     assert "SUPERVISOR_VPS_MODE" in script
     assert "caddy validate" in script and "systemctl reload caddy" in script
