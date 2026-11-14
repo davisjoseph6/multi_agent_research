@@ -182,3 +182,99 @@ def test_dispatcher_no_PUBLIC_paths_or_mail(suite):
     assert get("/study/health").json["enrollment_authorized"] is False
     assert get("/unrecognized").status_code == 404
     assert get("/interest/api/apply").status_code == 405
+
+
+def test_qa_form_is_bilingual_passwordless_and_separate_from_signed_live_notice(suite):
+    browser=suite["interest"].test_client()
+    for form in ("school","external"):
+        page=browser.get("/interest/"+form)
+        assert page.status_code==200
+        html=page.get_data(as_text=True)
+        assert 'id="language"' in html
+        assert 'id="no-ai-note"' in html
+        assert 'id="ack"' in html
+        assert "NOT real research enrollment" in html
+        assert 'type="password"' not in html
+        assert '/interest/qa.js' in html
+        assert '/interest/qa.css' in html
+    script=browser.get("/interest/qa.js")
+    assert script.status_code==200
+    source=script.get_data(as_text=True)
+    for phrase in ("Prêt(e) à découvrir", "generative AI tools",
+                   "IA générative", 'document.documentElement.lang',
+                   'messages[lang].received'):
+        assert phrase in source
+    stylesheet=browser.get("/interest/qa.css")
+    assert stylesheet.status_code==200
+    assert "@media(max-width:680px)" in stylesheet.get_data(as_text=True)
+
+
+def test_researcher_issues_all_approved_qa_links_in_one_action(suite):
+    applicant=suite["interest"].test_client()
+    submit(applicant,SCHOOL,"school")
+    submit(applicant,GMAIL,"external")
+    staff=suite["control"].test_client()
+    assert staff.get("/control/qa/").status_code==200
+    assert staff.get("/control/qa.js").status_code==200
+    assert staff.post("/control/api/qa-issue-all",
+        json={"confirm":True},headers=headers()).status_code==409
+    csrf=signin(staff,suite)
+    assert staff.post("/control/api/qa-issue-all",
+        json={},headers=headers(csrf=csrf)).status_code==409
+    none=staff.post("/control/api/qa-issue-all",
+        json={"confirm":True},headers=headers(csrf=csrf))
+    assert none.status_code==200 and none.json["issued"]==0
+    ids=[r["candidate_id"] for r in suite["ledger"].candidates()]
+    assert staff.post("/control/api/approve",json={
+        "candidate_ids":ids},headers=headers(csrf=csrf)).status_code==200
+    result=staff.post("/control/api/qa-issue-all",
+        json={"confirm":True},headers=headers(csrf=csrf))
+    assert result.status_code==200
+    assert result.json["qa_only"] is True
+    assert result.json["mail_sent"] is False
+    assert result.json["issued"]==2
+    assert len(result.json["links"])==2
+    assert {x["email"] for x in result.json["links"]}=={SCHOOL,GMAIL}
+    tokens=[parse_qs(urlsplit(x["test_link"]).fragment)["invite"][0]
+            for x in result.json["links"]]
+    assert len(set(tokens))==2
+    for token in tokens:
+        assert suite["intake"].status(token,at=datetime.now(timezone.utc))
+    assert all(row["invitation_status"]=="prepared"
+               for row in suite["ledger"].candidates())
+    replay=staff.post("/control/api/qa-issue-all",
+        json={"confirm":True},headers=headers(csrf=csrf))
+    assert replay.status_code==200
+    assert replay.json["issued"]==0 and replay.json["links"]==[]
+    with suite["ledger"]._tx() as db:
+        assert db.execute("SELECT COUNT(*) FROM mail_dispatch").fetchone()[0]==0
+
+
+@pytest.mark.parametrize("researcher",(
+    "davis.joseph@aivancity.education",
+    "wiam.belouard@aivancity.education",
+    "sara.elkardi@aivancity.education",
+    "yaacoub@aivancity.ai",
+))
+def test_all_four_staff_can_individually_issue_private_qa_links(suite,researcher):
+    applicant=suite["interest"].test_client()
+    assert submit(applicant,SCHOOL,"school").status_code==202
+    staff=suite["control"].test_client()
+    password=suite["passwords"][researcher]
+    result=staff.post("/control/api/login",
+        json={"email":researcher,"password":password},headers=headers())
+    assert result.status_code==200
+    csrf=staff.get_cookie("recruitment_csrf",path="/control/").value
+    assert staff.post("/control/api/qa-issue-all",
+        json={"confirm":True},headers=headers(csrf=csrf)).status_code==409
+    changed=staff.post("/control/api/change-password",
+        json={"current":password,"replacement":NEWPASS+"another-unique"},
+        headers=headers(csrf=csrf))
+    assert changed.status_code==200
+    assert staff.post("/control/api/approve",
+        json={"candidate_ids":[suite["ledger"].candidates()[0]["candidate_id"]]},
+        headers=headers(csrf=csrf)).status_code==200
+    result=staff.post("/control/api/qa-issue-all",
+        json={"confirm":True},headers=headers(csrf=csrf))
+    assert result.status_code==200
+    assert result.json["issued"]==1 and result.json["mail_sent"] is False

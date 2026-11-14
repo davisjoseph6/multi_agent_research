@@ -64,11 +64,21 @@ async function main(){
   for(const [page,kind,email] of [[school,"school",SCHOOL],[gmail,"external",EXTERNAL]]){
    await page.goto(base+"/interest/"+kind,{waitUntil:"networkidle"});
    assert.equal(await page.locator('input[type="password"]').count(),0);
+   assert.equal(await page.locator("#no-ai-note").count(),1);
+   if(kind==="external"){
+    await page.locator("#language").selectOption("fr");
+    assert.match(await page.locator("#title").textContent(),/Prêt\(e\)/);
+    assert.equal(await page.locator("html").getAttribute("lang"),"fr");
+   }else{
+    assert.match(await page.locator("#encourage").textContent(),/not graded/);
+    assert.equal(await page.locator("html").getAttribute("lang"),"en");
+   }
    await page.locator("#email").fill(email);
    await page.locator("#first-name").fill("Fictional");
    await page.locator("#ack").check();
    await page.locator('#interest-form button[type="submit"]').click();
-   await page.waitForFunction(()=>document.querySelector("#status").textContent.includes("QA application saved"));
+   await page.waitForFunction(()=>
+    /saved|enregistrée/.test(document.querySelector("#status").textContent));
   }
   await admin.goto(base+"/control/",{waitUntil:"networkidle"});
   assert.equal(await admin.locator("#dashboard").isHidden(),true);
@@ -100,13 +110,17 @@ async function main(){
   });
   const links={};
   await admin.goto(base+"/control/qa/",{waitUntil:"networkidle"});
-  for(const a of applicants){
-   await admin.locator("#candidate").fill(a.id);
-   await admin.locator("#issue-form button").click();
-   await admin.locator("#qa-link").waitFor({state:"visible"});
-   links[a.email]=await admin.locator("#qa-link").getAttribute("href");
-   assert.match(links[a.email],/^http:\/\/127\.0\.0\.1:8897\/study\/#invite=/);
+  admin.once("dialog",dialog=>dialog.accept());
+  await admin.locator("#qa-all").click();
+  await admin.locator("#qa-links li a").first().waitFor({state:"visible"});
+  const allLinks=await admin.locator("#qa-links li a").evaluateAll(nodes=>
+   nodes.map(a=>({email:a.dataset.email,href:a.getAttribute("href")})));
+  assert.equal(allLinks.length,2,"one-click QA issuance must cover both approved candidates");
+  for(const entry of allLinks){
+   links[entry.email]=entry.href;
+   assert.match(entry.href,/^http:\/\/127\.0\.0\.1:8897\/study\/#invite=/);
   }
+  assert.match(await admin.locator("#bulk-status").textContent(),/2 QA links created/);
   assert(links[SCHOOL]&&links[EXTERNAL]&&links[SCHOOL]!==links[EXTERNAL]);
   await Promise.all([
    school.goto(links[SCHOOL],{waitUntil:"networkidle"}),
@@ -194,7 +208,7 @@ async function main(){
   assert.equal(await admin.locator("#send-all").isDisabled(),true);
   assert.deepEqual(faults,[]);
   console.log("PASS: school and Gmail QA questionnaires were passwordless and isolated");
-  console.log("PASS: distinct researcher account approved and issued two private test links");
+  console.log("PASS: researcher approved both candidates and issued their test links in one click");
   console.log("PASS: operational student completed 16 pretest + one quiz answer");
   console.log("PASS: concurrent private researcher chart displayed recorded BKT mastery");
   console.log("PASS: no LIVE authorization, public recruitment, provider API calls or mail");

@@ -1,0 +1,23 @@
+{
+  "schema": "IJCAI2027_MAILBOX_AUTHORIZATION_V1",
+  "decision": "pending",
+  "release_commit": "<FULL_EXACT_APPROVED_RELEASE_SHA>",
+  "senders": {
+    "gmail_owner_pending": {
+      "provider": "gmail_delegated",
+      "email": "davisjoseph767@gmail.com",
+      "client_id": "<GOOGLE_OAUTH_APP_CLIENT_ID_NOT_CONFIGURED>",
+      "owner_authorized": false,
+      "institutional_scope_verified": false,
+      "owner_evidence_file": "/etc/ijcai-supervisor-live/mail/personal-gmail-owner-staff-authorization.pdf",
+      "owner_evidence_sha256": null,
+      "authorized_actors": [
+        "davis.joseph@aivancity.education",
+        "wiam.belouard@aivancity.education",
+        "sara.elkardi@aivancity.education",
+        "yaacoub@aivancity.ai"
+      ]
+    }
+  },
+  "warning": "DRAFT ONLY: the actor list expresses the user's requested future access, not issued mail permission. The owner and institution must approve the signed exact-commit policy; no fake document or test signature may activate mail."
+}

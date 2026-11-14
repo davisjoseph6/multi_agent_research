@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Private QA · Study interest questionnaire</title>
+<link rel="stylesheet" href="/interest/qa.css">
+<script src="/interest/qa.js" defer></script>
+</head><body>
+<main class="shell">
+ <header class="header">
+  <div class="brand"><span aria-hidden="true" class="brand-mark">A</span>
+   <span>AIVANCITY <span class="brand-lite">· RESEARCH LEARNING STUDY</span></span></div>
+  <label class="language-picker"><span id="language-label">Language / Langue</span>
+   <select id="language" aria-label="Language / Langue"><option value="en">English</option>
+   <option value="fr">Français</option></select></label>
+ </header>
+ <div class="qa-banner" role="note" id="qa-warning">PRIVATE QA ONLY — NOT real research enrollment or valid research consent.</div>
+ <section class="hero">
+  <p class="eyebrow" id="eyebrow">Learn. Explore. Have fun.</p>
+  <h1 id="title">Ready to explore how you learn?</h1>
+  <p class="lead" id="sub">Take a quick step toward our adaptive-learning study. This is just an interest form, not a graded test or registration.</p>
+  <div class="highlight">
+   <p class="highlight-title" id="encourage-title">Your curiosity is what counts!</p>
+   <p id="encourage">The quiz is not graded by how many answers you get right. Participation and completing the activities matter. Have fun discovering something new!</p>
+   <p class="respect" id="no-ai-note">Please try it independently, without generative AI tools such as ChatGPT, so the learning experience reflects your own thinking.</p>
+  </div>
+ </section>
+ <section class="panel" aria-labelledby="form-title">
+  <div class="panel-head">
+   <p class="step" id="step">A QUICK INTRODUCTION</p>
+   <h2 id="form-title">Tell us how to reach you</h2>
+   <p id="group">For an institutional student email address.</p>
+  </div>
+  <form id="interest-form">
+   <div class="form-grid">
+    <label class="full"><span id="email-label">Your email address <b aria-hidden="true">*</b></span>
+     <input id="email" type="email" autocomplete="email" maxlength="254" required></label>
+    <label><span id="first-label">First name (optional)</span>
+     <input id="first-name" autocomplete="given-name" maxlength="100"></label>
+    <label><span id="last-label">Family name (optional)</span>
+     <input id="last-name" autocomplete="family-name" maxlength="100"></label>
+   </div>
+   <p class="hint" id="email-hint">Enter the exact address authorized for this private rehearsal. No student password is needed.</p>
+   <label class="check-row"><input type="checkbox" id="ack" required>
+    <span id="ack-label">I understand this is only a private software test using draft information, not approved research participation or consent.</span></label>
+   <button type="submit" id="submit">Submit my interest</button>
+  </form>
+  <p id="status" role="status" aria-live="polite"></p>
+ </section>
+ <footer id="footer">This private test issues no emails. The supervisor distributes the real questionnaire link personally; approved invitations are separate.</footer>
+</main></body></html>

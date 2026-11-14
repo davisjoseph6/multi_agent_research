@@ -43,7 +43,7 @@ service account and private directory; do not use the existing LIVE state.
 
 ## Finding your researcher QA password (not institutional SSO)
 
-The QA console prints the actual temporary private directory path. While
+Every start creates a NEW private directory and four NEW QA passwords.\nOld passwords stop working immediately when the previous server exits.\nThe QA console prints the actual temporary private directory path. While
 the QA process is still running, open a **second WSL terminal** and read only
 your own temporary secret. Example, replacing the directory with the exact
 one printed by your own session:
@@ -90,10 +90,15 @@ account enumeration.
    Wiam, Sara and Yaacoub have separate QA identities, and only each
    intended owner should receive their own test credentials.
 3. Approve the two applicant rows in the researcher dashboard (this still
-   sends no email). Open `http://127.0.0.1:8897/control/qa/`, enter each
-   approved candidate ID and issue each one **once**. The server shows a
-   private QA invitation link in the authenticated researcher browser.
-   Never publish the fragment token. Student identities do not choose an arm.
+   sends no email). Open `http://127.0.0.1:8897/control/qa/` and click
+   **Issue all approved QA links**. One authenticated action generates a
+   distinct private link for each not-yet-issued approved test candidate
+   (at most the two permitted test addresses), without sending email.
+   Each created link is shown only in the authenticated research browser.
+   The single-ID issuance form remains available for targeted tests.
+   Previously prepared links are never regenerated; the link tokens are
+   one-time confidential access credentials. Never publish any token.
+   Student identities do not choose an arm.
 4. In the student's browser context, open the test link. The actual study
    portal exercises bilingual information, test-only consent flow, screening,
    student registration, BKT estimation, three RCT arms, interventions and
@@ -105,6 +110,23 @@ account enumeration.
    identities, personally identifying test address records and test passwords
    are removed. Do not use this setup to test multi-day persistence; use
    existing hermetic session/resumption test suites for that.
+
+## Friendly bilingual questionnaire and participation message
+
+Both private QA and approved public intake page implementations now offer
+instant English/French switching, including all headings, explanatory
+paragraphs, checkbox text, success/error messages and buttons. The choice
+switches only the display language and does not erase entered data.
+The student forms require no username or password.
+
+The copy encourages independent participation without generative AI tools,
+explains that the number of correct quiz answers does not determine the
+participant's grade, and asks learners to enjoy the experience. This is
+participant-facing **draft source copy until independently reviewed and
+signed**; the QA form prominently states that draft material is not valid
+research consent. The genuine public form still requires independently
+signed EN/FR recruitment privacy PDFs. The supervisor personally distributes
+the questionnaire URL, never the application.
 
 ## What this does NOT test or authorize
 
@@ -184,7 +206,7 @@ mailbox scoping and the LIVE signed sender router.
 
 ## Automatic checks
 
-    python -m pytest -q tests/test_supervisor_private_qa.py tests/test_supervisor_mail_owner_canary.py
+    python -m pytest -q tests/test_supervisor_private_qa.py tests/test_supervisor_mail_owner_canary.py tests/test_supervisor_questionnaire_copy.py
 
 GitHub CI also runs the candidate's trace oracle, Chromium study journeys and
 offline release tests. A green source CI result is not proof that the user's
