@@ -22,6 +22,7 @@ from pathlib import Path
 import re
 import sqlite3
 import stat
+import uuid
 import subprocess
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -48,7 +49,7 @@ class MailDeliveryUnknown(MailDeliveryError):
 
 APPROVAL_SCHEMA = "IJCAI2027_MAILBOX_AUTHORIZATION_V1"
 CONFIG_SCHEMA = "IJCAI2027_MAIL_ROUTES_V1"
-PROVIDERS = frozenset(("graph_application", "graph_delegated", "gmail_delegated"))
+PROVIDERS = frozenset(("graph_application", "graph_delegated", "gmail_delegated", "brevo_api"))
 GRAPH_TOKEN = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 GMAIL_TOKEN = "https://oauth2.googleapis.com/token"
 GUID = re.compile(r"[0-9a-fA-F-]{36}\Z")
@@ -275,6 +276,69 @@ class DelegatedOAuthSender:
             raise MailDeliveryError(f"{self.provider} declined send ({code})")
 
 
+class DomainVerifiedApiSender:
+    """Optional domain-native transactional API (Brevo), with signed DNS proof.
+
+    Requires independently signed authorization of the sending domain in
+    verify_signed_mail_policy. No OAuth/Entra access or other user's mailbox
+    password is needed. The API key exists only in a private local file.
+    """
+    ENDPOINT = "https://api.brevo.com/v3/smtp/email"
+
+    def __init__(self, *, sender: str, api_key_file: str | Path,
+                 provider: str = "brevo_api", transport=None):
+        if provider != "brevo_api":
+            raise MailConfigurationError("unsupported domain transactional API")
+        self.sender = canonical_email(sender)
+        self.key_file = private_file(api_key_file)
+        self.transport = transport or _http
+        if len(self.key_file.read_text().strip()) < 24:
+            raise MailConfigurationError("domain API key is missing or too short")
+
+    def send(self, *, to: str, subject: str, body: str,
+             delivery_key: str | None = None) -> None:
+        recipient = canonical_email(to)
+        if (type(subject) is not str or not 1 <= len(subject) <= 160
+                or "\r" in subject or "\n" in subject
+                or type(body) is not str or not 1 <= len(body) <= 16000):
+            raise MailConfigurationError("outbound mail content invalid")
+        headers = {
+            "api-key": private_file(self.key_file).read_text().strip(),
+            "Content-Type": "application/json", "Accept": "application/json",
+        }
+        payload = {
+            "sender": {"email": self.sender},
+            "to": [{"email": recipient}], "subject": subject,
+            "textContent": body,
+        }
+        if delivery_key is not None:
+            if type(delivery_key) is not str or not 1 <= len(delivery_key) <= 240:
+                raise MailConfigurationError("invalid delivery idempotency key")
+            # Brevo's UUID provider key protects brief response-loss windows;
+            # the encrypted/hashed local journal prevents retries for longer.
+            marker = str(uuid.uuid5(uuid.NAMESPACE_URL,
+                                    "ijcai2027-brevo-" + delivery_key))
+            payload["headers"] = {"IdempotencyKey": marker}
+        status, response = self.transport(
+            self.ENDPOINT, method="POST", headers=headers,
+            payload=payload, timeout=25,
+        )
+        if status != 201:
+            raise MailDeliveryError(f"domain transactional API declined send ({status})")
+        try:
+            receipt = json.loads(response)
+            if (type(receipt) is not dict or
+                not isinstance(receipt.get("messageId"), str) or
+                len(receipt["messageId"]) < 8):
+                raise ValueError("message ID missing")
+        except (ValueError, TypeError):
+            # The API may already have accepted the email: fail closed and
+            # keep the journal's reservation rather than retrying blindly.
+            raise MailDeliveryUnknown(
+                "provider accepted without verifiable message ID; reconcile manually"
+            ) from None
+
+
 class MailDeliveryJournal:
     """Pseudonymous append-only operational receipts, no email/body/token.
 
@@ -356,7 +420,11 @@ class MailRoute:
         marker = (self.journal.reserve(sender_id=self.identifier,to=to,key=delivery_key)
                   if self.journal else None)
         try:
-            value = self.sender.send(to=to, subject=subject, body=body)
+            if isinstance(self.sender, DomainVerifiedApiSender):
+                value = self.sender.send(to=to, subject=subject, body=body,
+                                         delivery_key=marker or delivery_key)
+            else:
+                value = self.sender.send(to=to, subject=subject, body=body)
         except Exception:
             if marker:
                 self.journal.finalize(marker, accepted=False)
@@ -455,12 +523,27 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
                 raise MailConfigurationError("send-as alias verification evidence mismatch")
         elif grant.get("from_alias") is not None:
             raise MailConfigurationError("signed alias cannot be omitted from route")
-        # Signed grants must bind the actual Entra/Google OAuth CLIENT, not
-        # only a human-readable sender address. Repointing a signed mailbox
-        # scope to a different app/tenant requires fresh institutional review.
-        if (not isinstance(definition.get("client_id"),str)
-                or grant.get("client_id") != definition["client_id"]):
-            raise MailConfigurationError("signed grant is not bound to OAuth client")
+        # Bind credentials to the signed provider account, never to an
+        # arbitrary replacement path or unsigned sender identity.
+        if definition["provider"] == "brevo_api":
+            label = definition.get("api_key_label")
+            if (type(label) is not str or len(label) < 8 or
+                label != grant.get("api_key_label") or
+                grant.get("sender_domain_authenticated") is not True):
+                raise MailConfigurationError("unsigned domain API credential or sender")
+            evidence = grant.get("domain_evidence_file")
+            digest = grant.get("domain_evidence_sha256")
+            if (not isinstance(evidence,str) or not isinstance(digest,str)
+                    or not HEX.fullmatch(digest)):
+                raise MailConfigurationError("signed domain authorization evidence missing")
+            proof = private_file(evidence).read_bytes()
+            if not proof.startswith(b"%PDF-") or sha256(proof).hexdigest()!=digest:
+                raise MailConfigurationError("domain evidence verification failed")
+        else:
+            # Signed grants must bind the OAuth client/tenant exactly.
+            if (not isinstance(definition.get("client_id"),str)
+                    or grant.get("client_id") != definition["client_id"]):
+                raise MailConfigurationError("signed grant is not bound to OAuth client")
         if definition["provider"] in ("graph_application","graph_delegated"):
             if grant.get("tenant") != definition.get("tenant"):
                 raise MailConfigurationError("signed grant is not bound to Microsoft tenant")
@@ -491,7 +574,12 @@ def build_mail_router(*, config_file: str | Path, approval_file: str | Path,
     routes = {}
     for key, item in config["routes"].items():
         provider = item["provider"]
-        if provider == "graph_application":
+        if provider == "brevo_api":
+            source = DomainVerifiedApiSender(
+                sender=item["email"], api_key_file=item["api_key_file"],
+                transport=transport,
+            )
+        elif provider == "graph_application":
             source = GraphMailSender(
                 tenant_id=item["tenant"], client_id=item["client_id"],
                 client_secret=private_file(item["client_secret_file"]).read_text().strip(),
