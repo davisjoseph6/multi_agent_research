@@ -424,11 +424,24 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
                 or not HEX.fullmatch(grant["owner_evidence_sha256"])):
             raise MailConfigurationError("mailbox owner/institution authorization missing")
         canonical_email(definition["email"])
+        # Signed grants must bind the actual Entra/Google OAuth CLIENT, not
+        # only a human-readable sender address. Repointing a signed mailbox
+        # scope to a different app/tenant requires fresh institutional review.
+        if (not isinstance(definition.get("client_id"),str)
+                or grant.get("client_id") != definition["client_id"]):
+            raise MailConfigurationError("signed grant is not bound to OAuth client")
+        if definition["provider"] in ("graph_application","graph_delegated"):
+            if grant.get("tenant") != definition.get("tenant"):
+                raise MailConfigurationError("signed grant is not bound to Microsoft tenant")
         if definition["provider"] == "graph_application":
             if not GUID.fullmatch(definition.get("tenant", "")) or not GUID.fullmatch(definition.get("client_id", "")):
                 raise MailConfigurationError("Graph app credentials invalid")
-        elif not isinstance(definition.get("client_id"), str):
-            raise MailConfigurationError("delegated client ID missing")
+        evidence=grant.get("owner_evidence_file")
+        if not isinstance(evidence,str):
+            raise MailConfigurationError("explicit mailbox-owner authorization evidence missing")
+        raw=private_file(evidence).read_bytes()
+        if not raw.startswith(b"%PDF-") or sha256(raw).hexdigest()!=grant["owner_evidence_sha256"]:
+            raise MailConfigurationError("signed mailbox-owner evidence mismatch")
     actor_routes = config.get("by_actor", {})
     if not isinstance(actor_routes, dict) or any(v not in config["routes"] for v in actor_routes.values()):
         raise MailConfigurationError("unapproved actor route")
