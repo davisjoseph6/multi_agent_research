@@ -352,7 +352,7 @@ def make_recruitment_app(
     @app.get("/interest/app.css")
     def intake_css():
         if not public_intake_enabled:return "",404
-        return send_file(STATIC/"supervisor_recruitment_admin.css",
+        return send_file(STATIC/"supervisor_recruitment_interest.css",
                          mimetype="text/css")
 
     @app.post("/interest/api/apply")
