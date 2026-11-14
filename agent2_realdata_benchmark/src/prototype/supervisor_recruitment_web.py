@@ -238,7 +238,7 @@ def make_recruitment_app(
     def send_invitations():
         user=admin(mutation=True)
         if dispatcher is None or not live_verified:
-            raise RecruitmentError("live Graph invitation sending is not configured")
+            raise RecruitmentError("signed live invitation sending is not configured")
         selection=body("candidate_ids","select_all")
         all_selected=selection["select_all"]
         if type(all_selected) is not bool:
@@ -252,7 +252,7 @@ def make_recruitment_app(
     def manual_reminder():
         admin(mutation=True)
         if inactivity_sender is None or operational_store is None or not live_verified:
-            raise RecruitmentError("live Graph reminder sender is not configured")
+            raise RecruitmentError("signed live reminder sender is not configured")
         selection=body("learner_id")
         return jsonify(reconcile_inactivity(
             operational_store,ledger,at=now(),send=inactivity_sender.send,
