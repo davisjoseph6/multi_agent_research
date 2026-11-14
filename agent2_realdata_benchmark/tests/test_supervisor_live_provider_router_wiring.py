@@ -51,3 +51,25 @@ def test_researcher_portal_does_not_assume_every_sender_is_outlook():
     service = (ROOT / "src/prototype/supervisor_recruitment_web.py").read_text(encoding="utf-8")
     assert "signed live invitation sending is not configured" in service
     assert "signed live reminder sender is not configured" in service
+
+
+def test_pending_upgrade_preserves_state_and_requires_disabled_services():
+    import subprocess
+    script = ROOT / "ops/supervisor/upgrade_pending_live_release.sh"
+    assert subprocess.run(["bash", "-n", str(script)], check=False).returncode == 0
+    body = script.read_text(encoding="utf-8")
+    assert "flock -n 9" in body
+    assert "systemctl is-active --quiet" in body
+    assert "systemctl is-enabled --quiet" in body
+    assert '! -e "$STATE/document_registry/current"' in body
+    assert '! -e "$PRIVATE/live.env"' in body
+    assert '! -e /etc/caddy/ijcai-supervisor-live.caddy' in body
+    assert 'materialize_live_bundle.sh' in body
+    assert 'git -C "$PREFIX/releases/$OLD" status --porcelain' in body
+    assert "scripts.supervisor_doc_bundle_cli" in body
+    assert 'mv -Tf -- "$TEMP" "$PREFIX/current"' in body
+    assert "systemctl enable" not in body
+    assert "systemctl start" not in body
+    assert "systemctl reload" not in body
+    assert "rm -rf" not in body
+    assert "activate" not in body.replace("unactivated", "")
