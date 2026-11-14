@@ -88,7 +88,10 @@ async function main(){
   assert.equal(new Set(applicants.map(x=>x.email)).size,2);
   await admin.locator("#all").check();
   await admin.locator("#approve").click();
-  await admin.waitForFunction(()=>document.querySelector("#status").textContent.includes("2 applications"));
+  await admin.waitForFunction(()=>{
+   const rows=[...document.querySelectorAll("#applicants tr")];
+   return rows.length===2 && rows.every(r=>r.textContent.includes("Approved"));
+  });
   const links={};
   await admin.goto(base+"/control/qa/",{waitUntil:"networkidle"});
   for(const a of applicants){
