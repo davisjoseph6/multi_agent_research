@@ -267,6 +267,20 @@ class SupervisorSyntheticStore:
                         learner_id TEXT
                     )
                 """)
+                db.execute("""
+                    CREATE TABLE IF NOT EXISTS pii.consent_document_history(
+                        learner_id TEXT PRIMARY KEY,
+                        bundle_sha256 TEXT NOT NULL,
+                        information_sha256 TEXT NOT NULL,
+                        document_version TEXT NOT NULL,
+                        captured_at TEXT NOT NULL
+                    )
+                """)
+                fields={r["name"] for r in db.execute("PRAGMA pii.table_info(invitations)")}
+                for field in ("document_bundle_sha256","information_sha256",
+                              "document_version"):
+                    if field not in fields:
+                        db.execute("ALTER TABLE pii.invitations ADD COLUMN "+field+" TEXT")
             db.execute(
                 "INSERT OR IGNORE INTO collection_status(one,closed_at) VALUES(1,NULL)"
             )
@@ -550,6 +564,18 @@ class SupervisorSyntheticStore:
                     "WHERE token_hash=?",
                     (ref,hashlib.sha256(token.encode()).hexdigest()),
                 )
+                provenance=db.execute(
+                    "SELECT document_bundle_sha256,information_sha256,document_version "
+                    "FROM pii.invitations WHERE token_hash=?",
+                    (hashlib.sha256(token.encode()).hexdigest(),),
+                ).fetchone()
+                if provenance and provenance["document_bundle_sha256"]:
+                    db.execute(
+                        "INSERT INTO pii.consent_document_history VALUES(?,?,?,?,?)",
+                        (ref,provenance["document_bundle_sha256"],
+                         provenance["information_sha256"],
+                         provenance["document_version"],now),
+                    )
             for i, offset in enumerate((0, 4, 8), 1):
                 db.execute(
                     "INSERT INTO sessions(learner_id,session_no,scheduled_for,"
@@ -1012,6 +1038,8 @@ class SupervisorSyntheticStore:
                     if self.operational:
                         db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
                                    (ref,))
+                        db.execute("DELETE FROM pii.consent_document_history WHERE learner_id=?",
+                                   (ref,))
                         db.execute("DELETE FROM pii.reminder_outbox WHERE learner_id=?",
                                    (ref,))
                         db.execute("DELETE FROM operational_rendered WHERE learner_id=?",
@@ -1077,6 +1105,8 @@ class SupervisorSyntheticStore:
                 try:
                     if self.operational:
                         db.execute("DELETE FROM pii.invitations WHERE learner_id=?",
+                                   (ref,))
+                        db.execute("DELETE FROM pii.consent_document_history WHERE learner_id=?",
                                    (ref,))
                         db.execute("DELETE FROM pii.reminder_outbox WHERE learner_id=?",
                                    (ref,))
