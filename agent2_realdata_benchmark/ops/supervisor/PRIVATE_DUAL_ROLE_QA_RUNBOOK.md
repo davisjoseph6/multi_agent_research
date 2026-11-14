@@ -41,6 +41,38 @@ For the initial acceptance, running on local WSL is simpler and has no risk
 of changing the VPS service units. A future VPS QA service must use a separate
 service account and private directory; do not use the existing LIVE state.
 
+## Finding your researcher QA password (not institutional SSO)
+
+The QA console prints the actual temporary private directory path. While
+the QA process is still running, open a **second WSL terminal** and read only
+your own temporary secret. Example, replacing the directory with the exact
+one printed by your own session:
+
+    cat /tmp/ijcai-qa-self-acceptance-EXAMPLE/qa-admin-secrets/davis.joseph_at_aivancity.education.txt
+
+The new QA runner also prints this safe `cat` command directly (never the
+password). The file is local, mode 0600 and usable only until the process
+stops. Use it with `davis.joseph@aivancity.education` in the private staff
+login; change the temporary password at first sign-in. Do **not** try a
+Microsoft Entra password, a QA student password or an older LIVE secret.
+An unauthenticated `/control/api/me` response of HTTP 409 is normal.
+For Wiam, Sara and the supervisor, each has an independently generated QA
+secret. Give each owner only their own secret using a secure channel; never
+post credentials in chat, a shared log or GitHub.
+
+## Duplicate questionnaire behavior and identity separation
+
+Every accepted questionnaire submission is recorded in a private submission
+audit, but the candidates table is UNIQUE by case-insensitive normalized
+email. A repeated click or new submission with the same email produces the
+**same candidate_id** and an incremented application_count, never a second
+candidate profile or another invitation. That candidate ID is an internal
+staff identifier, not a verified Aivancity student number and not yet a
+pseudonymous RCT participant ID. A study participant ID is created only
+later, after an approved invitation and screening/registration.
+Public questionnaire responses do not reveal candidate IDs; this prevents
+account enumeration.
+
 ## Two concurrent browser roles
 
 1. Open `http://127.0.0.1:8897/interest/school` and
