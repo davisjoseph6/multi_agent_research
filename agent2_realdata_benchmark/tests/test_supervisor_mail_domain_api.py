@@ -20,7 +20,7 @@ DOMAIN_SENDER="private_quiz@selfhealing-edu.fr"
 KEY="xkeysib-QA-PLACEHOLDER-NEVER-USABLE-1234567890"
 
 
-def files(root: Path, *, verified=True, sender=DOMAIN_SENDER):
+def files(root: Path, *, verified=True, sender=DOMAIN_SENDER, actors=()):
     if shutil.which("openssl") is None:
         pytest.skip("OpenSSL required")
     secret=root/"restricted"
@@ -40,12 +40,13 @@ def files(root: Path, *, verified=True, sender=DOMAIN_SENDER):
             "provider":"brevo_api","email":sender,
             "api_key_label":"owner-domain-v1",
             "api_key_file":str(api),
-         }},"by_actor":{}}
+         }},"by_actor":{actor:"domain_sender" for actor in actors}}
     policy={"schema":"IJCAI2027_MAILBOX_AUTHORIZATION_V1",
             "decision":"approved","release_commit":COMMIT,
             "senders":{"domain_sender":{
                 "provider":"brevo_api","email":DOMAIN_SENDER,
                 "owner_authorized":True,"institutional_scope_verified":True,
+                "authorized_actors":list(actors),
                 "owner_evidence_file":str(auth),"owner_evidence_sha256":digest(auth),
                 "api_key_label":"owner-domain-v1",
                 "api_key_file":str(api),
@@ -143,3 +144,30 @@ def test_domain_send_without_provider_receipt_requires_manual_review(tmp_path):
         route.send(to="myself@example.org",subject="QA",body="test",
                    delivery_key="one-error")
     assert len(sent)==1
+
+
+def test_wiam_and_sara_can_send_through_one_signed_domain_mailbox_without_send_as_roles(tmp_path):
+    wiam="wiam.belouard@aivancity.education"
+    sara="sara.elkardi@aivancity.education"
+    secret,config,approval,sig,pub=files(tmp_path,actors=(wiam,sara))
+    router=build_mail_router(
+        config_file=config,approval_file=approval,approval_signature=sig,
+        institution_key=pub,release_commit=COMMIT,
+        transport=lambda *a,**kw:(201,b'{"messageId":"<fake-message-id@example.org>"}'),
+    )
+    assert router.for_actor(wiam) is router.routes["domain_sender"]
+    assert router.for_actor(sara) is router.routes["domain_sender"]
+    # The supervisor is an admin but not authorized to use this sender.
+    with pytest.raises(MailConfigurationError,match="signed sender"):
+        router.for_actor("yaacoub@aivancity.ai")
+    assert router.routes["domain_sender"].sender.sender==DOMAIN_SENDER
+
+
+def test_unsigned_actor_addition_cannot_use_verified_sender(tmp_path):
+    staff="wiam.belouard@aivancity.education"
+    _,config,approval,sig,pub=files(tmp_path,actors=(staff,))
+    raw=json.loads(config.read_text())
+    raw["by_actor"]["sara.elkardi@aivancity.education"]="domain_sender"
+    config.write_text(json.dumps(raw))
+    with pytest.raises(MailConfigurationError,match="actor route"):
+        verify_signed_mail_policy(config,approval,sig,pub,release_commit=COMMIT)
