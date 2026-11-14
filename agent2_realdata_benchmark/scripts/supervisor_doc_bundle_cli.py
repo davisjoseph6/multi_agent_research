@@ -14,7 +14,9 @@ import subprocess
 from src.prototype.supervisor_release_documents import (
     DocumentReleaseError,new_draft,revise,verify,verify_current,activate,
 )
-from scripts.supervisor_vps_wsgi import _release_verified, ROOT
+# Deliberately avoid importing Flask or the live application for draft work.
+# Source-only review folders need only the Python 3 standard library.
+WORK_ROOT=Path(__file__).resolve().parents[2]
 
 
 def _verify_live_environment(release_commit):
@@ -22,12 +24,13 @@ def _verify_live_environment(release_commit):
         raise DocumentReleaseError("real release activation is forbidden outside LIVE")
     if os.environ.get("SUPERVISOR_VPS_COMMIT") != release_commit:
         raise DocumentReleaseError("exact release environment/source mismatch")
-    actual=subprocess.run(["git","rev-parse","HEAD"],cwd=ROOT.parent,
+    actual=subprocess.run(["git","rev-parse","HEAD"],cwd=WORK_ROOT,
                           check=True,text=True,capture_output=True,timeout=8).stdout.strip()
-    dirty=subprocess.run(["git","status","--porcelain"],cwd=ROOT.parent,
+    dirty=subprocess.run(["git","status","--porcelain"],cwd=WORK_ROOT,
                          check=True,text=True,capture_output=True,timeout=8).stdout.strip()
     if actual!=release_commit or dirty:
         raise DocumentReleaseError("source checkout is not exact and clean")
+    from scripts.supervisor_vps_wsgi import _release_verified
     return _release_verified(release_commit)
 
 

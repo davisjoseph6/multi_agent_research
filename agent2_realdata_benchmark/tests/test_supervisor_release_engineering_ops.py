@@ -19,6 +19,9 @@ def test_live_scripts_parse_and_prepare_does_not_send():
     assert '8890/control/api/overview' in script
     assert '8890/interest/school' in script
     assert "scripts.supervisor_live_readiness" in script
+    assert "scripts.supervisor_doc_bundle_cli" in script
+    assert "document_intake_empty" in script
+    assert "--draft-source" in script
     assert "SUPERVISOR_VPS_MODE" in script
     assert "caddy validate" in script and "systemctl reload caddy" in script
     assert "rollback()" in script and "systemctl stop" in script
