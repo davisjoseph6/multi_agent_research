@@ -96,6 +96,7 @@ jobs:
           node --check src/prototype/static/supervisor_research_monitor.js
           node --check src/prototype/static/supervisor_recruitment_admin.js
           node --check src/prototype/static/supervisor_recruitment_interest.js
+          node --check scripts/supervisor_private_qa_browser_playwright.cjs
           bash -n ops/supervisor/enable_researcher_dashboard.sh
           node --check src/prototype/static/supervisor_fictional_web.js
           node --check src/prototype/static/supervisor_fictional_copy.js
@@ -166,6 +167,8 @@ jobs:
         run: node scripts/supervisor_three_arm_browser_playwright.cjs
       - name: Operational /study/ real-browser A/B/C onboarding and session-one acceptance
         run: node scripts/supervisor_vps_browser_playwright.cjs
+      - name: Concurrent QA students and authenticated staff in real Chromium
+        run: node scripts/supervisor_private_qa_browser_playwright.cjs
       - name: Researcher-only live BKT dashboard in real Chromium
         run: node scripts/supervisor_research_monitor_playwright.cjs
       - name: Operational staging language switch and second Socratic hint persistence
