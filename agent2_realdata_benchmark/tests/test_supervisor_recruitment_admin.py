@@ -391,7 +391,7 @@ def test_live_hourly_reminder_timer_is_fail_closed_and_never_runs_in_staging():
     source=script.read_text()
     assert subprocess.run(["bash","-n",str(script)],check=False).returncode==0
     assert "SUPERVISOR_VPS_MODE=live" in source
-    assert "SUPERVISOR_MAIL_TRANSPORT=microsoft_graph" in source
+    assert "SUPERVISOR_MAIL_TRANSPORT=provider_router" in source
     assert "from scripts.supervisor_vps_admin import load; load()" in source
     assert "ProtectSystem=strict" in source
     assert "ReadWritePaths=$STATE" in source
