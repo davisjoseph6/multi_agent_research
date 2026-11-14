@@ -195,6 +195,10 @@ rollback(){
   trap - EXIT
   if [[ "$status" -ne 0 ]]; then
     echo "FAILED: deactivating LIVE services and restoring Caddy; STAGING untouched" >&2
+    # If the hourly timer was installed before a later activation check
+    # failed, stop it BEFORE restoring routing. Never leave a mail-capable
+    # worker running behind a failed release.
+    systemctl disable --now ijcai-supervisor-live-reminders.timer >/dev/null 2>&1 || true
     systemctl stop "$STUDY" "$ADMIN" "$CONTROL" >/dev/null 2>&1 || true
     systemctl disable "$STUDY" "$ADMIN" "$CONTROL" >/dev/null 2>&1 || true
     if [[ "$changed" -eq 1 ]]; then
