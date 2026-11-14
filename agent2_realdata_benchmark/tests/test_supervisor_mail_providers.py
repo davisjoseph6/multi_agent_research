@@ -202,12 +202,19 @@ def test_signed_mailbox_policy_requires_exact_owner_and_release(tmp_path):
         "by_actor":{}
     }))
     cfg.chmod(0o600)
+    proof=private/"owner-consent.pdf"
+    proof.write_bytes(b"%PDF-1.7\nTEST fixture only, not a real owner signature\n%%EOF\n")
+    proof.chmod(0o600)
+    from hashlib import sha256
     rec={"schema":"IJCAI2027_MAILBOX_AUTHORIZATION_V1",
          "decision":"approved","release_commit":commit,
          "senders":{"wiam":{"provider":"graph_application","email":sender,
+                              "tenant":"11111111-1111-1111-1111-111111111111",
+                              "client_id":"22222222-2222-2222-2222-222222222222",
                               "owner_authorized":True,
                               "institutional_scope_verified":True,
-                              "owner_evidence_sha256":"b"*64}}}
+                              "owner_evidence_file":str(proof),
+                              "owner_evidence_sha256":sha256(proof.read_bytes()).hexdigest()}}}
     manifest,sig,pub=_sign(private,rec)
     found=verify_signed_mail_policy(cfg,manifest,sig,pub,release_commit=commit)
     assert found["default"]=="wiam"
