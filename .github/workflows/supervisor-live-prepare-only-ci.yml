@@ -87,7 +87,7 @@ jobs:
           sudo test -e /var/lib/ijcai-supervisor-live/supervisor_operational_contacts.sqlite3
           sudo test -e /var/lib/ijcai-supervisor-live/supervisor_recruitment.sqlite3
           sudo find /var/lib/ijcai-supervisor-live/initial-admin-secrets -type f -printf '%f %s\n' | sort > /tmp/ijcai-admin-secrets-before
-          sudo sha256sum /var/lib/ijcai-supervisor-live/supervisor_operational_*.sqlite3 /var/lib/ijcai-supervisor-live/supervisor_recruitment.sqlite3 > /tmp/ijcai-pending-db-before
+          sudo bash -c "sha256sum /var/lib/ijcai-supervisor-live/supervisor_operational_*.sqlite3 /var/lib/ijcai-supervisor-live/supervisor_recruitment.sqlite3" > /tmp/ijcai-pending-db-before
           sudo find /var/lib/ijcai-supervisor-live/document_registry/versions -name manifest.json | wc -l > /tmp/ijcai-pending-document-count-before
       - name: Upgrade only the pending code and create a new unsigned document version
         run: |
@@ -100,7 +100,7 @@ jobs:
           bash -n ops/supervisor/upgrade_pending_live_release.sh
           sudo bash ops/supervisor/upgrade_pending_live_release.sh /tmp/ijcai-new-pending.bundle "$NEW"
           test "$(sudo git -C /srv/ijcai-supervisor-live/current rev-parse HEAD)" = "$NEW"
-          sudo sha256sum /var/lib/ijcai-supervisor-live/supervisor_operational_*.sqlite3 /var/lib/ijcai-supervisor-live/supervisor_recruitment.sqlite3 > /tmp/ijcai-pending-db-after
+          sudo bash -c "sha256sum /var/lib/ijcai-supervisor-live/supervisor_operational_*.sqlite3 /var/lib/ijcai-supervisor-live/supervisor_recruitment.sqlite3" > /tmp/ijcai-pending-db-after
           diff -u /tmp/ijcai-pending-db-before /tmp/ijcai-pending-db-after
           sudo find /var/lib/ijcai-supervisor-live/initial-admin-secrets -type f -printf '%f %s\n' | sort > /tmp/ijcai-admin-secrets-after
           diff -u /tmp/ijcai-admin-secrets-before /tmp/ijcai-admin-secrets-after
