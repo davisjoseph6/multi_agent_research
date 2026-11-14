@@ -11,7 +11,8 @@
       "owner_evidence_sha256": null,
       "tenant": "<APPROVED_ENTRA_TENANT_GUID>",
       "client_id": "<SIGNED_SCOPED_ENTRA_APP_ID>",
-      "owner_evidence_file": "/etc/ijcai-supervisor-live/mail/owner-consent-institutional_primary.pdf"
+      "owner_evidence_file": "/etc/ijcai-supervisor-live/mail/owner-consent-institutional_primary.pdf",
+      "authorized_actors": []
     },
     "colleague_wiam": {
       "provider": "graph_application",
@@ -21,7 +22,8 @@
       "owner_evidence_sha256": null,
       "tenant": "<APPROVED_ENTRA_TENANT_GUID>",
       "client_id": "<SIGNED_SCOPED_ENTRA_APP_ID>",
-      "owner_evidence_file": "/etc/ijcai-supervisor-live/mail/owner-consent-colleague_wiam.pdf"
+      "owner_evidence_file": "/etc/ijcai-supervisor-live/mail/owner-consent-colleague_wiam.pdf",
+      "authorized_actors": []
     },
     "colleague_sara": {
       "provider": "graph_application",
@@ -31,8 +33,38 @@
       "owner_evidence_sha256": null,
       "tenant": "<APPROVED_ENTRA_TENANT_GUID>",
       "client_id": "<SIGNED_SCOPED_ENTRA_APP_ID>",
-      "owner_evidence_file": "/etc/ijcai-supervisor-live/mail/owner-consent-colleague_sara.pdf"
+      "owner_evidence_file": "/etc/ijcai-supervisor-live/mail/owner-consent-colleague_sara.pdf",
+      "authorized_actors": []
+    },
+    "gmail_verified_domain_alias": {
+      "provider": "gmail_delegated",
+      "email": "<ACTUAL_GMAIL_OAUTH_OWNER>",
+      "client_id": "<GOOGLE_OAUTH_CLIENT_ID>",
+      "owner_authorized": false,
+      "institutional_scope_verified": false,
+      "owner_evidence_file": "/etc/ijcai-supervisor-live/mail/owner-consent-gmail-verified-domain-alias.pdf",
+      "owner_evidence_sha256": null,
+      "from_alias": "private_quiz@selfhealing-edu.fr",
+      "alias_verified_by_owner": false,
+      "alias_domain_authorized": false,
+      "alias_evidence_file": "/etc/ijcai-supervisor-live/mail/alias-verification-private-quiz.pdf",
+      "alias_evidence_sha256": null,
+      "authorized_actors": []
+    },
+    "domain_native_brevo": {
+      "provider": "brevo_api",
+      "email": "private_quiz@selfhealing-edu.fr",
+      "owner_authorized": false,
+      "institutional_scope_verified": false,
+      "owner_evidence_file": "/etc/ijcai-supervisor-live/mail/owner-consent-domain-native-brevo.pdf",
+      "owner_evidence_sha256": null,
+      "authorized_actors": [],
+      "sender_domain_authenticated": false,
+      "domain_evidence_file": "/etc/ijcai-supervisor-live/mail/approved-domain-authentication.pdf",
+      "domain_evidence_sha256": null,
+      "api_key_label": "<REGISTERED_BREVO_API_CREDENTIAL_LABEL>",
+      "api_key_file": "/etc/ijcai-supervisor-live/mail/brevo-api.key"
     }
   },
-  "warning": "DRAFT ONLY. Independently verify explicit owner consent, Exchange/Microsoft Graph rights, and sign this exact JSON using an authenticated institutional key. This unsigned file cannot configure LIVE mail."
+  "warning": "DRAFT ONLY. Each actor authorized to send from a central provider must be listed in authorized_actors, with permission separately signed by sender owner and institutional authority. Signed domain verification evidence and exact source SHA required. Never enable mail on placeholders."
 }

@@ -143,8 +143,8 @@ def test_failed_file_compensation_cannot_delete_consented_or_registered_invite(t
     assert intake.status(token,at=T)["stage"]=="consented"
 
 
-def test_live_invitation_retry_uses_exact_existing_secret_and_original_recipient(tmp_path,monkeypatch,capsys):
-    """No actual SMTP or live participant; release gating is stubbed in this fixture."""
+def test_legacy_smtp_invitation_retry_is_unconditionally_disabled(tmp_path,monkeypatch,capsys):
+    """An approved LIVE source revision still never bypasses signed mail policy."""
     import sys
     from scripts import supervisor_vps_admin as admin
     store,intake,token=fixture(tmp_path)
@@ -154,17 +154,21 @@ def test_live_invitation_retry_uses_exact_existing_secret_and_original_recipient
     monkeypatch.setattr(admin,"load",lambda:(intake,"live"))
     monkeypatch.setenv("SUPERVISOR_VPS_ROOT",str(tmp_path))
     monkeypatch.setenv("SUPERVISOR_VPS_HOST","demo.selfhealing-edu.fr")
+    original_deliver=admin.deliver
     deliveries=[]
     monkeypatch.setattr(admin,"deliver",lambda *args,**kw:deliveries.append((args,kw)))
     monkeypatch.setattr(sys,"argv",["supervisor_vps_admin",
         "--send-existing",str(private),"--recipient",EMAIL])
-    admin.main()
-    assert deliveries==[((EMAIL,link),{"mode":"live"})]
-    output=capsys.readouterr().out
-    assert EMAIL not in output and token not in output and link not in output
+    with pytest.raises(SystemExit):
+        admin.main()
+    assert deliveries==[]
+    output=capsys.readouterr()
+    assert EMAIL not in output.out and token not in output.out and link not in output.out
     with store._tx() as db:
         assert db.execute("SELECT COUNT(*) FROM pii.invitations").fetchone()[0]==1
         assert db.execute("SELECT state FROM pii.invitations").fetchone()[0]=="invited"
+    with pytest.raises(ValueError,match="Legacy SMTP delivery disabled"):
+        original_deliver(EMAIL,link,mode="live")
 
 
 def test_invitation_retry_refuses_staging_and_wrong_recipient(tmp_path,monkeypatch):

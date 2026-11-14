@@ -22,6 +22,7 @@ from pathlib import Path
 import re
 import sqlite3
 import stat
+import uuid
 import subprocess
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -31,7 +32,7 @@ import fcntl
 from cryptography.fernet import Fernet, InvalidToken
 
 from .supervisor_graph_mail import GraphMailSender, GraphMailError
-from .supervisor_recruitment import canonical_email
+from .supervisor_recruitment import canonical_email, ADMIN_EMAILS
 
 
 class MailConfigurationError(RuntimeError):
@@ -48,7 +49,7 @@ class MailDeliveryUnknown(MailDeliveryError):
 
 APPROVAL_SCHEMA = "IJCAI2027_MAILBOX_AUTHORIZATION_V1"
 CONFIG_SCHEMA = "IJCAI2027_MAIL_ROUTES_V1"
-PROVIDERS = frozenset(("graph_application", "graph_delegated", "gmail_delegated"))
+PROVIDERS = frozenset(("graph_application", "graph_delegated", "gmail_delegated", "brevo_api"))
 GRAPH_TOKEN = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 GMAIL_TOKEN = "https://oauth2.googleapis.com/token"
 GUID = re.compile(r"[0-9a-fA-F-]{36}\Z")
@@ -193,11 +194,19 @@ class DelegatedOAuthSender:
     """
     def __init__(self, *, provider: str, sender: str, client_id: str,
                  client_secret_path: str | None, vault: EncryptedRefreshVault,
-                 tenant: str | None = None, transport=None, token_transport=None):
+                 tenant: str | None = None, transport=None, token_transport=None,
+                 from_alias: str | None = None):
         if provider not in ("graph_delegated", "gmail_delegated"):
             raise MailConfigurationError("unsupported delegated provider")
         self.provider = provider
         self.sender = canonical_email(sender)
+        # Send-as aliases are allowed only for the owner-granted Gmail API.
+        # The independent signed route must bind an accepted alias and its
+        # evidence; Gmail itself additionally enforces that it is verified.
+        if from_alias is not None and provider != "gmail_delegated":
+            raise MailConfigurationError("send-as alias requires Gmail delegated provider")
+        self.outbound_from = (canonical_email(from_alias) if from_alias is not None
+                              else self.sender)
         if provider == "graph_delegated" and self.sender.endswith("@gmail.com"):
             raise MailConfigurationError(
                 "a Microsoft login alias at gmail.com is not a verified Outlook mailbox")
@@ -252,7 +261,7 @@ class DelegatedOAuthSender:
             expected = 202
         else:
             mail = EmailMessage()
-            mail["From"] = self.sender
+            mail["From"] = self.outbound_from
             mail["To"] = recipient
             mail["Subject"] = subject
             mail.set_content(body)
@@ -265,6 +274,69 @@ class DelegatedOAuthSender:
             # Never retry a non-success response blindly after authorization
             # errors or transient network failures. Reconcile first.
             raise MailDeliveryError(f"{self.provider} declined send ({code})")
+
+
+class DomainVerifiedApiSender:
+    """Optional domain-native transactional API (Brevo), with signed DNS proof.
+
+    Requires independently signed authorization of the sending domain in
+    verify_signed_mail_policy. No OAuth/Entra access or other user's mailbox
+    password is needed. The API key exists only in a private local file.
+    """
+    ENDPOINT = "https://api.brevo.com/v3/smtp/email"
+
+    def __init__(self, *, sender: str, api_key_file: str | Path,
+                 provider: str = "brevo_api", transport=None):
+        if provider != "brevo_api":
+            raise MailConfigurationError("unsupported domain transactional API")
+        self.sender = canonical_email(sender)
+        self.key_file = private_file(api_key_file)
+        self.transport = transport or _http
+        if len(self.key_file.read_text().strip()) < 24:
+            raise MailConfigurationError("domain API key is missing or too short")
+
+    def send(self, *, to: str, subject: str, body: str,
+             delivery_key: str | None = None) -> None:
+        recipient = canonical_email(to)
+        if (type(subject) is not str or not 1 <= len(subject) <= 160
+                or "\r" in subject or "\n" in subject
+                or type(body) is not str or not 1 <= len(body) <= 16000):
+            raise MailConfigurationError("outbound mail content invalid")
+        headers = {
+            "api-key": private_file(self.key_file).read_text().strip(),
+            "Content-Type": "application/json", "Accept": "application/json",
+        }
+        payload = {
+            "sender": {"email": self.sender},
+            "to": [{"email": recipient}], "subject": subject,
+            "textContent": body,
+        }
+        if delivery_key is not None:
+            if type(delivery_key) is not str or not 1 <= len(delivery_key) <= 240:
+                raise MailConfigurationError("invalid delivery idempotency key")
+            # Brevo's UUID provider key protects brief response-loss windows;
+            # the encrypted/hashed local journal prevents retries for longer.
+            marker = str(uuid.uuid5(uuid.NAMESPACE_URL,
+                                    "ijcai2027-brevo-" + delivery_key))
+            payload["headers"] = {"IdempotencyKey": marker}
+        status, response = self.transport(
+            self.ENDPOINT, method="POST", headers=headers,
+            payload=payload, timeout=25,
+        )
+        if status != 201:
+            raise MailDeliveryError(f"domain transactional API declined send ({status})")
+        try:
+            receipt = json.loads(response)
+            if (type(receipt) is not dict or
+                not isinstance(receipt.get("messageId"), str) or
+                len(receipt["messageId"]) < 8):
+                raise ValueError("message ID missing")
+        except (ValueError, TypeError):
+            # The API may already have accepted the email: fail closed and
+            # keep the journal's reservation rather than retrying blindly.
+            raise MailDeliveryUnknown(
+                "provider accepted without verifiable message ID; reconcile manually"
+            ) from None
 
 
 class MailDeliveryJournal:
@@ -348,7 +420,11 @@ class MailRoute:
         marker = (self.journal.reserve(sender_id=self.identifier,to=to,key=delivery_key)
                   if self.journal else None)
         try:
-            value = self.sender.send(to=to, subject=subject, body=body)
+            if isinstance(self.sender, DomainVerifiedApiSender):
+                value = self.sender.send(to=to, subject=subject, body=body,
+                                         delivery_key=marker or delivery_key)
+            else:
+                value = self.sender.send(to=to, subject=subject, body=body)
         except Exception:
             if marker:
                 self.journal.finalize(marker, accepted=False)
@@ -365,16 +441,25 @@ class MailRouter:
     cannot introduce a sender missing from the institutional approval index.
     """
     def __init__(self, routes: dict[str, MailRoute], default: str, *,
-                 by_actor: dict[str, str] | None = None):
+                 by_actor: dict[str, str] | None = None,
+                 allowed_actors: dict[str, frozenset[str]] | None = None):
         if not routes or default not in routes:
             raise MailConfigurationError("explicit authorized default mail route required")
         self.routes, self.default = dict(routes), default
         self.by_actor = {canonical_email(k): v for k,v in (by_actor or {}).items()}
         if any(v not in routes for v in self.by_actor.values()):
             raise MailConfigurationError("actor route is not authorized")
+        self.allowed_actors = allowed_actors
+        if allowed_actors is not None and any(k not in routes for k in allowed_actors):
+            raise MailConfigurationError("signed actor scope refers to nonexistent sender")
 
     def for_actor(self, actor: str) -> MailRoute:
-        return self.routes[self.by_actor.get(canonical_email(actor), self.default)]
+        staff = canonical_email(actor)
+        route = self.by_actor.get(staff, self.default)
+        if (self.allowed_actors is not None and
+            staff not in self.allowed_actors.get(route, frozenset())):
+            raise MailConfigurationError("administrator lacks explicit signed sender permission")
+        return self.routes[route]
 
     def send(self, *, to: str, subject: str, body: str):
         return self.routes[self.default].send(to=to, subject=subject, body=body)
@@ -382,7 +467,8 @@ class MailRouter:
 
 def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
                               signature_path: str | Path, public_key_path: str | Path,
-                              *, release_commit: str) -> dict:
+                              *, release_commit: str,
+                              include_actor_authorizations: bool = False):
     """Read two private JSONs and verify institutional sign-off over mailbox scope.
 
     The institutional public key must have been verified out-of-band. Config
@@ -411,6 +497,7 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
         raise MailConfigurationError("mail default not configured")
     if not config["routes"]:
         raise MailConfigurationError("no authorized mail senders")
+    authorized_staff = {}
     for key, definition in config["routes"].items():
         grant = policy["senders"].get(key)
         if not isinstance(grant, dict) or not isinstance(definition, dict):
@@ -424,12 +511,60 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
                 or not HEX.fullmatch(grant["owner_evidence_sha256"])):
             raise MailConfigurationError("mailbox owner/institution authorization missing")
         canonical_email(definition["email"])
-        # Signed grants must bind the actual Entra/Google OAuth CLIENT, not
-        # only a human-readable sender address. Repointing a signed mailbox
-        # scope to a different app/tenant requires fresh institutional review.
-        if (not isinstance(definition.get("client_id"),str)
-                or grant.get("client_id") != definition["client_id"]):
-            raise MailConfigurationError("signed grant is not bound to OAuth client")
+        # Human-operated sends MUST have exact consent from the mailbox or
+        # domain owner in the independently signed sender authorization file.
+        # Staff role grants only access to the app, never send-as rights.
+        actors = grant.get("authorized_actors", [])
+        if (type(actors) is not list or
+            any(type(actor) is not str or actor not in ADMIN_EMAILS
+                for actor in actors) or len(set(actors)) != len(actors)):
+            raise MailConfigurationError("signed staff sender authorization invalid")
+        authorized_staff[key] = frozenset(actors)
+        alias = definition.get("from_alias")
+        if alias is not None:
+            # The OAuth identity remains the *real* Gmail account. Merely
+            # editing JSON cannot delegate its privileges to an arbitrary
+            # vanity-domain address; signed owner and alias evidence are
+            # mandatory and verified before any LIVE service starts.
+            if definition["provider"] != "gmail_delegated":
+                raise MailConfigurationError("signed send-as aliases require Gmail")
+            alias = canonical_email(alias)
+            if (grant.get("from_alias") != alias or
+                grant.get("alias_verified_by_owner") is not True or
+                grant.get("alias_domain_authorized") is not True or
+                not isinstance(grant.get("alias_evidence_file"),str) or
+                not isinstance(grant.get("alias_evidence_sha256"),str) or
+                not HEX.fullmatch(grant["alias_evidence_sha256"])):
+                raise MailConfigurationError("signed send-as alias approval missing")
+            evidence_path = private_file(grant["alias_evidence_file"])
+            evidence_bytes = evidence_path.read_bytes()
+            if (not evidence_bytes.startswith(b"%PDF-") or
+                sha256(evidence_bytes).hexdigest() != grant["alias_evidence_sha256"]):
+                raise MailConfigurationError("send-as alias verification evidence mismatch")
+        elif grant.get("from_alias") is not None:
+            raise MailConfigurationError("signed alias cannot be omitted from route")
+        # Bind credentials to the signed provider account, never to an
+        # arbitrary replacement path or unsigned sender identity.
+        if definition["provider"] == "brevo_api":
+            label = definition.get("api_key_label")
+            if (type(label) is not str or len(label) < 8 or
+                label != grant.get("api_key_label") or
+                definition.get("api_key_file") != grant.get("api_key_file") or
+                grant.get("sender_domain_authenticated") is not True):
+                raise MailConfigurationError("unsigned domain API credential or sender")
+            evidence = grant.get("domain_evidence_file")
+            digest = grant.get("domain_evidence_sha256")
+            if (not isinstance(evidence,str) or not isinstance(digest,str)
+                    or not HEX.fullmatch(digest)):
+                raise MailConfigurationError("signed domain authorization evidence missing")
+            proof = private_file(evidence).read_bytes()
+            if not proof.startswith(b"%PDF-") or sha256(proof).hexdigest()!=digest:
+                raise MailConfigurationError("domain evidence verification failed")
+        else:
+            # Signed grants must bind the OAuth client/tenant exactly.
+            if (not isinstance(definition.get("client_id"),str)
+                    or grant.get("client_id") != definition["client_id"]):
+                raise MailConfigurationError("signed grant is not bound to OAuth client")
         if definition["provider"] in ("graph_application","graph_delegated"):
             if grant.get("tenant") != definition.get("tenant"):
                 raise MailConfigurationError("signed grant is not bound to Microsoft tenant")
@@ -445,6 +580,11 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
     actor_routes = config.get("by_actor", {})
     if not isinstance(actor_routes, dict) or any(v not in config["routes"] for v in actor_routes.values()):
         raise MailConfigurationError("unapproved actor route")
+    for actor, route in actor_routes.items():
+        if actor not in ADMIN_EMAILS or actor not in authorized_staff.get(route, frozenset()):
+            raise MailConfigurationError("actor route lacks explicit signed owner authorization")
+    if include_actor_authorizations:
+        return config, authorized_staff
     return config
 
 
@@ -453,14 +593,19 @@ def build_mail_router(*, config_file: str | Path, approval_file: str | Path,
                       release_commit: str, vault: EncryptedRefreshVault | None = None,
                       transport=None, token_transport=None,
                       journal: MailDeliveryJournal | None = None) -> MailRouter:
-    config = verify_signed_mail_policy(
+    config, signed_staff = verify_signed_mail_policy(
         config_file, approval_file, approval_signature, institution_key,
-        release_commit=release_commit,
+        release_commit=release_commit, include_actor_authorizations=True,
     )
     routes = {}
     for key, item in config["routes"].items():
         provider = item["provider"]
-        if provider == "graph_application":
+        if provider == "brevo_api":
+            source = DomainVerifiedApiSender(
+                sender=item["email"], api_key_file=item["api_key_file"],
+                transport=transport,
+            )
+        elif provider == "graph_application":
             source = GraphMailSender(
                 tenant_id=item["tenant"], client_id=item["client_id"],
                 client_secret=private_file(item["client_secret_file"]).read_text().strip(),
@@ -472,7 +617,8 @@ def build_mail_router(*, config_file: str | Path, approval_file: str | Path,
             source = DelegatedOAuthSender(
                 provider=provider, sender=item["email"], client_id=item["client_id"],
                 tenant=item.get("tenant"), client_secret_path=item.get("client_secret_file"),
-                vault=vault, transport=transport, token_transport=token_transport
+                vault=vault, transport=transport, token_transport=token_transport,
+                from_alias=item.get("from_alias")
             )
             # Fail before accepting live deployment if an account has not
             # explicitly consented and installed its refresh grant.
@@ -481,4 +627,5 @@ def build_mail_router(*, config_file: str | Path, approval_file: str | Path,
         routes[key] = MailRoute(sender=source, provider=provider,
                                 sender_email=item["email"],journal=journal,
                                 identifier=key)
-    return MailRouter(routes, config["default"], by_actor=config.get("by_actor", {}))
+    return MailRouter(routes, config["default"], by_actor=config.get("by_actor", {}),
+                      allowed_actors=signed_staff)

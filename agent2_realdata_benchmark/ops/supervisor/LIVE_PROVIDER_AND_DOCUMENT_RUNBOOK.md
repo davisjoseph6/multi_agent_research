@@ -163,6 +163,117 @@ over authenticated secure channels to the dedicated LIVE vault and
 root-owned private credentials directory. Configure separate backups,
 revocation and reauthorization procedures.
 
+## Personal Gmail OAuth registration (owner-controlled, no ChatGPT connection)
+
+This is the fallback when no institutional Entra administrator can authorize
+Microsoft Graph. Sending as **your own Gmail inbox** needs no university Entra
+application privileges. The researcher login identities never become OAuth
+identities. Proceed solely in your personal Google account and WSL machine:
+
+1. Open https://console.cloud.google.com/ and select or create a dedicated
+   project for IJCAI study mail. Enable **Gmail API** for that project.
+2. In Google Auth Platform configure the app's branding and External audience.
+   Add your own Gmail as a test user while testing. Under Data Access request
+   `openid`, `email` and the minimum send scope
+   `https://www.googleapis.com/auth/gmail.send`. No inbox-read scopes.
+3. Under Clients create a **Web application OAuth client**, register the exact
+   callback `http://127.0.0.1:8765/callback`, and privately record its Client
+   ID and secret (do not copy them into Git, chat, shell history or logs).
+   Complete Google's required verification/publishing steps before a
+   long-running production sender. External/Testing Gmail refresh tokens
+   normally expire in 7 days for `gmail.send`-scoped apps.
+4. On trusted local WSL, `umask 077`; create a mode-0700 credentials directory,
+   install the client secret in a mode-0600 file, and run the documented
+   `supervisor_oauth_bootstrap init-vault`, `start --provider gmail_delegated`
+   and `finish` commands from the section above.
+5. Run the existing
+   `python -m scripts.supervisor_mail_owner_canary` with your **actual**
+   Gmail address in `--sender`. Without `--send`, this only checks the
+   encrypted refresh grant; with `--send --confirm-own-mailbox`, it sends
+   **one generic test email to yourself** and leaves a permanent no-retry
+   receipt. Never put invitation links into this preliminary canary.
+6. Independently inspect the provider's Sent folder and destination inbox,
+   grant retention/rotation procedures and the applicable data-processing
+   agreement. Only then configure this route in the approved institutional
+   LIVE sender policy.
+
+Your Microsoft personal sign-in using a `@gmail.com` alias does not create
+an Outlook mailbox. Microsoft Graph `Mail.Send` delegated can be used only
+with an actual Graph-accessible personal mailbox, as confirmed by a successful
+owner-authenticated Graph request.
+
+## Durable custom-domain From address — optional Brevo API route
+
+The shared address `private_quiz@selfhealing-edu.fr` is **not** granted simply
+by using this string in a From header. It must be controlled and authenticated
+by the domain owner. Starting January 2027, Google says personal Gmail's
+third-party send-as feature will cease supporting non-Gmail third-party
+addresses in the existing form (Google Workspace aliases are excepted).
+For a study continuing in 2027, prefer a Google Workspace or Exchange Online
+mailbox on the study domain, or a domain-native transactional API.
+
+An optional, provider-neutral `brevo_api` sender implements
+`POST https://api.brevo.com/v3/smtp/email`, in addition to
+`graph_application`, `graph_delegated` and `gmail_delegated`. Its
+interface is unchanged: `send(to, subject, body)`. The API credential is
+read from a private file, never committed. Provider acceptance must return
+HTTP 201 and a plausible nonempty message ID; other outcomes are marked
+uncertain and are **never automatically retried**. A deterministic
+provider-side idempotency UUID and persistent private journal protect
+against duplicates; no invitation token is included in the audit record.
+
+Owner-side steps, without ChatGPT access to any account:
+
+1. Confirm **actual control and permission** to use
+   `selfhealing-edu.fr`; verify the domain in the approved mail service.
+   Configure its exact DNS records for SPF, DKIM and DMARC, and ensure the
+   real `private_quiz@` mailbox/alias can receive replies and rights requests.
+2. If using Brevo, create the study-controlled sender/domain in its own
+   dashboard, complete sender verification and domain authentication,
+   accept the appropriate research-data processor agreement, and issue a
+   restricted transactional-mail API key in the account's developer section.
+   Do not grant the app general contact export or campaign privileges.
+3. Securely write the API key to a root-owned mode-0600/0640 file under
+   `/etc/ijcai-supervisor-live/mail/`, readable only by the dedicated
+   service account, but never put a live API key into the draft templates.
+4. The institution independently reviews this exact sender domain and
+   each authorized staff actor (e.g. Wiam, Sara and Davis). Its signed
+   `mail_owner_authorizations` record must include
+   `sender_domain_authenticated=true`, the owner/domain approval PDF
+   digests, exact `api_key_label`, secret-file path and the explicitly
+   authorized researcher emails. Unapproved draft values must remain false.
+5. Set the private route's `default` to the signed `domain_native_brevo`
+   route only when the genuine LIVE release has been independently approved.
+   Restart the approved isolated LIVE service through the reviewed runbook,
+   not by editing a public demo or resetting any SQLite database.
+6. Run an explicitly authorized owner-to-self or controlled-group deliverability
+   test, verify Received/Spam and reply handling, and inspect the private
+   delivery journal and any delivery webhooks. Do not activate real-human
+   research with a fake approval.
+
+Reference:
+https://developers.brevo.com/reference/send-transac-email
+https://developers.brevo.com/docs/getting-started-with-senders-and-domains
+https://support.google.com/mail/answer/22370
+
+## Per-actor permission for shared mailboxes
+
+Using the same centrally approved sender for Wiam, Sara and Davis does
+**not** give anyone permission to impersonate those researchers. The
+outbound From remains the verified central mailbox. The private login and
+staff audit record identify the administrator initiating the send.
+Signed `authorized_actors` arrays for each route must individually contain
+the exact staff email; `by_actor` may only select a signed sender already
+approved for that staff member. Administrators omitted from the signed list
+cannot initiate a send, even if they have a researcher/supervisor login.
+Scheduled reminder delivery uses the independently approved default
+service-sender route, not a staff user's identity.
+
+The provider-neutral architecture intentionally does not change the four
+application admin identities or their permissions, questionnaire URLs,
+participant identifiers, randomized arm assignments, research history or
+student progress when a mailbox or provider is swapped.
+
 ## Signed sender routing & idempotency
 
 Templates templates/mail_routes.DRAFT.json,

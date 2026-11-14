@@ -1,21 +1,18 @@
 """Offline-only administrative controls for a separately gated VPS study.
 
 Never expose these commands as web routes. STAGING generates reserved .example
-links into a mode-0600 file; it never delivers mail. LIVE sending requires
-institutional release verification, an authorized sender and SMTP STARTTLS.
+links into a mode-0600 file; it never delivers mail. All LIVE outbound mail now uses the separate signed provider-neutral router.
+The legacy direct SMTP CLI is permanently disabled, including with --send.
 """
 from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
-from email.message import EmailMessage
 import json
 import os
 from pathlib import Path
 import secrets
 import stat
-import smtplib
-import ssl
 from urllib.parse import parse_qs, urlsplit
 
 from scripts.supervisor_vps_wsgi import BANK, _release_verified
@@ -105,35 +102,13 @@ def read_retryable_invitation(*, path: Path, root: Path, host: str,
 
 
 def deliver(recipient: str, link: str, *, mode: str):
-    if mode!="live":
-        raise ValueError("SMTP delivery disabled outside live approved release")
-    host=os.environ["SUPERVISOR_SMTP_HOST"]
-    port=int(os.environ.get("SUPERVISOR_SMTP_PORT","587"))
-    sender=os.environ["SUPERVISOR_SMTP_FROM"]
-    user=os.environ["SUPERVISOR_SMTP_USER"]
-    password=os.environ["SUPERVISOR_SMTP_PASSWORD"]
-    if not (host and sender and user and password) or not 1<=port<=65535:
-        raise ValueError("authenticated STARTTLS sender required")
-    msg=EmailMessage()
-    msg["From"]=sender
-    msg["To"]=recipient
-    msg["Subject"]="Private link for the Adaptive Learning Study"
-    msg.set_content(
-        "Hello,\n\n"
-        "You have been invited to a three-session adaptive learning study. "
-        "Read the information sheet and complete consent before registering.\n\n"
-        "Your personal link (do not share):\n"+link+"\n\n"
-        "You may stop taking part at any time using the link at the bottom "
-        "of the participant portal. Please reply to this email with any "
-        "questions about the study or your data rights.\n\n"
-        "Study coordination team\n"
-    )
-    with smtplib.SMTP(host,port,timeout=25) as client:
-        client.ehlo()
-        client.starttls(context=ssl.create_default_context())
-        client.ehlo()
-        client.login(user,password)
-        client.send_message(msg)
+    """Historical interface retained solely to reject bypass of signed mail routing.
+
+    Never use SMTP passwords or an unverified sender directly. The LIVE
+    researcher dispatch and reminder engine use the same signed
+    provider-neutral mail router with durable duplicate-send journal.
+    """
+    raise ValueError("Legacy SMTP delivery disabled: use the signed LIVE provider router")
 
 
 def main():
@@ -142,7 +117,7 @@ def main():
     group.add_argument("--issue",metavar="EMAIL")
     group.add_argument("--counts",action="store_true")
     group.add_argument("--send-existing",type=Path,metavar="PRIVATE_LINK_FILE",
-                       help="LIVE only: retry SMTP for an existing unclaimed invitation")
+                       help="RETIRED (rejected): direct SMTP retry is forbidden")
     group.add_argument("--rotate-registered-test",metavar="EMAIL",
                        help="STAGING only; replace an existing registered .example invitation without losing progress")
     group.add_argument("--withdraw-verified-ref",metavar="STUDY_PNNN")
@@ -154,11 +129,13 @@ def main():
     parser.add_argument("--recipient",metavar="EMAIL",
                         help="exact intended email address for --send-existing")
     parser.add_argument("--send",action="store_true",
-                        help="LIVE only, deliver invitation via verified SMTP")
+                        help="RETIRED (rejected): outbound mail uses signed provider router only")
     parser.add_argument("--validity-days",type=int,default=21,
                         help="Initial registration window only: 1..30 days. "
                              "Registered participants retain their link.")
     args=parser.parse_args()
+    if args.send or args.send_existing:
+        parser.error("Direct SMTP delivery is retired; use the signed LIVE researcher dashboard/provider router")
     if not 1<=args.validity_days<=30:
         parser.error("--validity-days must be 1..30")
     if args.validity_days!=21 and not args.issue:
@@ -273,7 +250,7 @@ def main():
         deliver(args.issue,link,mode=mode)
         print("SMTP server accepted the message. Delivery to inbox is not guaranteed.")
     else:
-        print("No email sent. Staging links are for reserved test identities only.")
+        print("No email sent. Private invitation file remains protected; use only approved dispatch policy.")
 
 
 if __name__=="__main__":

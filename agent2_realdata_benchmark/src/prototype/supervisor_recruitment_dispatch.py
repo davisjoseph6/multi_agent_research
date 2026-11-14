@@ -1,8 +1,8 @@
 """Verified-LIVE bulk invitation dispatch with private capability files.
 
 Admin staff can send to selected or all pre-approved candidates. One issued
-student credential per address. No re-sending after Graph's uncertain outcome:
-an authorized operator must reconcile the message in Outlook Sent Items.
+student credential per address. No re-sending after an uncertain provider result:
+an authorized operator must reconcile the message in the actual provider account.
 This is not mounted by the old staging participant portal.
 """
 from __future__ import annotations
@@ -33,7 +33,7 @@ class InvitationDispatcher:
         if type(hostname) is not str or "/" in hostname or "demo" in hostname or "." not in hostname:
             raise RecruitmentError("approved non-demo canonical study host required")
         if not hasattr(sender,"send") or not callable(sender.send):
-            raise TypeError("approved Microsoft Graph sender required")
+            raise TypeError("signed provider-neutral sender required")
         if type(allow_test_examples) is not bool:
             raise TypeError("fixture restriction must be explicit")
         self.intake=intake
@@ -119,8 +119,8 @@ class InvitationDispatcher:
                 self.ledger.finish_mail(
                     candidate_id=cid,accepted=False,actor=actor,at=at)
                 result["uncertain"]+=1
-                # Never retry automatically: Microsoft Graph's response can
-                # be lost even if Exchange accepted the message.
+                # Never retry automatically: any provider's acceptance reply
+                # can be lost after it has already accepted the message.
                 continue
             self.ledger.finish_mail(
                 candidate_id=cid,accepted=True,actor=actor,at=at)
