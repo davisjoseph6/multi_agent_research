@@ -399,7 +399,7 @@ def verify_signed_mail_policy(config_path: str | Path, policy_path: str | Path,
         "-signature", str(signature), str(policy_path)
     ], capture_output=True, text=True, timeout=12, check=False)
     if verification.returncode or "Verified OK" not in verification.stdout:
-        raise MailConfigurationError("institutionally signed sender policy invalid")
+        raise MailConfigurationError("institutional sender-policy signature invalid")
     if (policy.get("schema") != APPROVAL_SCHEMA
             or policy.get("decision") != "approved"
             or policy.get("release_commit") != release_commit
