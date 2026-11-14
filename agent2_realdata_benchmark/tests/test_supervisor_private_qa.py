@@ -159,4 +159,4 @@ def test_dispatcher_no_PUBLIC_paths_or_mail(suite):
     assert app.get("/interest/school").status_code == 200
     assert app.get("/study/health").json["enrollment_authorized"] is False
     assert app.get("/unrecognized").status_code == 404
-    assert app.get("/interest/api/apply").status_code == 404
+    assert app.get("/interest/api/apply").status_code == 405
