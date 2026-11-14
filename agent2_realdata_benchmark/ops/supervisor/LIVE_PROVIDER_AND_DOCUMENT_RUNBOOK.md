@@ -231,6 +231,39 @@ HTTPS Caddy routes are verified and the private dashboard is not public.
 On failure, it stops the separate LIVE units and rolls back Caddy changes.
 The reminders timer starts only after public routes pass.
 
+## Safe upgrade of an already PREPARED (never activated) LIVE release
+
+PREPARE creates the three systemd unit files and deliberately refuses a
+second PREPARE attempt. **Never remove the units, databases, passwords or
+release directory to retry installation.** For a newer reviewed source commit,
+upload a complete pinned remote-tracking Git bundle together with the
+`upgrade_pending_live_release.sh` script and matching
+`materialize_live_bundle.sh` from that exact commit. Verify all transferred
+files with SHA-256 before executing anything as root.
+
+The dedicated upgrade accepts only an existing clean, Git-pinned, inactive
+installation with disabled study/recruitment/control/reminder units, no
+LIVE Caddy fragment, no LIVE environment file and no approved/current
+document-bundle pointer. An already activated or partially configured
+installation must follow a separate independently reviewed migration plan.
+With those prerequisites checked, the operator uses:
+
+    sudo bash upgrade_pending_live_release.sh /private/upload/ijcai-live.bundle FULL_NEW_COMMIT_SHA
+
+It checks the exact bundle ref/SHA, creates a new source checkout and
+**new PENDING 16-category document version** bound to the new commit, then
+atomically changes only the `/srv/ijcai-supervisor-live/current` code
+symlink. Existing LIVE research/contact/admin databases, confidential
+administrator credentials, historic document versions, and staging state
+remain untouched. It does not install or start public services, send mail,
+approve the study or run an experimental enrollment.
+
+The new commit MUST be tested, reviewed and signed explicitly; an existing
+institutional signature for the previous source commit does not authorize
+a different one. Do not reuse the old bundle or the PREPARE-only wrapper
+to update a populated install. Inspect stopped units and the new source
+SHA independently after upgrade.
+
 Before the first participant, institutional operations must ALSO complete:
 independent security/accessibility audit, power/protocol approval, 3-arm
 randomization integrity review, load/device tests, offsite encrypted backup
