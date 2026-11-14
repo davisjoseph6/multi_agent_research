@@ -158,12 +158,18 @@ async function main(){
    const correct=answerKey[item.question_id];
    assert(correct,"missing canonical answer for a QA item");
    await school.locator('#choices input[value="'+correct+'"]').check();
-   const feedback=school.waitForResponse(respond("answer"));
-   await school.locator("#answer").click();
-   assert.equal((await (await feedback).json()).previous_correct,true);
-   await school.locator("#answer-feedback").waitFor({state:"visible"});
-   nextPromise=school.waitForResponse(respond("item"));
-   await school.locator("#feedback-next").click();
+   if(item.action==="QUESTION"){
+    const feedback=school.waitForResponse(respond("answer"));
+    await school.locator("#answer").click();
+    const report=await (await feedback).json();
+    assert.equal(report.previous_correct,true);
+    await school.locator("#answer-feedback").waitFor({state:"visible"});
+    nextPromise=school.waitForResponse(respond("item"));
+    await school.locator("#feedback-next").click();
+   }else{
+    nextPromise=school.waitForResponse(respond("item"));
+    await school.locator("#answer").click();
+   }
    item=await (await nextPromise).json();
   }
 
