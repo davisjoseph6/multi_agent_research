@@ -1,0 +1,29 @@
+{
+  "schema": "IJCAI2027_MAILBOX_AUTHORIZATION_V1",
+  "decision": "pending",
+  "release_commit": "<FULL_EXACT_RELEASE_SHA>",
+  "senders": {
+    "institutional_primary": {
+      "provider": "graph_application",
+      "email": "davis.joseph@aivancity.education",
+      "owner_authorized": false,
+      "institutional_scope_verified": false,
+      "owner_evidence_sha256": null
+    },
+    "colleague_wiam": {
+      "provider": "graph_application",
+      "email": "wiam.belouard@aivancity.education",
+      "owner_authorized": false,
+      "institutional_scope_verified": false,
+      "owner_evidence_sha256": null
+    },
+    "colleague_sara": {
+      "provider": "graph_application",
+      "email": "sara.elkardi@aivancity.education",
+      "owner_authorized": false,
+      "institutional_scope_verified": false,
+      "owner_evidence_sha256": null
+    }
+  },
+  "warning": "DRAFT ONLY. Independently verify explicit owner consent, Exchange/Microsoft Graph rights, and sign this exact JSON using an authenticated institutional key. This unsigned file cannot configure LIVE mail."
+}
