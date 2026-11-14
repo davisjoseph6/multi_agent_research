@@ -41,7 +41,8 @@ function display(data){
  rows("applicants",candidates,(c,tr)=>{
   const td=document.createElement("td"),input=document.createElement("input");
   input.type="checkbox";input.className="candidate";input.value=String(c.candidate_id);
-  td.append(input);tr.append(td);
+  input.setAttribute("aria-label","Select internal candidate ID "+String(c.candidate_id));
+  td.append(input,document.createTextNode(" ID "+String(c.candidate_id)));tr.append(td);
   [c.email,[c.first_name,c.last_name].filter(Boolean).join(" ")||"—",
    c.questionnaire,c.approved_for_invitation?"Approved":c.invitation_status,
    c.submitted_at].forEach(v=>tr.append(element("td",v)));
