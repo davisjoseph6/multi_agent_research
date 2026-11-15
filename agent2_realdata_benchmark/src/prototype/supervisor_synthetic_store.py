@@ -45,12 +45,23 @@ class SupervisorSyntheticStore:
     """Bank-pinned, synthetic-only participant state and append-only audit log."""
 
     def __init__(self, folder: str | Path, *, bank: SupervisorBank,
-                 operational: bool = False):
+                 operational: bool = False,
+                 qa_early_preview_emails: frozenset[str] = frozenset()):
         # Default is the original, strictly fictional, reference-harness
         # behavior. The separately gated VPS service may opt into a
         # real-contact-capable storage schema; no API is enabled by this flag.
         if type(operational) is not bool:
             raise SyntheticStudyError("explicit operational boolean required")
+        if (type(qa_early_preview_emails) is not frozenset or
+                (qa_early_preview_emails and not operational) or
+                any(type(email) is not str or email != email.casefold()
+                    or "@" not in email or len(email)>254
+                    for email in qa_early_preview_emails)):
+            raise SyntheticStudyError("invalid QA-only preview allowlist")
+        # No LIVE route can invoke the staging preview endpoint. The only
+        # operational allowlist is passed explicitly by the disposable,
+        # loopback-only private self-acceptance harness.
+        self._qa_early_preview_emails = qa_early_preview_emails
         self.operational = operational
         self.folder = Path(folder)
         if not self.folder.is_dir() or self.folder.is_symlink():
@@ -916,8 +927,12 @@ class SupervisorSyntheticStore:
                     "SELECT email FROM pii.contacts WHERE learner_id=?",
                     (ref,),
                 ).fetchone()
-                if (identity is None or not identity["email"].lower().endswith(".example")):
-                    raise SyntheticStudyError("review-only fictional contact required")
+                allowed_fictional = (identity is not None and
+                                     identity["email"].lower().endswith(".example"))
+                allowed_private_qa = (identity is not None and
+                    identity["email"].casefold() in self._qa_early_preview_emails)
+                if not (allowed_fictional or allowed_private_qa):
+                    raise SyntheticStudyError("review-only QA contact required")
                 updated = db.execute(
                     "UPDATE sessions SET scheduled_for=? "
                     "WHERE learner_id=? AND session_no=? AND status='scheduled'",
