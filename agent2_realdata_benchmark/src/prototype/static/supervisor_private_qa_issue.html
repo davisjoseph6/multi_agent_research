@@ -28,6 +28,17 @@
   <button type="button" id="qa-all">Issue all approved QA links</button>
   <p id="bulk-status" role="status" aria-live="polite"></p>
   <ul id="qa-links" aria-label="Private test invitation links"></ul>
+  <hr>
+  <h2>Lost an invitation link? Recover without losing progress</h2>
+  <p>For an already invited QA student only. An authenticated researcher can replace the lost access link <strong>without deleting responses, resetting the student ID or changing the assigned arm</strong>. The previous link and active student cookie will stop working; the student must open the replacement link. This does not create another candidate or send an email.</p>
+  <form id="recover-form">
+   <label for="recover-candidate">Existing approved QA candidate ID</label>
+   <input id="recover-candidate" type="number" min="1" step="1" required>
+   <button type="submit" id="recover-submit">Generate replacement QA link</button>
+  </form>
+  <p id="recover-status" role="status" aria-live="polite"></p>
+  <a id="recover-link" href="#" hidden rel="noreferrer noopener">Open replacement student link</a>
+  <button id="recover-copy" type="button" hidden>Copy replacement link (do not open)</button>
  </section>
  <footer>Tokens are secret credentials: never copy them into logs, GitHub, or chat. Only authorized staff can access these links.</footer>
 </main></body></html>
