@@ -105,6 +105,10 @@ function drawMastery(data){
   const points=values.map(p=>p.map(n=>n.toFixed(2)).join(",")).join(" ");
   svg.append(nodeSVG("polyline",{points,fill:"none",stroke:colors[index%colors.length],
    "stroke-width":2.7,"stroke-linejoin":"round"}));
+  if(values.length===1){
+   svg.append(nodeSVG("circle",{cx:values[0][0],cy:values[0][1],
+    r:4,fill:colors[index%colors.length]}));
+  }
  }
  const overall=dots.map((point,i)=>typeof point.overall_bkt_mean==="number"
    ?[48+(i/count)*872,315-point.overall_bkt_mean*288]:null).filter(Boolean);
@@ -112,6 +116,10 @@ function drawMastery(data){
   const points=overall.map(p=>p.map(v=>v.toFixed(2)).join(",")).join(" ");
   svg.append(nodeSVG("polyline",{"data-series":"overall-bkt-mean",points,
    fill:"none",stroke:"#182d3a","stroke-width":4,"stroke-dasharray":"9 5"}));
+  if(overall.length===1){
+   svg.append(nodeSVG("circle",{"data-series":"overall-bkt-mean",
+    cx:overall[0][0],cy:overall[0][1],r:5,fill:"#182d3a"}));
+  }
  }
  const caption=nodeSVG("text",{x:430,y:358,"font-size":14,fill:"#516578"});
  caption.textContent="Scored quiz and recovery response index";
