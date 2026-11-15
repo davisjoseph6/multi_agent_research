@@ -52,7 +52,47 @@ The FOUR separate LIVE bootstrap accounts already exist in /var/lib/ijcai-superv
 
 Student records persist as real SQLite tables within protected QA state, and the researcher dashboard can download a per-student pseudonymous seven-file ZIP with session/quiz arm, C1-C8 BKT estimated mastery, overall mean, event-level response times, session gaps, fatigue and assessments. The authenticated researcher dashboard also offers a bounded all-students ZIP containing each participant's seven-file archive. Batch exports are limited to 250 records and 64 MiB per response, with a separate staff audit entry. QA data is explicitly not a genuine RCT dataset. Use independent encrypted backups if this rehearsal must survive disk failure.
 
-## 5. Proposed friendly production hostnames — NOT YET CONFIGURED
+## 5. Recover a lost invitation URL without deleting research responses
+
+The browser deliberately erases `#invite=...` after a successful token
+exchange. Because only a hash of that token is stored, its plaintext cannot
+be recovered from the database. Never reset the account or re-register.
+
+The **private QA** researcher console now supports a **lost invitation link
+recovery** operation. It is not an enrollment or LIVE researcher feature.
+
+1. Keep the SSH tunnel running and sign in as an authorized researcher at
+   `http://127.0.0.1:8897/researcher`.
+2. Open `http://127.0.0.1:8897/researcher/invitations` and scroll to
+   **Lost an invitation link? Recover without losing progress**.
+3. Enter the student's existing approved **candidate ID** (visible in the
+   protected researcher applicant list, distinct from `STUDY_Pnnn`).
+4. Select **Generate replacement QA link** and approve the warning.
+   This invalidates the old URL and any browser cookie that used it,
+   but preserves the existing `STUDY_Pnnn` ID, assigned arm,
+   previously answered questions, assessment scores, BKT snapshots,
+   session schedule, and fatigue responses.
+5. **Click Copy replacement link, not Open replacement student link.**
+   Save it in the private WSL file for the owner-only Gmail self-test:
+   `$HOME/.ijcai_oauth_private/qa-school-link.txt`.
+   The token must never appear in Git, chat, shell history or logs.
+   Open the link in a new student browser tab only after saving it.
+
+Registered students resume their current existing phase; invited/consented/
+screened students resume their corresponding step. No new candidate or
+participant record is created, and the QA link is never sent by this tool.
+The recovery is only available to an authenticated researcher who has
+changed their bootstrap password; it requires CSRF, explicit confirmation,
+a pre-approved existing candidate from the exact two QA allowlisted emails,
+and rate limits repeated rotations. The backend returns the new plaintext
+token only once; researcher audit records contain no tokens.
+
+LIVE enrollment still has no `/control/api/qa-recover` route; recovery is
+not a replacement for institutional identity verification or authentic
+participant recontact. Each recovered QA URL works only through the private
+SSH tunnel on localhost:8897.
+
+## 6. Proposed friendly production hostnames — NOT YET CONFIGURED
 
 After the domain owner confirms real DNS control, TLS and institutional approval, one possible naming scheme is:
 

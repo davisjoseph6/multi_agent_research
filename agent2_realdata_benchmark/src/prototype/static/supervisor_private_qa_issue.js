@@ -20,6 +20,43 @@
    el("status").textContent="One QA link issued; no mail was sent.";
   }catch(_){el("status").textContent="Denied. Sign in, change your temporary password, approve the candidate, and use a not-yet-issued ID."}
  });
+ let recoveredLink="";
+ el("recover-form").addEventListener("submit",async event=>{
+  event.preventDefault();
+  recoveredLink="";
+  el("recover-link").hidden=true;
+  el("recover-copy").hidden=true;
+  el("recover-status").textContent="";
+  const candidate=Number(el("recover-candidate").value);
+  if(!Number.isSafeInteger(candidate)||candidate<1){
+   el("recover-status").textContent="Choose an approved candidate ID.";return;
+  }
+  if(!window.confirm("Revoke this candidate's previous QA link and all existing student browser sessions? Their ID, assigned arm, answers and progress will be preserved."))return;
+  el("recover-submit").disabled=true;
+  try{
+   const d=await post("/control/api/qa-recover",
+    {candidate_id:candidate,confirm:true});
+   recoveredLink=d.test_link;
+   el("recover-link").href=recoveredLink;
+   el("recover-link").hidden=false;
+   el("recover-copy").hidden=false;
+   el("recover-status").textContent=
+    "A replacement link for "+(d.learner_id||"the pending QA invitation")+
+    " is ready. Copy it privately NOW; opening it clears the token from the address bar. Old sessions are invalid. No responses were reset and no email was sent.";
+  }catch(_){
+   el("recover-status").textContent=
+    "Recovery denied. Sign in with a changed staff password and select an existing approved, invited QA candidate. Do not create another student.";
+  }finally{el("recover-submit").disabled=false;}
+ });
+ el("recover-copy").addEventListener("click",async()=>{
+  if(!recoveredLink)return;
+  try{
+   await navigator.clipboard.writeText(recoveredLink);
+   el("recover-status").textContent="Copied privately. Paste directly into your protected WSL file, not chat or shell history.";
+  }catch(_){
+   el("recover-status").textContent="Clipboard copy unavailable. Right-click the replacement link and choose Copy link address.";
+  }
+ });
  el("qa-all").addEventListener("click",async()=>{
   if(!window.confirm("Generate a separate local QA link for ALL new approved test applicants? No email will be sent."))return;
   el("qa-links").replaceChildren();
