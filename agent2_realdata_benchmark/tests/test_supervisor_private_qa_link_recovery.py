@@ -93,19 +93,15 @@ def test_recover_before_registration_preserves_original_intake_stage(suite,stage
         "/control/api/qa-recover",json={"candidate_id":cid,"confirm":True},
         headers=headers())
     assert denied.status_code==409
-    assert recover(reviewer,csrf,cid).status_code==200
+    response=recover(reviewer,csrf,cid)
+    assert response.status_code==200
+    assert response.json["stage"]==stage
     # The previous token cannot be used to pass intake stages.
     with pytest.raises(SyntheticStudyError,match="not found"):
         suite["intake"].status(old,at=NOW())
-    # The new token resumes the same stage, no duplicate candidate.
-    second=recover(reviewer,csrf,cid)
-    assert second.status_code==200
-    assert second.json["stage"]==stage
-    token=parse_qs(urlsplit(second.json["test_link"]).fragment)["invite"][0]
-    assert suite["intake"].status(token,at=NOW())["stage"] in (
-        ("invited","consented","screened") if stage=="invited" else
-        ("screening",) if stage=="consented" else ("registration",)
-    )
+    # The new token resumes the exact persisted stage, not a fresh consent.
+    token=parse_qs(urlsplit(response.json["test_link"]).fragment)["invite"][0]
+    assert suite["intake"].status(token,at=NOW())["stage"]==stage
     assert len(suite["ledger"].candidates())==1
     with suite["store"]._tx() as db:
         assert db.execute("SELECT COUNT(*) FROM participants").fetchone()[0]==0
