@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 from contextlib import nullcontext
 import fcntl
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hmac
 from html import escape
 import json
@@ -281,7 +281,7 @@ def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
                 "SELECT COUNT(*) FROM audit WHERE subject_id=? "
                 "AND action='qa_invitation_recovered' AND at>=?",
                 (cid, (datetime.now(timezone.utc) -
-                       __import__("datetime").timedelta(days=1)).isoformat()),
+                       timedelta(days=1)).isoformat()),
             ).fetchone()[0]
         if recent >= 5:
             raise RecruitmentError("QA recovery limit reached for this candidate")
