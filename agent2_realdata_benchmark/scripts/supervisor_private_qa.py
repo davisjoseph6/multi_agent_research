@@ -66,7 +66,8 @@ def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
         raise ValueError("one institutional and one external QA address required")
     permitted = frozenset((school, external))
     store = SupervisorSyntheticStore(directory, bank=SupervisorBank(BANK),
-                                     operational=True)
+                                     operational=True,
+                                     qa_early_preview_emails=permitted)
     intake = OperationalIntake(store, programs=("Private QA only",))
     ledger = RecruitmentLedger(directory)
     credential_dir = directory / "qa-admin-secrets"
@@ -280,6 +281,7 @@ def main():
         print("QA researcher link tool: http://127.0.0.1:%d/control/qa/" % args.port, flush=True)
         print("No real study enrollment, approved consent, mail or public routing.", flush=True)
         print("Temporary QA state is deleted on exit; keep no important data here.", flush=True)
+        print("TEST ONLY: approved QA students can advance to session 2/3 without the real three-day wait.", flush=True)
         server = make_server("127.0.0.1", args.port, sandbox["app"],
                              threaded=True)
         try:
