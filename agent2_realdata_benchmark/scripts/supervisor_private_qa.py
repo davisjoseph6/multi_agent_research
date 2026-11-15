@@ -14,6 +14,8 @@ that token in /study/ while a different browser context monitors mastery.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
+import fcntl
 from datetime import datetime, timezone
 import hmac
 from html import escape
@@ -45,9 +47,13 @@ QA_STATIC = ROOT / "src" / "prototype" / "static"
 
 
 def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
-                      port: int):
+                      port: int, persistent: bool = False):
     """Create solely disposable QA state and applications; no sockets or mail."""
     directory = Path(directory)
+    if type(persistent) is not bool:
+        raise ValueError("explicit boolean required for persistent QA")
+    if persistent and (directory != directory.resolve(strict=True)):
+        raise ValueError("persistent QA directory must not use symbolic links")
     if (not directory.is_absolute() or directory.is_symlink()
             or not directory.is_dir()
             or stat.S_IMODE(directory.stat().st_mode) != 0o700):
@@ -71,19 +77,38 @@ def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
     intake = OperationalIntake(store, programs=("Private QA only",))
     ledger = RecruitmentLedger(directory)
     credential_dir = directory / "qa-admin-secrets"
-    credential_dir.mkdir(mode=0o700)
+    if credential_dir.exists() or credential_dir.is_symlink():
+        if (not persistent or credential_dir.is_symlink()
+                or not credential_dir.is_dir()
+                or stat.S_IMODE(credential_dir.stat().st_mode) != 0o700):
+            raise ValueError("existing QA secret directory is not safe")
+    else:
+        credential_dir.mkdir(mode=0o700)
+    with ledger._tx() as db:
+        existing = {record["email"] for record in
+                    db.execute("SELECT email FROM administrators")}
+    if existing and not persistent:
+        raise ValueError("disposable QA cannot reuse persistent staff credentials")
+    if any(email not in ADMIN_EMAILS for email in existing):
+        raise ValueError("unexpected researcher in protected QA database")
     passwords = {}
     for email in ADMIN_EMAILS:
+        if email in existing:
+            continue  # Never rotate or overwrite existing changed passwords.
         password = secrets.token_urlsafe(32)
-        ledger.provision(email=email, temporary_password=password,
-                         at=datetime.now(timezone.utc))
-        passwords[email] = password
         path = credential_dir / (email.replace("@", "_at_") + ".txt")
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
                      0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as output:
             output.write("QA ONLY (not your LIVE password)\n"
                          f"Account: {email}\nTemporary password: {password}\n")
+        try:
+            ledger.provision(email=email, temporary_password=password,
+                             at=datetime.now(timezone.utc))
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
+        passwords[email] = password
 
     study = make_supervisor_vps_app(
         intake, hostname="qa.localhost", proxy_mode=False,
@@ -233,6 +258,23 @@ def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
 
     def dispatch(environ, start_response):
         path = environ.get("PATH_INFO", "")
+        # Permanent *path names* inside the private, SSH-only QA origin.
+        # No DNS, public LIVE Caddy route or special QA action is enabled.
+        aliases = {
+            "/questionnaire/student": "/interest/school",
+            "/questionnaire/external": "/interest/external",
+            "/researcher": "/control/",
+            "/researcher/invitations": "/control/qa/",
+            "/participate": "/study/",
+        }
+        if path in aliases and environ.get("REQUEST_METHOD") == "GET":
+            response = Response("",status=302,headers={
+                "Location":aliases[path],
+                "Cache-Control":"private, no-store, max-age=0",
+                "Referrer-Policy":"no-referrer",
+                "X-Robots-Tag":"noindex,nofollow",
+            })
+            return response(environ,start_response)
         if path.startswith("/study/"):
             app = study
         elif path.startswith("/control/"):
@@ -258,7 +300,13 @@ def main():
     parser.add_argument("--port", type=int, default=8897)
     parser.add_argument("--school-email", required=True)
     parser.add_argument("--external-email", required=True)
+    parser.add_argument("--persistent-state-dir",type=Path,
+                        help="separate existing 0700 QA-only state; never the LIVE directory")
+    parser.add_argument("--acknowledge-private-qa-only",action="store_true",
+                        help="explicitly confirm that persistent rehearsal is NOT enrollment")
     args = parser.parse_args()
+    if bool(args.persistent_state_dir) != args.acknowledge_private_qa_only:
+        parser.error("persistent rehearsal requires both state directory and QA-only acknowledgment")
     if args.port in FORBIDDEN_PORTS:
         parser.error("would conflict with production or staging")
     # Graceful SIGTERM (including browser CI shutdown) must not strand a
@@ -266,30 +314,55 @@ def main():
     def shutdown_on_signal(_signal_number, _frame):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, shutdown_on_signal)
-    with TemporaryDirectory(prefix="ijcai-qa-self-acceptance-") as tmp:
-        sandbox = new_private_suite(Path(tmp),
-            (args.school_email, args.external_email), port=args.port)
-        print(QA_TITLE, flush=True)
-        print("Private QA account secrets at:", sandbox["credential_dir"], flush=True)
-        print("QA researcher password (run in SECOND local terminal):",flush=True)
-        print("  cat "+str(sandbox["credential_dir"] / "davis.joseph_at_aivancity.education.txt"),flush=True)
-        print("Do not post temporary QA passwords or copy LIVE administrator secrets into chat.",flush=True)
-        print("Old QA passwords expire whenever this disposable server restarts.",flush=True)
-        print("QA school form: http://127.0.0.1:%d/interest/school" % args.port, flush=True)
-        print("QA external form: http://127.0.0.1:%d/interest/external" % args.port, flush=True)
-        print("QA researcher sign-in: http://127.0.0.1:%d/control/" % args.port, flush=True)
-        print("QA researcher link tool: http://127.0.0.1:%d/control/qa/" % args.port, flush=True)
-        print("No real study enrollment, approved consent, mail or public routing.", flush=True)
-        print("Temporary QA state is deleted on exit; keep no important data here.", flush=True)
-        print("TEST ONLY: approved QA students can advance to session 2/3 without the real three-day wait.", flush=True)
-        server = make_server("127.0.0.1", args.port, sandbox["app"],
-                             threaded=True)
+    context=(nullcontext(args.persistent_state_dir)
+             if args.persistent_state_dir else
+             TemporaryDirectory(prefix="ijcai-qa-self-acceptance-"))
+    with context as tmp:
+        directory=Path(tmp)
+        if args.persistent_state_dir and (
+                not directory.is_absolute() or not directory.is_dir() or
+                directory.is_symlink() or
+                stat.S_IMODE(directory.stat().st_mode)!=0o700):
+            parser.error("persistent QA requires a separate existing mode-0700 directory")
+        # A second persistent instance may never write the same SQLite
+        # database concurrently or silently regenerate bootstrap secrets.
+        lock = os.open(directory/".private-qa.lock",
+                       os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
         try:
-            server.serve_forever()
-        except KeyboardInterrupt:
-            pass
+            try:
+                fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            except BlockingIOError:
+                parser.error("another private QA server already owns this state")
+            sandbox=new_private_suite(
+                directory,(args.school_email,args.external_email),
+                port=args.port,persistent=bool(args.persistent_state_dir))
+            print(QA_TITLE, flush=True)
+            print("Private QA account secrets at:",sandbox["credential_dir"],flush=True)
+            print("QA researcher bootstrap file, if still retained securely:",flush=True)
+            print("  "+str(sandbox["credential_dir"] /
+                  "davis.joseph_at_aivancity.education.txt"),flush=True)
+            print("Do not post passwords or copy LIVE administrator secrets into chat.",flush=True)
+            if args.persistent_state_dir:
+                print("PERSISTENT PRIVATE QA: accounts and test student data survive restarts.",flush=True)
+                print("The original passwords (including changed ones) are preserved.",flush=True)
+            else:
+                print("Ephemeral QA: state and passwords are deleted on exit.",flush=True)
+            print("Student school form: http://127.0.0.1:%d/questionnaire/student" % args.port,flush=True)
+            print("Student external form: http://127.0.0.1:%d/questionnaire/external" % args.port,flush=True)
+            print("Private researcher: http://127.0.0.1:%d/researcher" % args.port,flush=True)
+            print("Invitation console: http://127.0.0.1:%d/researcher/invitations" % args.port,flush=True)
+            print("No authentic enrollment, public routing, LIVE permissions or mail.",flush=True)
+            print("TEST ONLY: approved QA students may advance session 2/3 early.",flush=True)
+            server=make_server("127.0.0.1",args.port,sandbox["app"],
+                               threaded=True)
+            try:
+                server.serve_forever()
+            except KeyboardInterrupt:
+                pass
+            finally:
+                server.server_close()
         finally:
-            server.server_close()
+            os.close(lock)
 
 
 if __name__ == "__main__":
