@@ -20,7 +20,7 @@ from .supervisor_recruitment import (
     RecruitmentLedger, RecruitmentError, ADMIN_EMAILS,
 )
 from .supervisor_recruitment_metrics import inter_answer_times, mastery_series
-from .supervisor_research_export import build_student_research_archive
+from .supervisor_research_export import (build_student_research_archive, build_cohort_research_archive)
 from io import BytesIO
 from .supervisor_inactivity_worker import reconcile_inactivity
 from .supervisor_recruitment_dispatch import InvitationDispatcher
@@ -317,6 +317,28 @@ def make_recruitment_app(
         value["last_name"]=candidate.get("last_name")
         value["contains_pii"]=True
         return jsonify(value)
+
+    @app.get("/control/api/research-export-all.zip")
+    def cohort_export():
+        # The complete cohort never transits the unauthenticated student
+        # portal. All values come from the pseudonymous research DB.
+        actor=admin()
+        db=paired_db()
+        try:
+            try:
+                count=db.execute("SELECT COUNT(*) FROM participants").fetchone()[0]
+                raw=build_cohort_research_archive(db)
+            except ValueError as exc:
+                raise RecruitmentError("cohort exceeds authorized export limits") from exc
+        finally:
+            db.close()
+        ledger.record_cohort_research_export(
+            actor=actor["email"],count=count,at=now(),
+        )
+        return send_file(BytesIO(raw),mimetype="application/zip",
+                         as_attachment=True,
+                         download_name="ijcai-cohort-pseudonymized-research.zip",
+                         max_age=0)
 
     @app.get("/control/api/research-export/<ref>.zip")
     def research_export(ref):

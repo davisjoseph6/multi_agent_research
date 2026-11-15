@@ -204,6 +204,18 @@ class RecruitmentLedger:
                 (utc(at),actor,"pseudonymous_research_export",learner_id),
             )
 
+    def record_cohort_research_export(self, *, actor: str, count: int,
+                                      at: datetime) -> None:
+        """Audit the scope of each researcher-only aggregate download."""
+        if actor not in ADMIN_EMAILS or type(count) is not int or count<0:
+            raise RecruitmentError("authenticated researcher required for cohort export")
+        with self._tx() as db:
+            db.execute(
+                "INSERT INTO audit(at,actor,action,details) VALUES(?,?,?,?)",
+                (utc(at),actor,"pseudonymous_cohort_research_export",
+                 "student_count="+str(count)),
+            )
+
     def check_intake_rate(self, *, remote_ip: str, secret: bytes,
                           at: datetime, max_per_day: int = 10) -> bool:
         """Private salted daily counter; raw source IP is never stored."""

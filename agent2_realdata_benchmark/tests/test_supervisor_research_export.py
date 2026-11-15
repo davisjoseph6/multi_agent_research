@@ -229,3 +229,24 @@ def test_learner_id_remains_one_per_email_and_one_arm(prepared):
         ).fetchone()[0]==1
     with pytest.raises(Exception,match="already registered"):
         suite["intake"].issue(SCHOOL,at=NOW())
+
+
+def test_cohort_download_through_authenticated_control(prepared):
+    from io import BytesIO
+    from zipfile import ZipFile
+    suite,student_id,_=prepared
+    endpoint="/control/api/research-export-all.zip"
+    assert suite["control"].test_client().get(endpoint).status_code==409
+    staff=login(suite)
+    response=staff.get(endpoint)
+    assert response.status_code==200
+    assert response.mimetype=="application/zip"
+    with ZipFile(BytesIO(response.data)) as archive:
+        assert "cohort_manifest.json" in archive.namelist()
+        assert f"students/{student_id}.zip" in archive.namelist()
+        manifest=json.loads(archive.read("cohort_manifest.json"))
+        assert manifest["student_count"]==1
+    with suite["ledger"]._tx() as db:
+        count=db.execute("SELECT COUNT(*) FROM audit WHERE "
+                         "action='pseudonymous_cohort_research_export'").fetchone()[0]
+    assert count==1

@@ -56,3 +56,11 @@ htmlcov/
 *~
 .DS_Store
 Thumbs.db
+
+# Google OAuth Web client downloads must never enter a commit
+client_secret_*.json
+client_secret*.json
+**/google-web-downloaded.json
+**/google-client.secret
+**/google.pending
+**/owner-canary-*.json
