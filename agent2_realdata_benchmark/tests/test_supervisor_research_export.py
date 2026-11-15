@@ -210,7 +210,7 @@ def test_export_is_strictly_researcher_authenticated_and_audited(prepared):
 def test_csv_formula_injection_is_neutralized():
     content=_csv_bytes(
         ("label","number"),
-        ({"label":"=HYPERLINK(\\"https://evil.invalid\\")","number":12},),
+        ({"label":"=1+1","number":12},),
     ).decode("utf-8-sig")
     assert content.startswith("label,number")
     assert "'=HYPERLINK" in content
