@@ -170,6 +170,10 @@ runuser -u "$APPUSER" -- bash -c '
 if [[ "$STUDY_HOST" == "$RECRUIT_HOST" ]]; then
 cat > "$SNIPPET" <<EOF
 $STUDY_HOST {
+  # Friendly mnemonic paths; only enabled after exact signed LIVE activation.
+  redir /participate /study/ 302
+  redir /questionnaire/student /interest/school 302
+  redir /questionnaire/external /interest/external 302
   handle /study/* {
     reverse_proxy 127.0.0.1:8888
   }
@@ -184,12 +188,15 @@ EOF
 else
 cat > "$SNIPPET" <<EOF
 $STUDY_HOST {
+  redir /participate /study/ 302
   handle /study/* {
     reverse_proxy 127.0.0.1:8888
   }
   handle { respond "Not Found" 404 }
 }
 $RECRUIT_HOST {
+  redir /questionnaire/student /interest/school 302
+  redir /questionnaire/external /interest/external 302
   handle /interest/* {
     reverse_proxy 127.0.0.1:8889
   }
