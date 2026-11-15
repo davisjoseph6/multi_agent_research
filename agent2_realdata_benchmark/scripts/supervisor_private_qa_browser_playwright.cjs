@@ -206,7 +206,7 @@ async function main(){
   assert.equal(await admin.locator("#mastery-chart").getAttribute("role"),"img");
   assert.match(await admin.locator("#selected-student").textContent(),
    /A — Adaptive recovery/);
-  await admin.locator('#mastery-chart polyline[data-series="overall-bkt-mean"]').waitFor();
+  await admin.locator('#mastery-chart circle[data-series="overall-bkt-mean"]').waitFor();
   const link=admin.locator("#export-research");
   assert.equal(await link.isVisible(),true);
   assert.match(await link.getAttribute("href"),/\/control\/api\/research-export\/STUDY_P001\.zip/);
