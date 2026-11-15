@@ -212,6 +212,68 @@ class OperationalIntake:
                 raise SyntheticStudyError("invitation credential was changed concurrently")
         return ref
 
+    def rotate_private_qa_invitation(self, email: str, *, new_token: str,
+                                     at: datetime) -> dict:
+        """Recover a lost PRIVATE QA link without creating a new student.
+
+        Only explicitly allowed loopback QA identities may use this method.
+        The production intake/store has an empty QA allowlist, so even a
+        privileged LIVE caller cannot invoke it successfully. Both contacts
+        and invite credential are replaced in one SQLite transaction.
+        Answers, arm, consent, BKT, sessions and rendered items are untouched.
+        The caller MUST be a signed-in, CSRF-protected QA researcher.
+        """
+        if (type(email) is not str or not _ALLOWED.fullmatch(email)
+                or email != email.casefold()
+                or email not in self.store._qa_early_preview_emails
+                or not self.store.operational):
+            raise SyntheticStudyError("private QA recovery requires allowlisted identity")
+        digest = self.digest(new_token)
+        with self.store._tx() as db:
+            row = db.execute(
+                "SELECT token_hash,learner_id,expires_at,state "
+                "FROM pii.invitations WHERE email=? COLLATE NOCASE",
+                (email,),
+            ).fetchone()
+            if row is None or row["state"] not in (
+                    "invited","consented","screened","registered"):
+                raise SyntheticStudyError("recoverable QA invitation not found")
+            old_hash, ref, stage = row["token_hash"], row["learner_id"], row["state"]
+            if old_hash == digest or db.execute(
+                "SELECT 1 FROM pii.invitations WHERE token_hash=?", (digest,)
+            ).fetchone():
+                raise SyntheticStudyError("invalid replacement credential")
+            if stage == "registered":
+                participant = db.execute(
+                    "SELECT status FROM participants WHERE learner_id=?", (ref,)
+                ).fetchone()
+                contact = db.execute(
+                    "SELECT token_hash,email FROM pii.contacts WHERE learner_id=?",
+                    (ref,),
+                ).fetchone()
+                if (not ref or participant is None or
+                        participant["status"] != "active" or
+                        contact is None or contact["email"].casefold() != email or
+                        contact["token_hash"] != old_hash):
+                    raise SyntheticStudyError("QA participant is not eligible for recovery")
+                change = db.execute(
+                    "UPDATE pii.contacts SET token_hash=?,token_created_at=? "
+                    "WHERE learner_id=? AND token_hash=?",
+                    (digest,iso(at),ref,old_hash),
+                )
+                if change.rowcount != 1:
+                    raise SyntheticStudyError("QA contact changed during recovery")
+            elif row["expires_at"] < iso(at):
+                raise SyntheticStudyError("unregistered QA invitation has expired")
+            change = db.execute(
+                "UPDATE pii.invitations SET token_hash=? "
+                "WHERE email=? COLLATE NOCASE AND token_hash=? AND state=?",
+                (digest,email,old_hash,stage),
+            )
+            if change.rowcount != 1:
+                raise SyntheticStudyError("QA invitation changed during recovery")
+        return dict(stage=stage,learner_id=ref if stage=="registered" else None)
+
     def _record(self, db, token: str, *, at: datetime):
         row=db.execute("SELECT * FROM pii.invitations WHERE token_hash=?",
                        (self.digest(token),)).fetchone()
