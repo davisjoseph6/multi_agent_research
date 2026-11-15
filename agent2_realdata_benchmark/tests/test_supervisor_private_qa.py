@@ -278,3 +278,67 @@ def test_all_four_staff_can_individually_issue_private_qa_links(suite,researcher
         json={"confirm":True},headers=headers(csrf=csrf))
     assert result.status_code==200
     assert result.json["issued"]==1 and result.json["mail_sent"] is False
+
+
+def test_only_explicit_private_qa_student_can_skip_wait_not_live(suite):
+    """Regression for the displayed TEST ONLY button returning HTTP 409."""
+    import json
+    from src.prototype.supervisor_trace_engine import (
+        SupervisorTraceEngine, CONCEPT_IDS,
+    )
+    token = suite["intake"].issue(SCHOOL,at=datetime.now(timezone.utc))
+    suite["intake"].consent(
+        token,checks=[True]*6,optional=False,language="en",
+        at=datetime.now(timezone.utc),
+    )
+    answers={
+        question.question_id:(
+            question.correct_answer if i<4 else next(
+                letter for letter in "ABCD" if letter!=question.correct_answer
+            )
+        )
+        for i,question in enumerate(suite["store"].bank.forms["screening"])
+    }
+    assert suite["intake"].screening(token,answers=answers,
+        at=datetime.now(timezone.utc))["eligible"]
+    assert suite["intake"].register(
+        token,age=24,program="Private QA only",
+        at=datetime.now(timezone.utc),
+    )["eligible"]
+    ref = suite["intake"].learner(token,at=datetime.now(timezone.utc))
+    student=suite["study"].test_client()
+    assert student.post("/study/api/exchange",json={"token":token},
+                        headers=headers()).status_code==200
+    assert student.post("/study/api/staging-next-session",json={},
+                        headers=headers()).status_code==409
+    with suite["store"]._tx() as db:
+        state=json.loads(db.execute(
+            "SELECT state_json FROM learner_state WHERE learner_id=?",(ref,)
+        ).fetchone()["state_json"])
+        state["phase"]="WAITING_NEXT_SESSION"
+        state["session"]=1
+        engine=SupervisorTraceEngine("A",dict.fromkeys(CONCEPT_IDS,.5))
+        engine.question_in_session=20
+        state["engine"]=engine.snapshot()
+        db.execute(
+            "UPDATE learner_state SET step='WAITING_NEXT_SESSION',"
+            "step_index=0,state_json=? WHERE learner_id=?",
+            (json.dumps(state),ref),
+        )
+    # The genuine three-day scheduling endpoint must remain blocked.
+    assert student.post("/study/api/next-session",json={},
+                        headers=headers()).status_code==409
+    preview=student.post("/study/api/staging-next-session",json={},
+                         headers=headers())
+    assert preview.status_code==200, preview.json
+    assert preview.json["session_started"]==2
+    assert preview.json["staging_preview_advance"] is True
+    assert student.post("/study/api/staging-next-session",json={},
+                        headers=headers()).status_code==409
+    assert student.get("/study/health").json["enrollment_authorized"] is False
+    with suite["store"]._tx() as db:
+        current=db.execute("SELECT grp FROM participants WHERE learner_id=?",
+                           (ref,)).fetchone()
+        assert current["grp"]=="A"
+        assert db.execute("SELECT COUNT(*) FROM participants").fetchone()[0]==1
+    assert suite["control"].test_client().get("/control/api/capabilities").status_code==409
