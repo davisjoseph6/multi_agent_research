@@ -62,7 +62,7 @@ After the domain owner confirms real DNS control, TLS and institutional approval
 
 These exact hostnames are suggestions only, not verified DNS or active services. The private LIVE research dashboard on loopback port 8890 is intentionally SSH-only. Never publicly route /control/ without a separately reviewed identity-aware access gateway. The approved installer requires genuine non-demo DNS, HTTPS, exact-commit release signatures, all bilingual signed documents and a signed mailbox policy. Placeholder PDFs must remain pending; adding the genuine versions does not require discarding research data.
 
-## 7. Send one real Gmail-to-school PRIVATE QA invitation (not LIVE recruitment)
+## 6. Send one real Gmail-to-school PRIVATE QA invitation (not LIVE recruitment)
 
 Once the owner has completed encrypted OAuth with their own Gmail mailbox,
 the local WSL tool can email an already-issued private QA token only to
@@ -106,7 +106,7 @@ release and sender authorization are installed. The QA researcher console
 continues to issue links without network mail and never authorizes actual
 enrollment.
 
-## 6. Complete the already imported Google OAuth client locally
+## 7. Complete the already imported Google OAuth client locally
 
 The downloaded Google Web client JSON was imported successfully, but no Gmail OAuth grant has yet been issued. In WSL run:
 
