@@ -256,6 +256,57 @@ def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
         return jsonify(qa_only=True, mail_sent=False, issued=len(links),
                        links=links)
 
+    @control.post("/control/api/qa-recover")
+    def qa_recover():
+        """Owner-authorized QA-only re-entry, never a second registration."""
+        actor_email = qa_actor()  # login, changed password, session and CSRF
+        data = request.get_json(silent=True)
+        if (type(data) is not dict or set(data) != {"candidate_id","confirm"}
+                or type(data["candidate_id"]) is not int
+                or data["candidate_id"] < 1 or data["confirm"] is not True):
+            raise RecruitmentError("explicit one-student QA recovery confirmation required")
+        cid = data["candidate_id"]
+        candidates = ledger.selected_for_invitation(ids=[cid])
+        if len(candidates) != 1:
+            raise RecruitmentError("approved QA candidate not found")
+        candidate = candidates[0]
+        address = candidate["email"]
+        if (not candidate["approved_for_invitation"]
+                or candidate["invitation_status"] != "prepared"
+                or address not in permitted):
+            raise RecruitmentError("existing approved QA invitation required")
+        # Private QA protects against accidental rapid repeated rotations.
+        with ledger._tx() as db:
+            recent=db.execute(
+                "SELECT COUNT(*) FROM audit WHERE subject_id=? "
+                "AND action='qa_invitation_recovered' AND at>=?",
+                (cid, (datetime.now(timezone.utc) -
+                       __import__("datetime").timedelta(days=1)).isoformat()),
+            ).fetchone()[0]
+        if recent >= 5:
+            raise RecruitmentError("QA recovery limit reached for this candidate")
+        token = secrets.token_urlsafe(40)
+        recovered = intake.rotate_private_qa_invitation(
+            address, new_token=token, at=datetime.now(timezone.utc),
+        )
+        # Record only candidate ID, researcher, previous stage and the
+        # pseudonymous ID; never log the token or the private link.
+        with ledger._tx() as db:
+            db.execute(
+                "INSERT INTO audit(at,actor,action,subject_id,details) "
+                "VALUES(?,?,?,?,?)",
+                (datetime.now(timezone.utc).isoformat(), actor_email,
+                 "qa_invitation_recovered", cid,
+                 recovered["stage"]+":"+(recovered["learner_id"] or "pending")),
+            )
+        return jsonify(
+            qa_only=True, mail_sent=False, same_participant=True,
+            candidate_id=cid, learner_id=recovered["learner_id"],
+            stage=recovered["stage"],
+            test_link=f"http://127.0.0.1:{port}/study/#invite={token}",
+            old_link_revoked=True,
+        )
+
     def dispatch(environ, start_response):
         path = environ.get("PATH_INFO", "")
         # Permanent *path names* inside the private, SSH-only QA origin.
