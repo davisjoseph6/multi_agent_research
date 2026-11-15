@@ -36,7 +36,7 @@ from src.prototype.supervisor_recruitment import (
     ADMIN_EMAILS, RecruitmentLedger, RecruitmentError, canonical_email,
 )
 from src.prototype.supervisor_recruitment_web import make_recruitment_app
-from src.prototype.supervisor_synthetic_store import SupervisorSyntheticStore
+from src.prototype.supervisor_synthetic_store import SupervisorSyntheticStore, SyntheticStudyError
 from src.prototype.supervisor_vps_web import make_supervisor_vps_app
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -286,9 +286,15 @@ def new_private_suite(directory: Path, allowed_emails: tuple[str, str], *,
         if recent >= 5:
             raise RecruitmentError("QA recovery limit reached for this candidate")
         token = secrets.token_urlsafe(40)
-        recovered = intake.rotate_private_qa_invitation(
-            address, new_token=token, at=datetime.now(timezone.utc),
-        )
+        try:
+            recovered = intake.rotate_private_qa_invitation(
+                address, new_token=token, at=datetime.now(timezone.utc),
+            )
+        except SyntheticStudyError as exc:
+            # The separately created QA control app handles RecruitmentError,
+            # not a study-service exception. Fail closed as HTTP 409 instead
+            # of exposing a 500 or leaking internal participant details.
+            raise RecruitmentError("private QA link recovery unavailable") from exc
         # Record only candidate ID, researcher, previous stage and the
         # pseudonymous ID; never log the token or the private link.
         with ledger._tx() as db:
