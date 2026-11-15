@@ -207,13 +207,9 @@ def test_export_is_strictly_researcher_authenticated_and_audited(prepared):
     assert log[0]["details"]==ref
 
 
-def test_csv_formula_injection_is_neutralized():
-    content=_csv_bytes(
-        ("label","number"),
-        ({"label":"=1+1","number":12},),
-    ).decode("utf-8-sig")
-    assert content.startswith("label,number")
-    assert "'=HYPERLINK" in content
+def test_csv_cell_is_spreadsheet_safe():
+    encoded = _csv_bytes(("label",), ({"label":"=1+1"},)).decode("utf-8-sig")
+    assert encoded.splitlines()[1].startswith("'=1+1")
 
 
 def test_learner_id_remains_one_per_email_and_one_arm(prepared):
