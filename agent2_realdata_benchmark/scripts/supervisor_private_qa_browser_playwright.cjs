@@ -252,6 +252,8 @@ async function main(){
   assert.equal(resumed.session,1);
   await newContext.close();
   console.log("PASS: lost QA token recovered without a second enrollment or quiz reset");
+  await admin.goto(base+"/control/",{waitUntil:"networkidle"});
+  await admin.locator("#dashboard").waitFor({state:"visible"});
   assert.equal(await admin.locator("#send-selected").isDisabled(),true);
   assert.equal(await admin.locator("#send-all").isDisabled(),true);
   assert.deepEqual(faults,[]);
