@@ -50,15 +50,15 @@ Four QA identities are created on initial first start; one private 0600 file per
 
 The FOUR separate LIVE bootstrap accounts already exist in /var/lib/ijcai-supervisor-live/initial-admin-secrets. They are distinct from QA and cannot be used until authorized LIVE activation.
 
-Student records persist as real SQLite tables within protected QA state, and the researcher dashboard can download a per-student pseudonymous seven-file ZIP with session/quiz arm, C1-C8 BKT estimated mastery, overall mean, event-level response times, session gaps, fatigue and assessments. QA data is explicitly not a genuine RCT dataset. Use independent encrypted backups if this rehearsal must survive disk failure.
+Student records persist as real SQLite tables within protected QA state, and the researcher dashboard can download a per-student pseudonymous seven-file ZIP with session/quiz arm, C1-C8 BKT estimated mastery, overall mean, event-level response times, session gaps, fatigue and assessments. The authenticated researcher dashboard also offers a bounded all-students ZIP containing each participant's seven-file archive. Batch exports are limited to 250 records and 64 MiB per response, with a separate staff audit entry. QA data is explicitly not a genuine RCT dataset. Use independent encrypted backups if this rehearsal must survive disk failure.
 
 ## 5. Proposed friendly production hostnames — NOT YET CONFIGURED
 
 After the domain owner confirms real DNS control, TLS and institutional approval, one possible naming scheme is:
 
-- https://study.selfhealing-edu.fr/study/
-- https://study.selfhealing-edu.fr/interest/school
-- https://study.selfhealing-edu.fr/interest/external
+- https://study.selfhealing-edu.fr/participate (signed-only friendly alias to /study/)
+- https://study.selfhealing-edu.fr/questionnaire/student (signed-only alias to /interest/school)
+- https://study.selfhealing-edu.fr/questionnaire/external (signed-only alias to /interest/external)
 
 These exact hostnames are suggestions only, not verified DNS or active services. The private LIVE research dashboard on loopback port 8890 is intentionally SSH-only. Never publicly route /control/ without a separately reviewed identity-aware access gateway. The approved installer requires genuine non-demo DNS, HTTPS, exact-commit release signatures, all bilingual signed documents and a signed mailbox policy. Placeholder PDFs must remain pending; adding the genuine versions does not require discarding research data.
 
