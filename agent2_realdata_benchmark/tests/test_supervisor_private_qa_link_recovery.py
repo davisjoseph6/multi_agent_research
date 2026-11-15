@@ -219,3 +219,10 @@ def test_recovery_does_not_reopen_closed_study_or_allow_other_email(suite):
             intake.rotate_private_qa_invitation(
                 SCHOOL,new_token="B"*70,at=NOW())
     assert suite["intake"].status(new_token,at=NOW())["stage"]=="invited"
+    with suite["store"]._tx() as db:
+        db.execute("UPDATE collection_status SET closed_at=? WHERE one=1",
+                   (NOW().isoformat(),))
+    assert recover(reviewer,csrf,cid).status_code==409
+    # Closing the cohort must not revoke the earlier token as a side effect
+    # of a denied recovery or generate a second student.
+    assert suite["intake"].status(new_token,at=NOW())["stage"]=="invited"
