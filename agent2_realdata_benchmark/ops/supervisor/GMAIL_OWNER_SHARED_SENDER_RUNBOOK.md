@@ -53,17 +53,38 @@ Use the exact checked-out candidate source and existing Python environment:
       --vault-dir "$HOME/.ijcai_oauth_private/vault" \
       --vault-key-file "$HOME/.ijcai_oauth_private/mail.key"
 
-Privately place the **actual Google OAuth Web client secret value** in the
-mode-0600 file `$HOME/.ijcai_oauth_private/google-client.secret`.
-Never paste it into a shell command line, Git repository, screenshot or
-ChatGPT conversation. Create the file using a locally trusted editor and
-verify `stat -c '%a' "$HOME/.ijcai_oauth_private/google-client.secret"`
-returns 600.
+You reported downloading a Google **Web application OAuth client JSON**
+after registering the exact `http://127.0.0.1:8765/callback` redirect.
+You do **not** need to upload that file to ChatGPT or extract the secret by
+pasting it into shell commands.
+
+Copy the downloaded JSON into a dedicated WSL directory using a filename
+known only locally (replace `SOURCE_JSON_FILE` with its actual local path).
+If the original is in Windows Downloads, use its mounted WSL path, but
+**keep the copied file under your protected Linux home**.
+
+    umask 077
+    install -m 0600 SOURCE_JSON_FILE "$HOME/.ijcai_oauth_private/google-web-downloaded.json"
+    python -m scripts.supervisor_oauth_bootstrap import-google-json \
+      --source "$HOME/.ijcai_oauth_private/google-web-downloaded.json" \
+      --client-id-file "$HOME/.ijcai_oauth_private/google-client-id.txt" \
+      --client-secret-file "$HOME/.ijcai_oauth_private/google-client.secret"
+
+The import checks the Web client type, redirect URI, exact localhost callback
+and private file permissions, and writes the Client ID and Client Secret in
+separate new 0600 files without displaying the secret. A desktop OAuth JSON
+or a wrong callback is rejected. The `start` command reads the Client ID
+from the newly created file via local shell substitution.
+
+Never save this downloaded file in the Git checkout or send it to researchers;
+remove redundant copies from your Downloads after independently confirming
+the protected copy and backup policy. Do not rerun `import-google-json` on
+existing outputs: it refuses to overwrite credentials.
 
     python -m scripts.supervisor_oauth_bootstrap start \
       --provider gmail_delegated \
       --sender davisjoseph767@gmail.com \
-      --client-id YOUR_GOOGLE_WEB_OAUTH_CLIENT_ID \
+      --client-id "$(cat "$HOME/.ijcai_oauth_private/google-client-id.txt")" \
       --client-secret-file "$HOME/.ijcai_oauth_private/google-client.secret" \
       --session-file "$HOME/.ijcai_oauth_private/google.pending"
 
@@ -85,7 +106,7 @@ This is **not a study invitation** and must not include a private token:
     python -m scripts.supervisor_mail_owner_canary \
       --provider gmail_delegated \
       --sender davisjoseph767@gmail.com \
-      --client-id YOUR_GOOGLE_WEB_OAUTH_CLIENT_ID \
+      --client-id "$(cat "$HOME/.ijcai_oauth_private/google-client-id.txt")" \
       --client-secret-file "$HOME/.ijcai_oauth_private/google-client.secret" \
       --vault-dir "$HOME/.ijcai_oauth_private/vault" \
       --vault-key-file "$HOME/.ijcai_oauth_private/mail.key" \

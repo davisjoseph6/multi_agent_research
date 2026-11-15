@@ -2,6 +2,7 @@
 (()=>{
 const $=id=>document.getElementById(id);
 let csrf="",sendingAvailable=false,reminderAvailable=false;
+const ARM_LABELS={A:"A — Adaptive recovery",B:"B — Greedy",C:"C — Fixed sequence"};
 const status=t=>$("status").textContent=t;
 function getCsrf(){
  const field=document.cookie.split("; ").find(s=>s.startsWith("recruitment_csrf="));
@@ -29,7 +30,7 @@ function element(tag,value){
 function rows(target,arr,render){
  const n=$(target);n.replaceChildren();
  if(!arr.length){const tr=document.createElement("tr"),td=element("td","No records yet");
-  td.colSpan=7;tr.append(td);n.append(tr);return}
+  td.colSpan=target==="students"?9:6;tr.append(td);n.append(tr);return}
  for(const value of arr){const tr=document.createElement("tr");render(value,tr);n.append(tr)}
 }
 function display(data){
@@ -53,7 +54,7 @@ function display(data){
   button.textContent=s.learner_id;
   button.addEventListener("click",()=>selectStudent(s).catch(e=>status(e.message)));
   label.append(button);tr.append(label);
-  [s.email||"—",
+  [ARM_LABELS[s.grp]||"—",s.email||"—",
    [s.first_name,s.last_name].filter(Boolean).join(" ")||"—",
    s.session_no,s.step,s.status,s.updated_at].forEach(v=>tr.append(element("td",v)));
   const reminder=document.createElement("td"),button2=document.createElement("button");
@@ -104,6 +105,21 @@ function drawMastery(data){
   const points=values.map(p=>p.map(n=>n.toFixed(2)).join(",")).join(" ");
   svg.append(nodeSVG("polyline",{points,fill:"none",stroke:colors[index%colors.length],
    "stroke-width":2.7,"stroke-linejoin":"round"}));
+  if(values.length===1){
+   svg.append(nodeSVG("circle",{cx:values[0][0],cy:values[0][1],
+    r:4,fill:colors[index%colors.length]}));
+  }
+ }
+ const overall=dots.map((point,i)=>typeof point.overall_bkt_mean==="number"
+   ?[48+(i/count)*872,315-point.overall_bkt_mean*288]:null).filter(Boolean);
+ if(overall.length){
+  const points=overall.map(p=>p.map(v=>v.toFixed(2)).join(",")).join(" ");
+  svg.append(nodeSVG("polyline",{"data-series":"overall-bkt-mean",points,
+   fill:"none",stroke:"#182d3a","stroke-width":4,"stroke-dasharray":"9 5"}));
+  if(overall.length===1){
+   svg.append(nodeSVG("circle",{"data-series":"overall-bkt-mean",
+    cx:overall[0][0],cy:overall[0][1],r:5,fill:"#182d3a"}));
+  }
  }
  const caption=nodeSVG("text",{x:430,y:358,"font-size":14,fill:"#516578"});
  caption.textContent="Scored quiz and recovery response index";
@@ -115,15 +131,21 @@ function drawMastery(data){
   dot.style.backgroundColor=colors[i%colors.length];
   text.append(dot,document.createTextNode(concept));legend.append(text);
  }
+ const average=document.createElement("span");
+ const meanDot=document.createElement("span");meanDot.className="legend-dot";meanDot.style.backgroundColor="#182d3a";
+ average.append(meanDot,document.createTextNode("Overall mean of C1–C8"));
+ legend.append(average);
 }
 async function selectStudent(student){
  const [r,t]=await Promise.all([
   api("mastery/"+encodeURIComponent(student.learner_id)),
   api("question-intervals?learner_id="+encodeURIComponent(student.learner_id))
  ]);
- const info=r.learner_id+" — "+(r.email||"unknown email")+" — "+
+ const info=r.learner_id+" — "+(ARM_LABELS[r.arm]||"Unknown arm")+" — "+(r.email||"unknown email")+" — "+
   [r.first_name,r.last_name].filter(Boolean).join(" ")+" — "+r.stage;
  $("selected-student").textContent=info;
+ $("export-research").href="/control/api/research-export/"+encodeURIComponent(r.learner_id)+".zip";
+ $("export-research").hidden=false;
  drawMastery(r);
  rows("intervals",t.intervals,(v,tr)=>{
   [v.session,v.phase,v.question_id,

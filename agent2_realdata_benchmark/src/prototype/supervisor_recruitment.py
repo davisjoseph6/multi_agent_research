@@ -192,6 +192,18 @@ class RecruitmentLedger:
         finally:
             db.close()
 
+    def record_research_export(self, *, actor: str, learner_id: str,
+                               at: datetime) -> None:
+        """Audit an authenticated per-student download without changing research data."""
+        if actor not in ADMIN_EMAILS or type(learner_id) is not str or not re.fullmatch(
+                r"STUDY_P[0-9]{3,}", learner_id):
+            raise RecruitmentError("valid researcher and pseudonym required")
+        with self._tx() as db:
+            db.execute(
+                "INSERT INTO audit(at,actor,action,details) VALUES(?,?,?,?)",
+                (utc(at),actor,"pseudonymous_research_export",learner_id),
+            )
+
     def check_intake_rate(self, *, remote_ip: str, secret: bytes,
                           at: datetime, max_per_day: int = 10) -> bool:
         """Private salted daily counter; raw source IP is never stored."""

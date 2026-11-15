@@ -51,12 +51,14 @@
  </section>
  <section class="panel"><h2>Registered students and current progress</h2>
  <div class="scroll"><table><thead><tr>
- <th>Student</th><th>Email</th><th>Optional name</th><th>Session</th><th>Current stage</th><th>Status</th><th>Last activity (UTC)</th><th>Encouragement</th>
+ <th>Student ID</th><th>Assigned arm (researchers only)</th><th>Email</th><th>Optional name</th><th>Session</th><th>Current stage</th><th>Status</th><th>Last activity (UTC)</th><th>Encouragement</th>
  </tr></thead><tbody id="students"></tbody></table></div></section>
  <section class="panel">
   <h2>Individual mastery and inter-question timing</h2>
   <p class="muted">Select a student above. Mastery estimates are observational and do not change randomization or recovery decisions.</p>
   <p id="selected-student" aria-live="polite">No student selected</p>
+  <p><a id="export-research" href="#" hidden>Download research archive for selected student (.zip)</a></p>
+  <p class="muted">Researcher-only export includes fixed A/B/C assignment, response and intervention events, per-concept and overall BKT estimates, question and between-session intervals, fatigue, and assessment outcomes. Contact identifiers, private tokens, and raw reflections are not included.</p>
   <div class="chart-wrap">
     <svg id="mastery-chart" viewBox="0 0 950 370" role="img" aria-label="BKT mastery progression" preserveAspectRatio="xMidYMid meet"></svg>
   </div>

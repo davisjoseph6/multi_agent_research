@@ -71,11 +71,15 @@ def mastery_series(db: sqlite3.Connection, learner_id: str):
         mastery=model.get("mastery") if isinstance(model,dict) else None
         if not isinstance(mastery,dict):
             continue
+        values={concept:round(float(mastery[concept]),6)
+                for concept in CONCEPT_IDS}
         points.append({
+            "event_id":event["event_id"],
+            "question_id":event["question_id"],
             "index":n,"session":event["session_no"],
             "action":event["action_type"],"answered_at":event["answered_at"],
-            "mastery":{concept:round(float(mastery[concept]),6)
-                       for concept in CONCEPT_IDS}
+            "mastery":values,
+            "overall_bkt_mean":round(sum(values.values())/len(CONCEPT_IDS),6),
         })
     return {
         "learner_id":row["learner_id"],"arm":row["grp"],

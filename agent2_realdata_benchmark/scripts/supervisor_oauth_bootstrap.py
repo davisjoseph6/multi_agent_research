@@ -60,6 +60,46 @@ def init_vault(*, vault_dir: Path, key_file: Path):
                 status="PRIVATE_KEY_GENERATED_NO_MAIL_PERMISSIONS_GRANTED")
 
 
+def import_google_web_client(*, source: Path,
+                             client_id_path: Path,
+                             client_secret_path: Path) -> dict:
+    """Safely extract the local Web OAuth client JSON (never a user token).
+
+    No web request, Gmail connection or automatic sending occurs. Source
+    and destination directories must already be private. Client secrets
+    never appear in CLI output or source control.
+    """
+    raw = private_file(source).read_text(encoding="utf-8")
+    try:
+        payload = json.loads(raw)
+        if type(payload) is not dict or type(payload.get("web")) is not dict:
+            raise ValueError("Google Web application OAuth client required")
+        web = payload["web"]
+        client_id = web["client_id"]
+        secret = web["client_secret"]
+        redirects = web["redirect_uris"]
+        if (type(client_id) is not str or
+                not client_id.endswith(".apps.googleusercontent.com") or
+                type(secret) is not str or not 8 <= len(secret) <= 500 or
+                type(redirects) is not list or REDIRECT not in redirects):
+            raise ValueError("invalid web client or missing exact localhost redirect")
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        raise MailConfigurationError(
+            "valid Google Web OAuth client JSON with exact callback required"
+        ) from None
+    if (client_id_path.resolve()==client_secret_path.resolve() or
+            client_id_path.resolve()==source.resolve() or
+            client_secret_path.resolve()==source.resolve() or
+            client_id_path.exists() or client_secret_path.exists()):
+        raise MailConfigurationError("use three distinct, nonexisting output paths")
+    _new_private_file(client_secret_path, secret+"\n")
+    _new_private_file(client_id_path, client_id+"\n")
+    return dict(provider="gmail_delegated",client_id=client_id,
+                client_id_file=str(client_id_path),
+                client_secret_file=str(client_secret_path),
+                oauth_consent_completed=False,mail_sent=False)
+
+
 def start(*, provider: str, sender: str, client_id: str,
           state_path: Path, tenant: str = "consumers",
           client_secret_file: str | None = None):
@@ -180,12 +220,20 @@ def main():
     finish_cmd.add_argument("--session-file",type=Path,required=True)
     finish_cmd.add_argument("--vault-dir",type=Path,required=True)
     finish_cmd.add_argument("--vault-key-file",type=Path,required=True)
+    google_import=choices.add_parser("import-google-json")
+    google_import.add_argument("--source",type=Path,required=True)
+    google_import.add_argument("--client-id-file",type=Path,required=True)
+    google_import.add_argument("--client-secret-file",type=Path,required=True)
     init=choices.add_parser("init-vault")
     init.add_argument("--vault-dir",type=Path,required=True)
     init.add_argument("--vault-key-file",type=Path,required=True)
     args=p.parse_args()
     if args.action=="init-vault":
         print(json.dumps(init_vault(vault_dir=args.vault_dir,key_file=args.vault_key_file)))
+    elif args.action=="import-google-json":
+        print(json.dumps(import_google_web_client(
+            source=args.source,client_id_path=args.client_id_file,
+            client_secret_path=args.client_secret_file)))
     elif args.action=="start":
         print("Open this URL in your own browser; do not send it in chat:")
         print(start(provider=args.provider,sender=args.sender,
