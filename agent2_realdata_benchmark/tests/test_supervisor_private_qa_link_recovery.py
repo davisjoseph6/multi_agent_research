@@ -132,7 +132,12 @@ def test_recovery_after_quiz_answer_keeps_exact_id_arm_events_and_resume(suite):
         events=db.execute(
             "SELECT COUNT(*) FROM events WHERE learner_id=?",(ref,)
         ).fetchone()[0]
-        assert events==1
+        # Registration also records the eight screening assessment events.
+        # Recovery must preserve the entire accumulated history, not merely
+        # the single pretest response.
+        assert events>=9
+        assert db.execute("SELECT COUNT(*) FROM events WHERE learner_id=? "
+                          "AND phase='PRETEST'",(ref,)).fetchone()[0]==1
 
     assert reviewer.post("/control/api/qa-recover",json={
         "candidate_id":cid,
