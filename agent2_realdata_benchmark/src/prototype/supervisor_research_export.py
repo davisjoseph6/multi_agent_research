@@ -248,3 +248,48 @@ def build_student_research_archive(db: sqlite3.Connection, *, learner_id: str) -
         ):
             zf.writestr(name,_csv_bytes(columns,rows))
     return archive.getvalue()
+
+
+def build_cohort_research_archive(db: sqlite3.Connection, *,
+                                  max_students: int = 250,
+                                  max_archive_bytes: int = 64 * 1024 * 1024
+                                  ) -> bytes:
+    """Bounded offline-safe batch of individually pseudonymized student ZIPs.
+
+    No contacts DB is attached; files are read from the same separately
+    protected research database, which contains no raw contact emails.
+    For larger cohorts use the local operator-only export workflow.
+    """
+    if (type(max_students) is not int or not 1 <= max_students <= 1000
+            or type(max_archive_bytes) is not int
+            or not 1024 <= max_archive_bytes <= 256 * 1024 * 1024):
+        raise ValueError("invalid research export resource limits")
+    db.row_factory=sqlite3.Row
+    student_ids=[row["learner_id"] for row in db.execute(
+        "SELECT learner_id FROM participants ORDER BY learner_id LIMIT ?",
+        (max_students+1,),
+    ).fetchall()]
+    if len(student_ids)>max_students:
+        raise ValueError("cohort exceeds configured authorized bulk-export size")
+    output=BytesIO()
+    included=[]
+    total_bytes=0
+    with ZipFile(output,mode="w",compression=ZIP_DEFLATED,compresslevel=4) as cohort:
+        for learner_id in student_ids:
+            payload=build_student_research_archive(db,learner_id=learner_id)
+            total_bytes+=len(payload)
+            if total_bytes>max_archive_bytes:
+                raise ValueError("research archive exceeds authorized memory size")
+            cohort.writestr("students/"+learner_id+".zip",payload)
+            included.append(learner_id)
+        cohort.writestr("cohort_manifest.json",json.dumps({
+            "schema":"IJCAI2027_PSEUDONYMIZED_COHORT_EXPORT_V1",
+            "student_count":len(included),
+            "student_ids":included,
+            "study_arms":"A=Adaptive recovery, B=Greedy, C=Fixed sequence",
+            "notes":"Each nested ZIP contains seven measurement files; no contact PII",
+            "not_anonymized":True,
+        },indent=2))
+    if len(output.getbuffer())>max_archive_bytes:
+        raise ValueError("compressed research archive exceeds authorized size")
+    return output.getvalue()
