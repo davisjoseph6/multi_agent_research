@@ -304,7 +304,7 @@ def test_only_explicit_private_qa_student_can_skip_wait_not_live(suite):
     assert suite["intake"].register(
         token,age=24,program="Private QA only",
         at=datetime.now(timezone.utc),
-    )["eligible"]
+    )["registered"]
     ref = suite["intake"].learner(token,at=datetime.now(timezone.utc))
     student=suite["study"].test_client()
     assert student.post("/study/api/exchange",json={"token":token},
