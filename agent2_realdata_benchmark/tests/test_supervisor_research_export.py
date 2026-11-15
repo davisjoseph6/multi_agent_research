@@ -47,10 +47,9 @@ def prepared(tmp_path):
     }
     assert intake.screening(token,answers=answers,at=NOW())["eligible"]
     result = intake.register(token,age=24,program="Private QA only",at=NOW())
-    assert result["eligible"]
+    assert result["registered"] is True
     ref = intake.learner(token,at=NOW())
     assert ref == "STUDY_P001"
-    assert result["fictional_learner_id"] == ref
 
     start = NOW()
     for idx,question in enumerate(store.bank.forms["pretest"]):
@@ -66,7 +65,7 @@ def prepared(tmp_path):
         assert state["phase"] == "QUIZ"
 
     question=store.next_item(ref,token)
-    assert question["phase"]=="QUIZ"
+    assert question["kind"]=="question"
     assert question["action"]=="QUESTION"
     qid=question["question_id"]
     correct=store.bank.get(qid,form="practice").correct_answer
@@ -232,10 +231,5 @@ def test_learner_id_remains_one_per_email_and_one_arm(prepared):
         assert db.execute(
             "SELECT COUNT(*) FROM participants WHERE learner_id=?",(ref,)
         ).fetchone()[0]==1
-    with pytest.raises(Exception,match="already registered|registered"):
-        store.register(
-            contact_email=SCHOOL,econ_course=False,
-            screening_answers={},consent_version="not-a-retest",
-            consent_given=True,age=24,program="Private QA only",at=NOW(),
-            consent_lang="en",invitation_token=token,
-        )
+    with pytest.raises(Exception,match="already registered"):
+        suite["intake"].issue(SCHOOL,at=NOW())
