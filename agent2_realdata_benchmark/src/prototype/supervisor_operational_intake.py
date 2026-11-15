@@ -230,6 +230,9 @@ class OperationalIntake:
             raise SyntheticStudyError("private QA recovery requires allowlisted identity")
         digest = self.digest(new_token)
         with self.store._tx() as db:
+            if db.execute("SELECT closed_at FROM collection_status WHERE one=1"
+                          ).fetchone()["closed_at"] is not None:
+                raise SyntheticStudyError("QA collection has closed")
             row = db.execute(
                 "SELECT token_hash,learner_id,expires_at,state "
                 "FROM pii.invitations WHERE email=? COLLATE NOCASE",
