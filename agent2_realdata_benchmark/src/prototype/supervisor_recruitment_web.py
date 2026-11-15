@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 import hmac
 import json
+import re
 from pathlib import Path
 import sqlite3
 
@@ -19,6 +20,8 @@ from .supervisor_recruitment import (
     RecruitmentLedger, RecruitmentError, ADMIN_EMAILS,
 )
 from .supervisor_recruitment_metrics import inter_answer_times, mastery_series
+from .supervisor_research_export import build_student_research_archive
+from io import BytesIO
 from .supervisor_inactivity_worker import reconcile_inactivity
 from .supervisor_recruitment_dispatch import InvitationDispatcher
 
@@ -314,6 +317,28 @@ def make_recruitment_app(
         value["last_name"]=candidate.get("last_name")
         value["contains_pii"]=True
         return jsonify(value)
+
+    @app.get("/control/api/research-export/<ref>.zip")
+    def research_export(ref):
+        # Never expose research archives to students or the public. The
+        # authenticated researcher cookie is required and provisional staff
+        # credentials are rejected. No emails, names or contact-token records.
+        actor=admin()
+        if not isinstance(ref,str) or not re.fullmatch(r"STUDY_P[0-9]{3,}",ref):
+            raise RecruitmentError("invalid pseudonymous participant reference")
+        db=paired_db()
+        try:
+            try:
+                archive=build_student_research_archive(db,learner_id=ref)
+            except ValueError as error:
+                raise RecruitmentError("student export unavailable") from error
+        finally:
+            db.close()
+        ledger.record_research_export(actor=actor["email"],learner_id=ref,at=now())
+        return send_file(BytesIO(archive),mimetype="application/zip",
+                         as_attachment=True,
+                         download_name=f"ijcai-study-{ref}-research.zip",
+                         max_age=0)
 
     @app.get("/control/api/reminder-policy")
     def policy():
