@@ -62,6 +62,50 @@ After the domain owner confirms real DNS control, TLS and institutional approval
 
 These exact hostnames are suggestions only, not verified DNS or active services. The private LIVE research dashboard on loopback port 8890 is intentionally SSH-only. Never publicly route /control/ without a separately reviewed identity-aware access gateway. The approved installer requires genuine non-demo DNS, HTTPS, exact-commit release signatures, all bilingual signed documents and a signed mailbox policy. Placeholder PDFs must remain pending; adding the genuine versions does not require discarding research data.
 
+## 7. Send one real Gmail-to-school PRIVATE QA invitation (not LIVE recruitment)
+
+Once the owner has completed encrypted OAuth with their own Gmail mailbox,
+the local WSL tool can email an already-issued private QA token only to
+davis.joseph@aivancity.education. The provider is the owner's real Gmail
+address; it does not impersonate Wiam, Sara or the supervisor.
+
+In the SSH-only researcher QA console, approve your school applicant and
+select Issue individual QA link or Issue all approved QA links. Privately
+copy ONLY that one school's resulting http://127.0.0.1:8897/study/#invite=
+URL. Do not include the token in shell history, Git, chat, or shared logs.
+Prepare the WSL local protected link file in the 0700 OAuth directory:
+
+    umask 077
+    install -m 0600 /dev/null "$HOME/.ijcai_oauth_private/qa-school-link.txt"
+    nano "$HOME/.ijcai_oauth_private/qa-school-link.txt"
+
+Paste the complete link into the private editor file and save it. From the
+current checkout's agent2_realdata_benchmark folder, first validate only:
+
+    python -m scripts.supervisor_private_qa_owner_mail \
+      --link-file "$HOME/.ijcai_oauth_private/qa-school-link.txt" \
+      --receipt-file "$HOME/.ijcai_oauth_private/qa-school-mail-once.json" \
+      --client-id-file "$HOME/.ijcai_oauth_private/google-client-id.txt" \
+      --client-secret-file "$HOME/.ijcai_oauth_private/google-client.secret" \
+      --vault-dir "$HOME/.ijcai_oauth_private/vault" \
+      --vault-key-file "$HOME/.ijcai_oauth_private/mail.key" \
+      --recipient davis.joseph@aivancity.education
+
+To send exactly one TEST-ONLY invitation, rerun that exact command with
+--send --confirm-owner-qa-only. A durable mode-0600 receipt is reserved
+before contacting Google; if the request times out, it remains uncertain
+and must not be retried automatically. Inspect Gmail Sent and the school
+inbox without sharing the link with anyone. The owner must have their own
+SSH tunnel to port 8897 open to follow the link.
+
+This safely tests real Gmail delivery of a QA token to an explicitly
+self-consenting address. It is NOT the genuine participant invitation
+workflow and does not activate the LIVE Send selected or Send all approved
+buttons. Those production buttons remain correctly disabled until signed
+release and sender authorization are installed. The QA researcher console
+continues to issue links without network mail and never authorizes actual
+enrollment.
+
 ## 6. Complete the already imported Google OAuth client locally
 
 The downloaded Google Web client JSON was imported successfully, but no Gmail OAuth grant has yet been issued. In WSL run:
