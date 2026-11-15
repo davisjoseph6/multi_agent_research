@@ -1,53 +1,110 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex,nofollow">
-  <title>Supervisor parallel study — private fictional preview</title>
-  <link rel="stylesheet" href="/supervisor-fake.css">
-  <script defer src="/supervisor-fake.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Supervisor parallel study — fictional consent and study preview</title>
+<link rel="stylesheet" href="/supervisor-fake.css">
+<script defer src="/supervisor-copy.js"></script>
+<script defer src="/supervisor-fake.js"></script>
 </head>
 <body>
 <main id="app" data-preview-nonce="{{ preview_nonce }}">
-  <h1>Supervisor’s adaptive quiz — technical preview</h1>
-  <p class="warning" role="status">
-    FICTIONAL ONLY. These files are for engineering validation. No real
-    student registration, email transmission, consent collection, or
-    scientifically approved experiment is enabled here.
-  </p>
-  <div class="toolbar">
-    <label for="fixture">Fictional learner</label>
-    <select id="fixture" aria-label="Fictional learner">
-      <option value="F1">F1</option>
-      <option value="F2">F2</option>
-      <option value="F3">F3</option>
-    </select>
-    <button type="button" id="load">Load status</button>
-  </div>
-  <p id="progress" aria-live="polite">No fictional learner selected.</p>
-  <section id="registration" aria-labelledby="register-title" hidden>
-    <h2 id="register-title">Registration and screening (fictional)</h2>
-    <label><input type="checkbox" id="consent">
-      I agree to run this FICTIONAL developer-only consent rehearsal.</label>
-    <label><input type="checkbox" id="econ">
-      I have previously taken an economics or behavioral science course.</label>
-    <p>One screening item per concept. No correct answers are shown.</p>
-    <div id="screening"></div>
-    <button id="register" type="button">Submit fictional registration</button>
-  </section>
-  <section aria-labelledby="phase-title">
-    <h2 id="phase-title">Current step</h2>
-    <p id="question"></p>
-    <fieldset id="options"><legend>Choose one answer</legend></fieldset>
-    <div class="actions">
-      <button type="button" id="answer" hidden>Submit</button>
-      <button type="button" id="continue" hidden>Continue recovery</button>
-      <button type="button" id="survey" hidden>Submit fatigue survey</button>
-      <button type="button" id="advance" hidden>Advance 4 fictional days</button>
-    </div>
-  </section>
-  <p id="feedback" role="alert" aria-live="assertive"></p>
+<header>
+<h1 data-i18n="main_title">Self-Healing Adaptive Quiz — developer-only study preview</h1>
+<p class="warning" role="status" data-i18n="synthetic_warning">SYNTHETIC ONLY. No human enrollment, real email, institutional consent collection or real data is enabled. The v1.0 text has been submitted for validation but is not an approved public release.</p>
+<label for="fixture" data-i18n="fictional_learner">Fictional learner</label>
+<select id="fixture"><option value="F1">F1</option><option value="F2">F2</option><option value="F3">F3</option></select>
+<button type="button" id="load" data-i18n="load_state">Load fictional state</button>
+<button type="button" id="quick-recovery" data-i18n="quick_recovery">Quick test: trigger Group A recovery (fresh F1 only)</button>
+<label for="study-lang" data-i18n="language_choice">Display language</label>
+<select id="study-lang" aria-label="Study language"><option value="en">English</option><option value="fr">Français</option></select>
+</header>
+<section id="information" aria-labelledby="info-title" hidden>
+<h2 id="info-title" data-i18n="info_title">Participant information sheet — v1.0</h2>
+<nav aria-label="Information sheet links">
+<a id="french-link" href="/content/consent/fr/info" data-i18n="french_link">Lire en français</a>
+<a id="pdf-link" href="/content/consent/en/pdf" data-i18n="download_pdf">Download PDF</a>
+</nav>
+<label for="info-lang" data-i18n="info_language">Information language</label>
+<select id="info-lang"><option value="en">English</option><option value="fr">Français</option></select>
+<div id="information-sheet" class="sheet" role="region" aria-label="Full information sheet" tabindex="0"></div>
+<button type="button" id="continue-info" data-i18n="continue_consent">Continue to consent form</button>
+</section>
+<section id="consent-stage" aria-labelledby="consent-title" hidden>
+<h2 id="consent-title" data-i18n="consent_title">Consent form — v1.0</h2>
+<p id="consent-intro" data-i18n="consent_intro">I confirm that:</p>
+<fieldset id="consent-required"><legend>Required declarations</legend></fieldset>
+<fieldset id="consent-optional"><legend>Optional (no effect on participation)</legend></fieldset>
+<button type="button" id="start-consent" disabled data-i18n="start">Start</button>
+<a href="#" id="econ-course-link" data-i18n="econ_course">I have taken such a course</a>
+</section>
+<section id="screening-stage" aria-labelledby="screening-title" hidden>
+<h2 id="screening-title" data-i18n="screening_title">Screening test (8 questions)</h2>
+<p data-i18n="screening_no_feedback">No correctness feedback is shown.</p>
+<p id="screening-number" aria-live="polite"></p>
+<p id="screening-prompt"></p>
+<fieldset id="screening-choices"><legend>Choose one answer</legend></fieldset>
+<button type="button" id="screening-next" data-i18n="next">Next</button>
+</section>
+<section id="registration-stage" aria-labelledby="registration-title" hidden>
+<h2 id="registration-title" data-i18n="registration_title">Registration</h2>
+<label for="email" data-i18n="email_label">Fictional email (.test addresses only)</label>
+<input type="email" id="email" autocomplete="off" value="" placeholder="demo@example.test">
+<label for="age" data-i18n="age_label">Age (18–99)</label><input type="number" id="age" min="18" max="99" value="23">
+<label for="program" data-i18n="program_label">Study program</label>
+<select id="program"><option value="Synthetic classroom demonstration" data-i18n="program_option">Synthetic classroom demonstration (fixture only)</option></select>
+<button type="button" id="submit-registration" data-i18n="register">Register fictional learner</button>
+</section>
+<section id="excluded-stage" hidden>
+<h2 data-i18n="excluded_title">Not eligible</h2>
+<p data-i18n="ineligible">Thank you for your interest. Unfortunately you do not meet the eligibility criteria for this study.</p>
+</section>
+<section id="registered-stage" hidden>
+<p id="registered-message" role="status"></p>
+<p id="progress" aria-live="polite"></p>
+<div id="previous-result" role="status" aria-live="polite" hidden><span id="previous-result-icon" aria-hidden="true"></span> <span id="previous-result-text"></span></div>
+<section aria-labelledby="phase-title">
+<h2 id="phase-title" data-i18n="current_step">Current step</h2>
+<p id="question"></p>
+<div id="recovery-content" hidden>
+  <p class="warning" id="recovery-review-status" data-i18n="draft_warning">Fictional instructional draft — requires supervisor review.</p>
+  <h3 id="recovery-title"></h3>
+  <div id="recovery-paragraphs"></div>
+  <p id="hint-guidance" hidden></p>
+  <label for="hint-reflection" id="hint-label" data-i18n="hint_label" hidden>Your reasoning (before seeing the answer choices)</label>
+  <textarea id="hint-reflection" rows="3" maxlength="500" hidden></textarea>
+</div>
+<fieldset id="options"><legend>Choose one answer</legend></fieldset>
+<div class="actions">
+<button type="button" id="answer" data-i18n="submit" hidden>Submit</button>
+<button type="button" id="continue" data-i18n="continue_recovery" hidden>Continue recovery</button>
+<button type="button" id="hint-next" data-i18n="next_hint" hidden>Next Socratic hint</button>
+<button type="button" id="survey" data-i18n="submit_survey" hidden>Submit fatigue survey</button>
+<button type="button" id="advance" data-i18n="advance_days" hidden>Advance 4 fictional days</button>
+</div>
+</section>
+</section>
+<section id="withdraw-stage" aria-labelledby="withdraw-title" hidden>
+<h2 id="withdraw-title" data-i18n="withdraw_title">Stop participating</h2>
+<p data-i18n="withdraw_description">You can stop at any time, without giving a reason. Please note: the 150 AI points are awarded only to participants who complete all 3 sessions, so no points will be awarded if you stop now.</p>
+<p data-i18n="choose_option">Choose one option:</p>
+<button type="button" id="withdraw-keep" data-i18n="withdraw_keep">Stop and keep my answers</button>
+<p data-i18n="withdraw_keep_desc">Your answers so far stay in the study, under a code.</p>
+<button type="button" id="withdraw-delete" data-i18n="withdraw_delete">Stop and delete my data</button>
+<p data-i18n="withdraw_delete_desc">All your answers and your email are deleted now.</p>
+<button type="button" id="withdraw-cancel" data-i18n="withdraw_cancel">Cancel, I want to continue</button>
+</section>
+<section id="debrief-stage" hidden>
+<h2 data-i18n="debrief_title">Debriefing</h2><p id="debrief"></p>
+</section>
+<p id="feedback" role="alert" aria-live="assertive"></p>
+<footer>
+<a id="footer-information" href="/content/consent/en/info" data-i18n="footer_info">Information sheet</a> |
+<a id="footer-stop" href="#" data-i18n="footer_stop">Stop participating</a> |
+<span data-i18n="footer_contact">Contact: [principal investigator email]</span>
+</footer>
 </main>
 </body>
 </html>

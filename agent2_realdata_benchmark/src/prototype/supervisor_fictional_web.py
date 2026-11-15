@@ -17,9 +17,12 @@ import secrets
 import time
 from typing import Callable
 
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import Flask, jsonify, render_template, request, send_file, redirect
 
 from .supervisor_content import SupervisorBank
+from .supervisor_i18n import localize_public
+from .supervisor_consent_flow import SyntheticConsentFlow
+from .supervisor_consent_texts import CONSENT_VERSION, required, STOP_PAGE
 from .supervisor_synthetic_store import (
     SupervisorSyntheticStore, SyntheticStudyError,
 )
@@ -53,6 +56,7 @@ class FictionalSupervisorRuntime:
         self.store = store
         self.clock = clock or FictionalSupervisorClock()
         self.roster = {}
+        self.consent = SyntheticConsentFlow(store)
         self.pending = {}
         self.lock = RLock()
 
@@ -128,6 +132,21 @@ def make_supervisor_fictional_app(
         return render_template("supervisor_fictional_web.html",
                                preview_nonce=nonce)
 
+    @app.get("/supervisor/consent")
+    def consent_form_page():
+        return redirect("/?consent=1",code=302)
+
+    @app.get("/supervisor/stop")
+    def stop_page():
+        return redirect("/?stop=1",code=302)
+
+    @app.get("/supervisor-copy.js")
+    def copy_script():
+        return send_file(
+            ROOT/"static/supervisor_fictional_copy.js",
+            mimetype="text/javascript",
+        )
+
     @app.get("/supervisor-fake.js")
     def script():
         return send_file(ROOT/"static/supervisor_fictional_web.js",
@@ -138,15 +157,230 @@ def make_supervisor_fictional_app(
         return send_file(ROOT/"static/supervisor_fictional_web.css",
                          mimetype="text/css")
 
+    @app.get("/content/consent/<lang>/info")
+    def information(lang):
+        if lang not in ("en", "fr"):
+            raise SyntheticStudyError("unsupported information sheet language")
+        filename="info_sheet_"+lang+"_v1.0.html"
+        return send_file(ROOT.parents[1]/"content"/"consent"/filename,
+                         mimetype="text/html")
+
+    @app.get("/content/consent/<lang>/pdf")
+    def information_pdf(lang):
+        if lang not in ("en","fr"):
+            raise SyntheticStudyError("unsupported information sheet language")
+        filename="info_sheet_"+lang+"_v1.0.pdf"
+        pdf=ROOT.parents[1]/"content"/"consent"/filename
+        if not pdf.exists():
+            raise SyntheticStudyError("versioned PDF must be built before deployment")
+        return send_file(pdf,mimetype="application/pdf")
+
+    @app.post("/supervisor/api/consent/copy")
+    def consent_copy():
+        v=payload({"fixture","language"})
+        required_text,optional_text=required(v["language"])
+        return jsonify(version=CONSENT_VERSION,required=required_text,
+                       optional=optional_text,
+                       synthetic_only=True)
+
+    @app.post("/supervisor/api/consent/start")
+    def consent_start():
+        v=payload({"fixture","checks","optional","language"})
+        with runtime.lock:
+            return jsonify(runtime.consent.start_consent(
+                v["fixture"],checks=v["checks"],optional=v["optional"],
+                language=v["language"],at=runtime.clock(),
+            ))
+
+    @app.post("/supervisor/api/consent/economics")
+    def consent_economics():
+        v=payload({"fixture"})
+        with runtime.lock:
+            return jsonify(runtime.consent.declare_economics_course(v["fixture"]))
+
+    @app.post("/supervisor/api/consent/screen")
+    def consent_screen():
+        v=payload({"fixture","answers"})
+        with runtime.lock:
+            return jsonify(runtime.consent.screen(
+                v["fixture"],answers=v["answers"],at=runtime.clock(),
+            ))
+
+    @app.post("/supervisor/api/consent/register")
+    def consent_register():
+        v=payload({"fixture","email","age","program"})
+        with runtime.lock:
+            result=runtime.consent.register(
+                v["fixture"],email=v["email"],age=v["age"],
+                program=v["program"],at=runtime.clock(),
+            )
+            runtime.roster[v["fixture"]]=runtime.consent.identities[v["fixture"]]
+            return jsonify(result)
+
+    @app.post("/supervisor/api/consent/withdraw")
+    def consent_withdraw():
+        v=payload({"fixture","delete","confirmed"})
+        if v["confirmed"] is not True:
+            raise SyntheticStudyError("explicit withdrawal confirmation required")
+        with runtime.lock:
+            outcome=runtime.consent.withdraw(
+                v["fixture"],delete=v["delete"],at=runtime.clock(),
+            )
+            runtime.roster.pop(v["fixture"],None)
+            runtime.pending.pop(v["fixture"],None)
+            return jsonify(outcome)
+
+    @app.post("/supervisor/api/consent/debrief")
+    def consent_debrief():
+        v=payload({"fixture"})
+        with runtime.lock:
+            result=runtime.consent.completed_debrief(v["fixture"])
+            ref,token=runtime.verified(v["fixture"])
+            language=runtime.store.progress(ref,token)["study_language"]
+            if language=="fr":
+                result["text"]=(
+                    "Merci d'avoir participé à cette étude ! Trois versions du "
+                    "quiz ont été utilisées. La première repérait les difficultés "
+                    "sur un concept et proposait un accompagnement. La deuxième "
+                    "choisissait toujours le concept le moins maîtrisé, sans aide. "
+                    "La troisième présentait les questions dans un ordre fixe, "
+                    "du plus facile au plus difficile. Votre version a été "
+                    "attribuée automatiquement et ne vous a pas été révélée "
+                    "pour ne pas influencer vos réponses. Vos 150 AI points "
+                    "seront crédités avant le [date]. Les résultats seront "
+                    "communiqués aux participants qui souhaitent les recevoir "
+                    "à la fin de l'étude. Pour toute question ou pour exercer "
+                    "vos droits : [email]."
+                )
+            return jsonify(result)
+
+    @app.post("/supervisor/api/demo/prime-recovery")
+    def demo_prime_recovery():
+        """Synthetic-only, one-click setup for the actual Group A recovery path.
+
+        Uses the normal consent, screening, registration, pretest and quiz
+        engine methods. Never creates real identities, sends email or permits
+        arbitrary starting states. Only a brand-new local F1 fixture may use it.
+        """
+        v = payload({"fixture"})
+        with runtime.lock:
+            if v["fixture"] != "F1":
+                raise SyntheticStudyError("quick recovery requires fictional F1")
+            with runtime.store._tx() as db:
+                already_used = (
+                    db.execute("SELECT COUNT(*) FROM participants").fetchone()[0]
+                    + db.execute("SELECT COUNT(*) FROM deletion_log").fetchone()[0]
+                )
+            if (already_used or runtime.roster or runtime.consent.drafts
+                    or runtime.consent.closed or runtime.consent.identities):
+                raise SyntheticStudyError(
+                    "quick recovery requires a fresh fictional preview; "
+                    "restart the local browser server"
+                )
+
+            bank = runtime.store.bank
+            def wrong(item):
+                return next(letter for letter in "ABCD"
+                            if letter != item.correct_answer)
+
+            # These are explicit TEST-FIXTURE declarations, not consent from
+            # a person. All contact addresses use the reserved .test TLD.
+            runtime.consent.start_consent(
+                "F1", checks=[True] * 6, optional=False, language="en",
+                at=runtime.clock(),
+            )
+            screening_answers = {
+                q.question_id: (q.correct_answer if i < 4 else wrong(q))
+                for i, q in enumerate(bank.forms["screening"])
+            }
+            screened = runtime.consent.screen(
+                "F1", answers=screening_answers, at=runtime.clock(),
+            )
+            if not screened["eligible"]:
+                raise SyntheticStudyError("fictional screening unexpectedly excluded")
+            runtime.consent.register(
+                "F1", email="quick-recovery-f1@example.test", age=23,
+                program="Synthetic classroom demonstration", at=runtime.clock(),
+            )
+            runtime.roster["F1"] = runtime.consent.identities["F1"]
+            ref, token = runtime.verified("F1")
+
+            # The supplied supervisor Case 1 starts C2 at mastery 0.20:
+            # one correct assessment item for C1,C3,C4,C8, none for others.
+            for i, q in enumerate(bank.forms["pretest"]):
+                preview = runtime.store.next_item(ref, token)
+                if preview.get("question_id") != q.question_id:
+                    raise SyntheticStudyError("pretest fixture order mismatch")
+                good = q.concept in {"C1", "C3", "C4", "C8"} and q.level == 2
+                instant = runtime.clock()
+                runtime.store.answer_assessment(
+                    ref, token, request_id=f"quick_pretest_{i:02d}",
+                    item_id=q.question_id,
+                    choice=q.correct_answer if good else wrong(q),
+                    shown_at=instant,
+                    answered_at=instant + timedelta(milliseconds=1),
+                )
+
+            # Case 1, Session 1, first three real engine questions; all wrong.
+            for i in range(1, 4):
+                item = runtime.store.next_item(ref, token)
+                expected_id = f"QZ_C2_L1_{i:02d}"
+                if item.get("question_id") != expected_id:
+                    raise SyntheticStudyError(
+                        "real engine did not reproduce supervisor Case 1"
+                    )
+                source = bank.get(expected_id, form="practice")
+                instant = runtime.clock()
+                runtime.store.answer_quiz(
+                    ref, token, request_id=f"quick_wrong_{i:02d}",
+                    item_id=expected_id, choice=wrong(source),
+                    shown_at=instant,
+                    answered_at=instant + timedelta(milliseconds=1),
+                )
+
+            next_step = runtime.store.next_item(ref, token)
+            if (next_step.get("kind") != "recovery"
+                    or next_step.get("action") != "CONCEPT_SUMMARY"):
+                raise SyntheticStudyError("expected Rule 5b recovery not triggered")
+            return jsonify(
+                prepared=True, group="A", session=1,
+                regular_questions_answered=3,
+                recovery_trigger="Rule 5b: three wrong on C2",
+                next_action="CONCEPT_SUMMARY",
+                synthetic_only=True, real_email_sent=False,
+                human_enrollment_authorized=False,
+            )
+
+    @app.post("/supervisor/api/language")
+    def set_language():
+        v=payload({"fixture","language"})
+        with runtime.lock:
+            ref,token=runtime.verified(v["fixture"])
+            runtime.store.set_study_language(ref,token,v["language"])
+            return jsonify(
+                language=v["language"],synthetic_only=True,
+                human_enrollment_authorized=False,
+            )
+
     @app.post("/supervisor/api/screening")
     def screening():
         v=payload({"fixture"})
         with runtime.lock:
             if runtime.fake(v["fixture"]):
                 raise SyntheticStudyError("already registered fake fixture")
+            if not app.config["TESTING"] and (
+                v["fixture"] not in runtime.consent.drafts
+                or runtime.consent.drafts[v["fixture"]]["screening_answers"] is not None
+            ):
+                raise SyntheticStudyError("six-checkbox consent required before screening")
+            draft=runtime.consent.drafts.get(v["fixture"])
+            lang=draft["consent_lang"] if draft else "en"
             return jsonify(
-                kind="fictional_registration",
-                questions=[q.public() for q in runtime.store.bank.forms["screening"]],
+                kind="fictional_registration",language=lang,
+                questions=[
+                    localize_public(q.public(),language=lang)
+                    for q in runtime.store.bank.forms["screening"]
+                ],
                 synthetic_only=True,human_enrollment_authorized=False,
             )
 
@@ -154,6 +388,10 @@ def make_supervisor_fictional_app(
     def register():
         v=payload({"fixture","consent","econ_course","screening_answers"})
         with runtime.lock:
+            if not app.config["TESTING"]:
+                raise SyntheticStudyError(
+                    "single-checkbox legacy fictional API disabled; use staged consent"
+                )
             fixture=v["fixture"]
             if runtime.fake(fixture):
                 raise SyntheticStudyError("duplicate fictional registration")
@@ -190,11 +428,33 @@ def make_supervisor_fictional_app(
         with runtime.lock:
             pair=runtime.fake(v["fixture"])
             if not pair:
-                return jsonify(registered=False,synthetic_only=True)
+                fixture=v["fixture"]
+                if fixture in runtime.consent.closed:
+                    stage="excluded"
+                elif fixture in runtime.consent.drafts:
+                    draft=runtime.consent.drafts[fixture]
+                    stage=("registration" if draft["screening_answers"] is not None
+                           else "screening")
+                else:
+                    stage="information"
+                draft_language=(
+                    runtime.consent.drafts[fixture]["consent_lang"]
+                    if fixture in runtime.consent.drafts else None
+                )
+                return jsonify(registered=False,consent_stage=stage,
+                               consent_lang=draft_language,synthetic_only=True)
             ref,token=pair
             state=runtime.store.progress(ref,token)
+            with runtime.store._tx() as db:
+                consent=db.execute(
+                    "SELECT consent_lang,consent_version FROM participants "
+                    "WHERE learner_id=?",(ref,),
+                ).fetchone()
             return jsonify(registered=True,phase=state["phase"],
                            session=state["session"],index=state["index"],
+                           consent_lang=consent["consent_lang"],
+                           consent_version=consent["consent_version"],
+                           study_language=state["study_language"],
                            synthetic_only=True,
                            human_enrollment_authorized=False)
 
@@ -222,7 +482,12 @@ def make_supervisor_fictional_app(
 
     @app.post("/supervisor/api/answer")
     def answer():
-        v=payload({"fixture","question_id","choice","request_id"})
+        expected={"fixture","question_id","choice","request_id"}
+        raw=request.get_json(silent=True)
+        if type(raw) is dict and "reflection" in raw:
+            v=payload(expected | {"reflection"})
+        else:
+            v=payload(expected)
         with runtime.lock:
             fixture=v["fixture"]
             ref,token=runtime.verified(fixture)
@@ -242,6 +507,8 @@ def make_supervisor_fictional_app(
                 raise SyntheticStudyError("request ID required")
             at=runtime.clock()
             if state["phase"] in ("PRETEST","POSTTEST"):
+                if "reflection" in v:
+                    raise SyntheticStudyError("assessment responses contain no recovery reflections")
                 if v["question_id"]!=current["question_id"]:
                     raise SyntheticStudyError("wrong assessment question")
                 result=runtime.store.answer_assessment(
@@ -252,10 +519,17 @@ def make_supervisor_fictional_app(
             else:
                 if v["question_id"]!=current.get("question_id"):
                     raise SyntheticStudyError("wrong quiz or recovery question")
+                if (current.get("action") == "SOCRATIC_HINT"
+                        and fixture in runtime.consent.identities
+                        and "reflection" not in v):
+                    raise SyntheticStudyError(
+                        "complete both Socratic reflections before the re-attempt"
+                    )
                 result=runtime.store.answer_quiz(
                     ref,token,request_id=v["request_id"],
                     item_id=v["question_id"],choice=v["choice"],
                     shown_at=prior[1],answered_at=at,
+                    free_text=v.get("reflection"),
                 )
             runtime.pending.pop(fixture,None)
             return jsonify(result)

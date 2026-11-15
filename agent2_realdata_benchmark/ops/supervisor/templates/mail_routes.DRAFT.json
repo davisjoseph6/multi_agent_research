@@ -1,0 +1,60 @@
+{
+  "schema": "IJCAI2027_MAIL_ROUTES_V1",
+  "draft_only": true,
+  "default": "not-configured",
+  "routes": {
+    "institutional_primary": {
+      "provider": "graph_application",
+      "email": "davis.joseph@aivancity.education",
+      "tenant": "<ENTRA_TENANT_GUID>",
+      "client_id": "<ENTRA_CLIENT_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/graph-client-secret"
+    },
+    "colleague_wiam": {
+      "provider": "graph_application",
+      "email": "wiam.belouard@aivancity.education",
+      "tenant": "<AUTHORIZED_TENANT_GUID>",
+      "client_id": "<APPROVED_APP_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/wiam-secret"
+    },
+    "colleague_sara": {
+      "provider": "graph_application",
+      "email": "sara.elkardi@aivancity.education",
+      "tenant": "<AUTHORIZED_TENANT_GUID>",
+      "client_id": "<APPROVED_APP_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/sara-secret"
+    },
+    "gmail_personal": {
+      "provider": "gmail_delegated",
+      "email": "<VERIFIED_GMAIL_ADDRESS>",
+      "client_id": "<GOOGLE_OAUTH_CLIENT_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/google-client-secret"
+    },
+    "outlook_personal": {
+      "provider": "graph_delegated",
+      "email": "<VERIFIED_OUTLOOK_MAILBOX_NOT_A_GMAIL_ALIAS>",
+      "tenant": "consumers",
+      "client_id": "<MS_OAUTH_CLIENT_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/microsoft-delegated-secret"
+    },
+    "gmail_verified_domain_alias": {
+      "provider": "gmail_delegated",
+      "email": "<ACTUAL_GMAIL_OAUTH_OWNER>",
+      "from_alias": "private_quiz@selfhealing-edu.fr",
+      "client_id": "<GOOGLE_OAUTH_CLIENT_ID>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/google-client-secret"
+    },
+    "domain_native_brevo": {
+      "provider": "brevo_api",
+      "email": "private_quiz@selfhealing-edu.fr",
+      "api_key_label": "<REGISTERED_BREVO_API_CREDENTIAL_LABEL>",
+      "api_key_file": "/etc/ijcai-supervisor-live/mail/brevo-api.key"
+    }
+  },
+  "by_actor": {
+    "wiam.belouard@aivancity.education": "domain_native_brevo",
+    "sara.elkardi@aivancity.education": "domain_native_brevo",
+    "davis.joseph@aivancity.education": "domain_native_brevo"
+  },
+  "warning": "DRAFT ONLY. Default remains not-configured. Signed owner-authorized actors and independently approved sending domain must be configured before any staff or automatic send. This document does not grant permission. Gmail third-party send-as changes in January 2027; use an authorized domain-native provider for a durable 2027 From address."
+}

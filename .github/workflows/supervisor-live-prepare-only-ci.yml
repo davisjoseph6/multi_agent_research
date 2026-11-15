@@ -1,0 +1,126 @@
+name: IJCAI signed LIVE install PREPARE-only smoke (no enrollment)
+on:
+  pull_request:
+    paths:
+      - 'agent2_realdata_benchmark/ops/supervisor/**'
+      - 'agent2_realdata_benchmark/scripts/supervisor_doc_bundle_cli.py'
+      - 'agent2_realdata_benchmark/src/prototype/supervisor_*.py'
+      - '.github/workflows/supervisor-live-prepare-only-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  private-live-preparation:
+    name: Isolated VPS install dry-rehearsal (never activate)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: agent2_realdata_benchmark
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # An install bundle MUST include all parent commits.
+      - name: Create an exact remote-tracking-only Git bundle
+        run: |
+          set -Eeuo pipefail
+          SHA="$(git rev-parse HEAD)"
+          REF=refs/remotes/origin/research/ijcai2027-supervisor-consent-gdpr-20261112
+          git update-ref "$REF" "$SHA"
+          git bundle create /tmp/ijcai-test-only-live.bundle "$REF"
+          git bundle list-heads /tmp/ijcai-test-only-live.bundle
+          git bundle verify /tmp/ijcai-test-only-live.bundle
+          echo "$SHA" > /tmp/ijcai-test-only-commit
+      - name: PREPARE separate empty LIVE storage and disabled units as root
+        run: |
+          set -Eeuo pipefail
+          SHA="$(cat /tmp/ijcai-test-only-commit)"
+          sudo bash ops/supervisor/install_live_services.sh prepare             /tmp/ijcai-test-only-live.bundle "$SHA"
+          test "$(sudo git -C /srv/ijcai-supervisor-live/current rev-parse HEAD)" = "$SHA"
+          sudo test -d /var/lib/ijcai-supervisor-live/document_registry/versions
+          sudo test ! -e /var/lib/ijcai-supervisor-live/document_registry/current
+          sudo find /var/lib/ijcai-supervisor-live/document_registry/versions             -mindepth 2 -maxdepth 2 -name manifest.json -print -quit |
+            grep -q .
+          for unit in ijcai-supervisor-live-study ijcai-supervisor-live-recruitment                       ijcai-supervisor-live-control ijcai-supervisor-live-reminders.timer; do
+            if systemctl is-active --quiet "$unit"; then
+              echo "FAIL: unexpectedly active $unit" >&2
+              exit 2
+            fi
+          done
+          sudo test ! -f /etc/ijcai-supervisor-live/live.env
+          echo "PASS: empty independent databases, pending PDF manifest, stopped LIVE units."
+      - name: Verify password identities are isolated and intake is disabled
+        run: |
+          set -Eeuo pipefail
+          cd /srv/ijcai-supervisor-live/current/agent2_realdata_benchmark
+          sudo runuser -u ijcai-supervisor-live --             /srv/ijcai-supervisor-live/venv/bin/python             -m scripts.supervisor_recruitment_cli             --state-dir /var/lib/ijcai-supervisor-live --counts
+          sudo test -f /var/lib/ijcai-supervisor-live/supervisor_operational_study.sqlite3
+          sudo test -f /var/lib/ijcai-supervisor-live/supervisor_operational_contacts.sqlite3
+          sudo test ! -e /etc/caddy/ijcai-supervisor-live.caddy
+          echo "PASS: no public routes, mail credentials or participant enrollment activated."
+
+  private-live-pending-upgrade:
+    name: Upgrade previous pending release without data migration or activation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: agent2_realdata_benchmark
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: PREPARE the previous pinned LIVE candidate as root
+        run: |
+          set -Eeuo pipefail
+          OLD=b8ba54432be61320dfdc18fb15009e3d8c12cf9f
+          REF=refs/remotes/origin/research/ijcai2027-supervisor-consent-gdpr-20261112
+          git cat-file -e "$OLD^{commit}"
+          git update-ref "$REF" "$OLD"
+          git bundle create /tmp/ijcai-old-pending.bundle "$REF"
+          git bundle verify /tmp/ijcai-old-pending.bundle
+          git show "$OLD:agent2_realdata_benchmark/ops/supervisor/install_live_services.sh" > /tmp/install_live_services.sh
+          git show "$OLD:agent2_realdata_benchmark/ops/supervisor/materialize_live_bundle.sh" > /tmp/materialize_live_bundle.sh
+          sudo bash /tmp/install_live_services.sh prepare /tmp/ijcai-old-pending.bundle "$OLD"
+          sudo test "$(git -C /srv/ijcai-supervisor-live/current rev-parse HEAD)" = "$OLD"
+          sudo test -e /var/lib/ijcai-supervisor-live/supervisor_operational_study.sqlite3
+          sudo test -e /var/lib/ijcai-supervisor-live/supervisor_operational_contacts.sqlite3
+          sudo test -e /var/lib/ijcai-supervisor-live/supervisor_recruitment.sqlite3
+          sudo find /var/lib/ijcai-supervisor-live/initial-admin-secrets -type f -printf '%f %s\n' | sort > /tmp/ijcai-admin-secrets-before
+          sudo bash -c "sha256sum /var/lib/ijcai-supervisor-live/supervisor_operational_*.sqlite3 /var/lib/ijcai-supervisor-live/supervisor_recruitment.sqlite3" > /tmp/ijcai-pending-db-before
+          sudo find /var/lib/ijcai-supervisor-live/document_registry/versions -name manifest.json | wc -l > /tmp/ijcai-pending-document-count-before
+      - name: Upgrade only the pending code and create a new unsigned document version
+        run: |
+          set -Eeuo pipefail
+          NEW="$(git rev-parse HEAD)"
+          REF=refs/remotes/origin/research/ijcai2027-supervisor-consent-gdpr-20261112
+          git update-ref "$REF" "$NEW"
+          git bundle create /tmp/ijcai-new-pending.bundle "$REF"
+          git bundle verify /tmp/ijcai-new-pending.bundle
+          bash -n ops/supervisor/upgrade_pending_live_release.sh
+          sudo bash ops/supervisor/upgrade_pending_live_release.sh /tmp/ijcai-new-pending.bundle "$NEW"
+          test "$(sudo git -C /srv/ijcai-supervisor-live/current rev-parse HEAD)" = "$NEW"
+          sudo bash -c "sha256sum /var/lib/ijcai-supervisor-live/supervisor_operational_*.sqlite3 /var/lib/ijcai-supervisor-live/supervisor_recruitment.sqlite3" > /tmp/ijcai-pending-db-after
+          diff -u /tmp/ijcai-pending-db-before /tmp/ijcai-pending-db-after
+          sudo find /var/lib/ijcai-supervisor-live/initial-admin-secrets -type f -printf '%f %s\n' | sort > /tmp/ijcai-admin-secrets-after
+          diff -u /tmp/ijcai-admin-secrets-before /tmp/ijcai-admin-secrets-after
+          BEFORE="$(cat /tmp/ijcai-pending-document-count-before)"
+          AFTER="$(sudo find /var/lib/ijcai-supervisor-live/document_registry/versions -name manifest.json | wc -l)"
+          test "$AFTER" -gt "$BEFORE"
+          sudo test ! -e /var/lib/ijcai-supervisor-live/document_registry/current
+          sudo test ! -e /etc/ijcai-supervisor-live/live.env
+          sudo test ! -e /etc/caddy/ijcai-supervisor-live.caddy
+          for unit in ijcai-supervisor-live-study ijcai-supervisor-live-recruitment ijcai-supervisor-live-control ijcai-supervisor-live-reminders.timer; do
+            ! systemctl is-active --quiet "$unit"
+          done
+          echo "PASS: pending upgrade preserved data, passwords, document history and disabled LIVE services."
+      - name: Upgrade is rejected if LIVE is activated or its source is dirty
+        run: |
+          set -Eeuo pipefail
+          NEW="$(git rev-parse HEAD)"
+          sudo touch /etc/ijcai-supervisor-live/live.env
+          if sudo bash ops/supervisor/upgrade_pending_live_release.sh /tmp/ijcai-new-pending.bundle "$NEW"; then
+            echo "FAIL: upgrade unexpectedly accepted an already configured LIVE environment" >&2
+            exit 2
+          fi
+          sudo rm /etc/ijcai-supervisor-live/live.env

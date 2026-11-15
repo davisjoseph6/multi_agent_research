@@ -1,0 +1,20 @@
+{
+  "schema": "IJCAI2027_MAIL_ROUTES_V1",
+  "draft_only": true,
+  "default": "gmail_owner_pending",
+  "routes": {
+    "gmail_owner_pending": {
+      "provider": "gmail_delegated",
+      "email": "davisjoseph767@gmail.com",
+      "client_id": "<GOOGLE_OAUTH_APP_CLIENT_ID_NOT_CONFIGURED>",
+      "client_secret_file": "/etc/ijcai-supervisor-live/mail/google-client-secret"
+    }
+  },
+  "by_actor": {
+    "davis.joseph@aivancity.education": "gmail_owner_pending",
+    "wiam.belouard@aivancity.education": "gmail_owner_pending",
+    "sara.elkardi@aivancity.education": "gmail_owner_pending",
+    "yaacoub@aivancity.ai": "gmail_owner_pending"
+  },
+  "warning": "DRAFT ONLY: non-functional until the mailbox owner performs Gmail OAuth, the genuine institutional evidence authorizes the exact signed release and each named researcher, the sender policy is signed, and exact LIVE gates pass. Do not copy this file into active LIVE configuration or set decision=approved without authentic evidence."
+}
