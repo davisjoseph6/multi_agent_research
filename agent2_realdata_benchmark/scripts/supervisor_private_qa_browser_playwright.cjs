@@ -218,6 +218,40 @@ async function main(){
   assert.equal(fileBuffer.subarray(0,2).toString(),"PK");
   assert((await admin.locator("#mastery-chart polyline").count())>=1,
     "researcher BKT mastery needs at least one committed quiz response");
+  // Lost link recovery after a completed pretest and one quiz answer.
+  const recoveredId=applicants.find(x=>x.email===SCHOOL).id;
+  await admin.goto(base+"/control/qa/",{waitUntil:"networkidle"});
+  await admin.locator("#recover-candidate").fill(recoveredId);
+  admin.once("dialog",dialog=>dialog.accept());
+  await admin.locator("#recover-submit").click();
+  await admin.locator("#recover-link").waitFor({state:"visible"});
+  const replacement=await admin.locator("#recover-link").getAttribute("href");
+  assert.match(replacement,/^http:\/\/127\.0\.0\.1:8897\/study\/#invite=/);
+  assert.notEqual(replacement,links[SCHOOL]);
+  assert.match(await admin.locator("#recover-status").textContent(),/STUDY_P001/);
+  const revoked=await school.evaluate(async()=>{
+   const response=await fetch("/study/api/status",{method:"POST",
+    headers:{"Content-Type":"application/json","X-Study-Request":"1"},
+    body:"{}"});
+   return response.status;
+  });
+  assert.equal(revoked,409,"old QA student session must be revoked");
+  const newContext=await browser.newContext();
+  const reentered=await newContext.newPage();
+  await reentered.goto(replacement,{waitUntil:"networkidle"});
+  await reentered.waitForFunction(()=>location.hash==="" &&
+   document.querySelector("#app")&&!document.querySelector("#app").hidden);
+  const resumed=await reentered.evaluate(async()=>{
+   const response=await fetch("/study/api/status",{method:"POST",
+    headers:{"Content-Type":"application/json","X-Study-Request":"1"},
+    body:"{}"});
+   return response.json();
+  });
+  assert.equal(resumed.stage,"participant");
+  assert.equal(resumed.phase,"QUIZ");
+  assert.equal(resumed.session,1);
+  await newContext.close();
+  console.log("PASS: lost QA token recovered without a second enrollment or quiz reset");
   assert.equal(await admin.locator("#send-selected").isDisabled(),true);
   assert.equal(await admin.locator("#send-all").isDisabled(),true);
   assert.deepEqual(faults,[]);
