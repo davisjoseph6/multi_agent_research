@@ -52,7 +52,7 @@ async function main(){
   const oldPassword=match[1];
   assert.match(credential,/QA ONLY/);
   browser=await chromium.launch({headless:true});
-  const staffContext=await browser.newContext();
+  const staffContext=await browser.newContext({acceptDownloads:true});
   const schoolContext=await browser.newContext();
   const gmailContext=await browser.newContext();
   const admin=await staffContext.newPage();
@@ -197,11 +197,25 @@ async function main(){
   await admin.locator("#dashboard").waitFor({state:"visible"});
   await admin.locator("#reload").click();
   await admin.waitForFunction(()=>document.querySelectorAll("#students tr button.inline-button").length>=1);
+  assert.match(await admin.locator("#students tr").first().textContent(),
+   /A — Adaptive recovery/);
   await admin.locator("#students tr button.inline-button").first().click();
   await admin.waitForFunction(()=>
     document.querySelectorAll("#chart-legend span").length>0 &&
     document.querySelector("#selected-student").textContent.includes("STUDY_P"));
   assert.equal(await admin.locator("#mastery-chart").getAttribute("role"),"img");
+  assert.match(await admin.locator("#selected-student").textContent(),
+   /A — Adaptive recovery/);
+  await admin.locator('#mastery-chart polyline[data-series="overall-bkt-mean"]').waitFor();
+  const link=admin.locator("#export-research");
+  assert.equal(await link.isVisible(),true);
+  assert.match(await link.getAttribute("href"),/\/control\/api\/research-export\/STUDY_P001\.zip/);
+  const receipt=admin.waitForEvent("download");
+  await link.click();
+  const file=await receipt;
+  assert.equal(file.suggestedFilename(),"ijcai-study-STUDY_P001-research.zip");
+  const fileBuffer=fs.readFileSync(await file.path());
+  assert.equal(fileBuffer.subarray(0,2).toString(),"PK");
   assert((await admin.locator("#mastery-chart polyline").count())>=1,
     "researcher BKT mastery needs at least one committed quiz response");
   assert.equal(await admin.locator("#send-selected").isDisabled(),true);
@@ -210,7 +224,8 @@ async function main(){
   console.log("PASS: school and Gmail QA questionnaires were passwordless and isolated");
   console.log("PASS: researcher approved both candidates and issued their test links in one click");
   console.log("PASS: operational student completed 16 pretest + one quiz answer");
-  console.log("PASS: concurrent private researcher chart displayed recorded BKT mastery");
+  console.log("PASS: concurrent researcher chart displayed per-concept and overall BKT plus correct arm");
+  console.log("PASS: authenticated research ZIP download returned a real ZIP, no student access");
   console.log("PASS: no LIVE authorization, public recruitment, provider API calls or mail");
  }catch(e){throw Error((e.stack||String(e))+"\nQA server diagnostics: "+errors.slice(-1200));}
  finally{
